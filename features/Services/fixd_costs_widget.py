@@ -1,0 +1,671 @@
+import sqlite3
+
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QCheckBox, QLabel, QPushButton, QLineEdit,
+                               QTableWidget, QDialog, QTableWidgetItem, QMenu)
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QAction
+from modules.helper_functions import (show_question_message_box, show_error_message_box, show_warning_message_box,
+                                      show_information_message_box, to_persian_number, persian_to_english_number,
+                                      return_resource)
+from modules.Documents.helper_functions import InputDialog
+from typing import Dict, Optional
+
+documents_database = return_resource('databases', 'documents.db')
+
+
+class FixedCostsWidget(QWidget):
+    """Widget for managing fixed costs with CRUD operations and search functionality."""
+
+    COLUMN_HEADERS = ["انتخاب", "هزینه‌های ثابت", "هزینه"]
+    COLUMN_WIDTHS = [15, 55, 30]  # Percentage widths - added checkbox column
+    DEFAULT_FIXED_COSTS = [
+        "کپی برابر اصل",
+        "ثبت در سامانه (امور دفتری)",
+        "مهر دادگستری",
+        "مهر امور خارجه",
+        "نسخه اضافی"
+    ]
+
+    def __init__(self):
+        super().__init__()
+        # Store ID mapping: row_index -> database_id
+        self.row_to_id_mapping = {}
+
+        self._setup_ui()
+        self._connect_signals()
+        self.load_fixed_costs()
+
+    def _setup_ui(self):
+        """Initialize and configure UI components."""
+        # Main layout
+        self.main_layout = QVBoxLayout()
+        self.setLayout(self.main_layout)
+
+        # Search bar
+        self._setup_search_bar()
+
+        # Selection controls
+        self._setup_selection_controls()
+
+        # Table
+        self._setup_table()
+
+        # Buttons
+        self._setup_buttons()
+
+    def _setup_selection_controls(self):
+        """Set up bulk selection controls."""
+        selection_layout = QHBoxLayout()
+
+        # Select all checkbox
+        self.select_all_checkbox = QCheckBox("انتخاب همه")
+        self.select_all_checkbox.stateChanged.connect(self._toggle_select_all)
+        selection_layout.addWidget(self.select_all_checkbox)
+
+        # Selected count label
+        self.selected_count_label = QLabel("0 مورد انتخاب شده")
+        selection_layout.addWidget(self.selected_count_label)
+
+        selection_layout.addStretch()
+
+        # Bulk delete button
+        self.bulk_delete_btn = QPushButton("🗑️ حذف موارد انتخابی")
+        self.bulk_delete_btn.setEnabled(False)
+        self.bulk_delete_btn.clicked.connect(self._bulk_delete_selected)
+        selection_layout.addWidget(self.bulk_delete_btn)
+
+        self.main_layout.addLayout(selection_layout)
+
+    def _create_checkbox_widget(self):
+        """Create a checkbox widget for table cells."""
+        widget = QWidget()
+        layout = QHBoxLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        checkbox = QCheckBox()
+        checkbox.stateChanged.connect(self._on_checkbox_changed)
+        layout.addWidget(checkbox)
+
+        return widget
+
+    def _on_checkbox_changed(self):
+        """Handle individual checkbox state change."""
+        self._update_selection_ui()
+
+    def _get_selected_rows(self):
+        """Get list of selected row indices."""
+        selected_rows = []
+        for row in range(self.table.rowCount()):
+            if not self.table.isRowHidden(row):
+                checkbox_widget = self.table.cellWidget(row, 0)
+                if checkbox_widget:
+                    checkbox = checkbox_widget.findChild(QCheckBox)
+                    if checkbox and checkbox.isChecked():
+                        selected_rows.append(row)
+        return selected_rows
+
+    def _get_selected_count(self):
+        """Get count of selected rows."""
+        return len(self._get_selected_rows())
+
+    def _get_visible_count(self):
+        """Get count of visible rows."""
+        visible_count = 0
+        for row in range(self.table.rowCount()):
+            if not self.table.isRowHidden(row):
+                visible_count += 1
+        return visible_count
+
+    def _bulk_delete_selected(self):
+        """Delete all selected services."""
+        selected_rows = self._get_selected_rows()
+
+        if not selected_rows:
+            show_warning_message_box(self, "خطا", "هیچ مورد انتخاب نشده است.")
+            return
+
+        # Get service names for confirmation
+        service_names = []
+        service_ids = []
+
+        for row in selected_rows:
+            name_item = self.table.item(row, 1)  # Name is in column 1
+            if name_item:
+                service_name = name_item.text()
+                service_names.append(service_name)
+                service_id = self._get_service_id_from_row(row)
+                if service_id:
+                    service_ids.append(service_id)
+
+        if not service_ids:
+            show_warning_message_box(self, "خطا", "خطا در دریافت اطلاعات موارد انتخابی.")
+            return
+
+        # Show confirmation dialog
+        def _bulk_delete_selected_rows():
+            try:
+                with sqlite3.connect(documents_database) as conn:
+                    cursor = conn.cursor()
+                    # Delete non-default items only
+                    placeholders = ','.join(['?'] * len(service_ids))
+                    cursor.execute(f"DELETE FROM fixed_prices WHERE id IN ({placeholders}) AND is_default = 0",
+                                   service_ids)
+
+                    deleted_count = cursor.rowcount
+                    if deleted_count > 0:
+                        self.load_fixed_costs()  # Reload table
+                        title = "موفق"
+                        message = f"{deleted_count} مورد با موفقیت حذف شد!"
+                        show_information_message_box(self, title, message)
+                    else:
+                        title = "خطا"
+                        message = "هیچ موردی حذف نشد. ممکن است موارد انتخابی از نوع پیش‌فرض باشند."
+                        show_warning_message_box(self, title, message)
+
+            except sqlite3.Error as e:
+                title = "خطای پایگاه داده"
+                message = f"خطا در حذف موارد:\n{str(e)}"
+                show_error_message_box(self, title, message)
+
+            finally:
+                self.load_fixed_costs()
+
+        services_text = "\n".join(service_names)
+        title ="حذف چندگانه"
+        message = f"آیا مطمئن هستید که می‌خواهید موارد زیر را حذف کنید؟\n\n{services_text}"
+        button1 = "بله، مطمئنم"
+        button2 = "خیر"
+        show_question_message_box(self, title, message, button1, _bulk_delete_selected_rows, button2)
+
+    def _get_service_id_from_row(self, row):
+        """Get service ID from row using the mapping."""
+        return self.row_to_id_mapping.get(row)
+
+    def _toggle_select_all(self):
+        """Toggle all checkboxes based on select all checkbox state."""
+        is_checked = self.select_all_checkbox.isChecked()
+
+        for row in range(self.table.rowCount()):
+            if not self.table.isRowHidden(row):  # Only affect visible rows
+                checkbox_widget = self.table.cellWidget(row, 0)
+                if checkbox_widget:
+                    checkbox = checkbox_widget.findChild(QCheckBox)
+                    if checkbox:
+                        checkbox.blockSignals(True)  # Prevent recursive calls
+                        checkbox.setChecked(is_checked)
+                        checkbox.blockSignals(False)
+
+        self._update_selection_ui()
+
+    def _update_selection_ui(self):
+        """Update the selection UI elements (count label, buttons)."""
+        selected_count = self._get_selected_count()
+        total_visible = self._get_visible_count()
+
+        # Update count label
+        self.selected_count_label.setText(f"{selected_count} مورد انتخاب شده")
+
+        # Update bulk delete button state
+        self.bulk_delete_btn.setEnabled(selected_count > 0)
+
+        # Update select all checkbox state
+        self.select_all_checkbox.blockSignals(True)
+        if selected_count == 0:
+            self.select_all_checkbox.setCheckState(Qt.CheckState.Unchecked)
+        elif selected_count == total_visible:
+            self.select_all_checkbox.setCheckState(Qt.CheckState.Checked)
+        else:
+            self.select_all_checkbox.setCheckState(Qt.CheckState.PartiallyChecked)
+        self.select_all_checkbox.blockSignals(False)
+
+    def _setup_search_bar(self):
+        """Set up the search functionality."""
+        self.search_bar = QLineEdit()
+        self.search_bar.setPlaceholderText("جستجوی هزینه‌های ثابت...")
+        self.search_bar.textChanged.connect(self._filter_costs)
+        self.main_layout.addWidget(self.search_bar)
+
+    def _setup_table(self):
+        """Configure the fixed costs table."""
+        self.table = QTableWidget()
+        self.table.setColumnCount(len(self.COLUMN_HEADERS))
+        self.table.setHorizontalHeaderLabels(self.COLUMN_HEADERS)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.table.setSortingEnabled(True)
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.table.customContextMenuRequested.connect(self._show_context_menu)
+
+        # Make the checkbox column non-sortable
+        self.table.horizontalHeader().setSortIndicatorShown(True)
+        self.table.horizontalHeader().setSectionsClickable(True)
+
+        self.main_layout.addWidget(self.table)
+
+    def _setup_buttons(self):
+        """Create and configure action buttons."""
+        button_layout = QHBoxLayout()
+
+        self.add_btn = QPushButton("➕ اضافه کردن هزینه ثابت")
+        self.edit_btn = QPushButton("✏️ ویرایش هزینه ثابت")
+        self.delete_btn = QPushButton("🗑️ حذف هزینه ثابت")
+
+        buttons = [self.add_btn, self.edit_btn, self.delete_btn]
+        for button in buttons:
+            button_layout.addWidget(button)
+
+        self.main_layout.addLayout(button_layout)
+
+    def _connect_signals(self):
+        """Connect UI signals to their handlers."""
+        self.add_btn.clicked.connect(self._show_add_dialog)
+        self.edit_btn.clicked.connect(self._edit_selected_cost)
+        self.delete_btn.clicked.connect(self._delete_selected_cost)
+
+    def _filter_costs(self, search_text):
+        """Filter table rows based on search text."""
+        search_text = search_text.strip().lower()
+        for row in range(self.table.rowCount()):
+            cost_name_item = self.table.item(row, 1)  # Name is now in column 1
+            if cost_name_item:
+                cost_name = cost_name_item.text().lower()
+                self.table.setRowHidden(row, search_text not in cost_name)
+
+        # Update selection UI when filtering
+        self._update_selection_ui()
+
+    def _show_context_menu(self, position):
+        """Display context menu for table row operations."""
+        selected_row = self.table.indexAt(position).row()
+        if selected_row == -1:
+            return
+
+        context_menu = QMenu(self)
+
+        edit_action = QAction("ویرایش", self)
+        edit_action.triggered.connect(lambda: self._edit_cost_by_row(selected_row))
+        context_menu.addAction(edit_action)
+
+        # Only show delete option for non-default items
+        if not self._is_default_cost(selected_row):
+            remove_action = QAction("حذف", self)
+            remove_action.triggered.connect(lambda: self._delete_cost_by_row(selected_row))
+            context_menu.addAction(remove_action)
+
+        context_menu.exec(self.table.viewport().mapToGlobal(position))
+
+    def resizeEvent(self, event):
+        """Adjust column widths dynamically on window resize."""
+        super().resizeEvent(event)
+        if hasattr(self, 'table'):
+            table_width = self.table.width()
+            for i, percentage in enumerate(self.COLUMN_WIDTHS):
+                self.table.setColumnWidth(i, table_width * percentage // 100)
+
+    def load_fixed_costs(self):
+        """Load fixed costs from database and populate the table."""
+        # Disable sorting temporarily to avoid issues during population
+        self.table.setSortingEnabled(False)
+
+        self.table.setRowCount(0)
+        self.row_to_id_mapping.clear()  # Clear the mapping
+
+        try:
+            with sqlite3.connect(documents_database) as connection:
+                cursor = connection.cursor()
+                # Modified to also fetch the id
+                cursor.execute("SELECT id, name, price, is_default FROM fixed_prices ORDER BY is_default DESC, name")
+                costs = cursor.fetchall()
+
+                for row_number, (cost_id, name, price, is_default) in enumerate(costs):
+                    self.table.insertRow(row_number)
+
+                    # Store the ID mapping
+                    self.row_to_id_mapping[row_number] = cost_id
+
+                    # Add checkbox in first column
+                    checkbox_widget = self._create_checkbox_widget()
+                    self.table.setCellWidget(row_number, 0, checkbox_widget)
+
+                    # Add name and price items
+                    name_item = QTableWidgetItem(str(name))
+                    price_item = QTableWidgetItem(str(price))
+
+                    # Set data for proper sorting
+                    price_item.setData(Qt.ItemDataRole.UserRole, price)  # Store numeric value for sorting
+
+                    # Make default items visually distinct
+                    if is_default:
+                        name_item.setBackground(Qt.GlobalColor.lightGray)
+                        price_item.setBackground(Qt.GlobalColor.lightGray)
+
+                    self.table.setItem(row_number, 1, name_item)
+                    self.table.setItem(row_number, 2, price_item)
+
+        except sqlite3.Error as e:
+            title = "خطا"
+            message = ("خطا در بارکذاری هزینه‌های ثابت:\n"
+                       f"{str(e)}")
+            show_error_message_box(self, title, message)
+
+        finally:
+            # Re-enable sorting
+            self.table.setSortingEnabled(True)
+            # Update selection UI
+            self._update_selection_ui()
+
+    def _get_cost_id_by_row(self, row):
+        """Get the database ID for a given table row."""
+        return self.row_to_id_mapping.get(row)
+
+    def _show_add_dialog(self) -> Optional[Dict[str, str]]:
+        dialog = InputDialog("FixedCostsWidget", self)
+        dialog.setWindowTitle("افزودن هزینه ثابت جدید")
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            # Get the values and map them to our expected format
+            values = dialog.get_values()
+            data = {
+                'fixed_cost': values.get('service_name', ''),
+                'cost': values.get('cost', '')
+            }
+            if self.add_fixed_cost(data):
+                self.load_fixed_costs()  # Reload to update the table and ID mapping
+        return None
+
+    def _show_edit_dialog(self, current_data: Dict[str, str]) -> Optional[Dict[str, str]]:
+        """Show edit dialog with current data pre-filled."""
+        dialog = InputDialog("FixedCostsWidget", self)
+        dialog.setWindowTitle("ویرایش هزینه ثابت")
+
+        # Pre-fill the dialog with current data
+        # Map the current_data keys to the InputDialog field keys
+        dialog_data = {
+            'service_name': current_data.get('fixed_cost', ''),
+            'cost': current_data.get('cost', '')
+        }
+
+        # Set the values in the dialog
+        for key, value in dialog_data.items():
+            if key in dialog.inputs:
+                dialog.inputs[key].setText(str(value))
+
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            # Get the values and map them back to our expected format
+            values = dialog.get_values()
+            return {
+                'fixed_cost': values.get('service_name', ''),
+                'cost': values.get('cost', '')
+            }
+        return None
+
+    def _edit_selected_cost(self):
+        """Edit the currently selected fixed cost."""
+        selected_row = self.table.currentRow()
+        if selected_row != -1:
+            self._edit_cost_by_row(selected_row)
+
+    def _edit_cost_by_row(self, row):
+        """Edit a fixed cost by table row index."""
+        if row == -1:
+            title = "خطا"
+            message = "لطفا هزینه ثابتی که می‌خواهید ویرایش کنید را انتخاب کنید"
+            show_warning_message_box(self, title, message)
+            return
+
+        cost_id = self._get_cost_id_by_row(row)
+        if cost_id is None:
+            title = "خطا"
+            message = "شناسه هزینه ثابت پیدا نشد"
+            show_error_message_box(self, title, message)
+            return
+
+        # Get current data (adjusted for new column layout)
+        name_item = self.table.item(row, 1)  # Name is now in column 1
+        price_item = self.table.item(row, 2)  # Price is now in column 2
+
+        if not name_item or not price_item:
+            title = "خطا"
+            message = "اطلاعات ردیف انتخاب شده نامعتبر است"
+            show_warning_message_box(self, title, message)
+            return
+
+        current_data = {
+            'fixed_cost': name_item.text(),
+            'cost': price_item.text()
+        }
+
+        # Show edit dialog
+        new_data = self._show_edit_dialog(current_data)
+        if new_data:
+            if self.edit_fixed_cost(cost_id, new_data):
+                self.load_fixed_costs()  # Reload to update the table
+
+    def add_fixed_cost(self, service_data: Dict[str, str]) -> bool:
+        """
+        Add a new service to the fixed_costs table.
+
+        Args:
+            service_data (Dict[str, str]): Dictionary with 'fixed_cost' and 'cost' keys
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            with sqlite3.connect(documents_database) as conn:
+                cursor = conn.cursor()
+
+                # Extract data from dictionary
+                name = service_data.get('fixed_cost', '').strip()
+                cost = service_data.get('cost', '0')
+
+                # Validate input
+                if not name:
+                    title = "خطا"
+                    message = "نام هزینه ثابت نمی‌تواند خالی باشد"
+                    show_warning_message_box(self, title, message)
+                    return False
+
+                # Convert cost to integer
+                try:
+                    price = int(cost)
+                except ValueError:
+                    title = "خطا"
+                    message = (f"قیمت وارد شده {cost} نامعتبر است.\n"
+                               f"\nلطفا هزینه را به صورت رقمی و بدون کاما وارد کنید."
+                               f"هنگام وارد کردن هزینه مطمئن شوید از کیبورد انگلیسی یا فارسی FA استفاده می‌کنید (نه FAS).")
+                    show_warning_message_box(self, title, message)
+                    return False
+
+                # Insert into database
+                cursor.execute("""
+                        INSERT INTO fixed_prices (name, price) 
+                        VALUES (?, ?)
+                    """, (name, price))
+
+                formatted_price = f"{price:,}"
+                persian_price = f"{to_persian_number(formatted_price)}"
+                title = "موفق"
+                message = (f"اطلاعات زیر با موفقیت به پایگاه داده اضافه شد:\n"
+                           f"نام خدمت: {name}\n"
+                           f"هزینه خدمت: {persian_price} تومان")
+                show_information_message_box(self, title, message)
+                return True
+
+        except sqlite3.IntegrityError as e:
+            if "UNIQUE constraint failed" in str(e):
+                title = "خطا"
+                message = f"خدمتی با نام '{name}' قبلا در پایگاه داده ثبت شده است."
+                show_warning_message_box(self, title, message)
+            else:
+                title = "خطا"
+                message = f"{e}"
+                show_error_message_box(self, title, message)
+            return False
+        except sqlite3.Error as e:
+            title = "خطا"
+            message = (f"خطا در افزودن خدمت به پایگاه داده:\n"
+                       f"{e}")
+            show_error_message_box(self, title, message)
+            return False
+
+    def edit_fixed_cost(self, cost_id: int, service_data: Dict[str, str]) -> bool:
+        """
+        Edit an existing fixed cost in the fixed_prices table.
+
+        Args:
+            cost_id (int): ID of the fixed cost to update
+            service_data (Dict[str, str]): Dictionary with 'fixed_cost' and 'cost' keys
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            with sqlite3.connect(documents_database) as conn:
+                cursor = conn.cursor()
+
+                # Extract data from dictionary
+                name = service_data.get('fixed_cost', '').strip()
+                cost = service_data.get('cost', '0')
+
+                # Validate input
+                if not name:
+                    title = "خطا"
+                    message = "نام هزینه ثابت نمی‌تواند خالی باشد"
+                    show_warning_message_box(self, title, message)
+                    return False
+
+                # Convert cost to integer
+                try:
+                    price = int(cost)
+                except ValueError:
+                    title = "خطا"
+                    message = (f"قیمت وارد شده {cost} نامعتبر است.\n"
+                               f"لطفا هزینه را به صورت رقمی و بدون کاما وارد کنید."
+                               f"\nهنگام وارد کردن هزینه مطمئن شوید از کیبورد انگلیسی یا فارسی FA استفاده می‌کنید (نه FAS).")
+                    show_warning_message_box(self, title, message)
+                    return False
+
+                # Check if fixed cost exists
+                cursor.execute("SELECT id FROM fixed_prices WHERE id = ?", (cost_id,))
+                if not cursor.fetchone():
+                    title = "خطا"
+                    message = (f"این هزینه ثابت در پایگاه داده پیدا نشد.\n"
+                               f"شناسه در پایگاه داده: {cost_id}")
+                    show_error_message_box(self, title, message)
+                    return False
+
+                # Update the fixed cost
+                cursor.execute("""
+                                UPDATE fixed_prices 
+                                SET name = ?, price = ? 
+                                WHERE id = ?
+                            """, (name, price, cost_id))
+
+                if cursor.rowcount > 0:
+                    formatted_price = f"{price:,}"
+                    persian_price = f"{to_persian_number(formatted_price)}"
+                    title = "موفق"
+                    message = (f"هزینه ثابت شما با شناسه {cost_id} در پایگاه داده بروزرسانی شد.\n"
+                               f"نام جدید: {name}، هزینه جدید: {persian_price}")
+                    show_information_message_box(self, title, message)
+                    return True
+                else:
+                    return False
+
+        except sqlite3.IntegrityError as e:
+            if "UNIQUE constraint failed" in str(e):
+                title = "خطا"
+                message = f"هزینه ثابتی با نام '{name}' قبلا در پایگاه داده ثبت شده است."
+                show_warning_message_box(self, title, message)
+            else:
+                title = "خطا"
+                message = f"{e}"
+                show_error_message_box(self, title, message)
+            return False
+        except sqlite3.Error as e:
+            title = "خطا"
+            message = (f"خطا در ویرایش هزینه ثابت:\n"
+                       f"{e}")
+            show_error_message_box(self, title, message)
+            return False
+
+    def _delete_selected_cost(self):
+        """Delete the currently selected fixed cost."""
+        selected_row = self.table.currentRow()
+        if selected_row != -1:
+            self._delete_cost_by_row(selected_row)
+            self.load_fixed_costs()
+
+    def _delete_cost_by_row(self, row):
+        """Delete a fixed cost by table row index."""
+        if row == -1:
+            title = "خطا"
+            message = "لطفا هزینه ثابتی که می‌خواهید حذف کنید را انتخاب کنید"
+            show_warning_message_box(self, title, message)
+            return
+
+        # Check if it's a default cost
+        if self._is_default_cost(row):
+            title = "خطا"
+            message = "نمی‌توانید هزینه‌های ثابت پیش‌فرض را حذف کنید!"
+            show_warning_message_box(self, title, message)
+            return
+
+        cost_id = self._get_cost_id_by_row(row)
+        if cost_id is None:
+            title = "خطا"
+            message = "شناسه هزینه ثابت پیدا نشد"
+            show_error_message_box(self, title, message)
+            return
+
+        name_item = self.table.item(row, 1)  # Name is now in column 1
+        if not name_item:
+            title = "خطا"
+            message = "ردیف انتخاب شده نامعتبر است"
+            show_warning_message_box(self, title, message)
+            return
+
+        cost_name = name_item.text()
+
+        # Confirm deletion
+        def delete_fixed_price():
+            try:
+                with sqlite3.connect(documents_database) as conn:
+                    cursor = conn.cursor()
+                    # Use ID instead of name for deletion
+                    cursor.execute("DELETE FROM fixed_prices WHERE id = ? AND is_default = 0", (cost_id,))
+
+                    if cursor.rowcount > 0:
+                        self.load_fixed_costs()  # Reload to update the table and ID mapping
+                        title = "موفق"
+                        message = f"هزینه ثابت '{cost_name}' با موفقیت حذف شد!"
+                        show_information_message_box(self, title, message)
+                    else:
+                        title = "خطا"
+                        message = "هزینه ثابت حذف نشد. ممکن است هزینه پیش‌فرض باشد."
+                        show_warning_message_box(self, title, message)
+
+            except sqlite3.Error as e:
+                title = "خطای پایگاه داده"
+                message = ("خطا در حذف هزینه ثابت:\n"
+                           f" {str(e)}")
+                show_error_message_box(self, title, message)
+
+            finally:
+                self.load_fixed_costs()
+
+        title = "حذف"
+        message = f"آیا مطمئن هستید که می‌خواهید '{cost_name}' را حذف کنید؟"
+        button1 = "بله، مطمئنم"
+        button2 = "خیر"
+        show_question_message_box(self, title, message, button1, delete_fixed_price, button2)
+
+    def _is_default_cost(self, row):
+        """Check if the cost at given row is a default cost."""
+        name_item = self.table.item(row, 1)  # Name is now in column 1
+        if not name_item:
+            return False
+
+        cost_name = name_item.text()
+        return cost_name in self.DEFAULT_FIXED_COSTS
