@@ -16,7 +16,7 @@ from shared.utils.number_utils import (
 from shared.utils.path_utils import (
     return_resource,
     get_remembered_user_info,
-    open_pdf
+    open_file
 )
 from shared.utils.theme_utils import is_dark_theme
 from shared.utils.ui_utils import (
@@ -62,7 +62,7 @@ __all__ = [
     "persian_to_english_number", "to_english_number", "to_persian_number",
     "format_number_with_separators", "clean_number_string",
     # path_utils
-    "return_resource", "get_remembered_user_info", "open_pdf",
+    "return_resource", "get_remembered_user_info", "open_file",
     # theme_utils
     "is_dark_theme",
     # ui_utils

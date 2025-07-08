@@ -1,8 +1,8 @@
 import sys
-from modules.RBAC import LoginWidget
+from features.Login import LoginWidget
 from PySide6.QtWidgets import QApplication
 # from modules.application_manager import CheckpointTimer, ApplicationManager
-from modules.MainWindow import MainWindow
+from features.MainWindow import MainWindow
 
 # def main():
 #     """Main entry point with timing"""

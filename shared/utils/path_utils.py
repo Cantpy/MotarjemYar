@@ -26,8 +26,8 @@ def return_resource(folder1, resource, folder2=None):
         # Running from source
         base_path = os.path.dirname(os.path.abspath(__file__))
 
-    # Go one level up to get to the project root
-    project_root = os.path.abspath(os.path.join(base_path, ".."))
+    # Go two levels up to get to a deeper root
+    project_root = os.path.abspath(os.path.join(base_path, "..", ".."))
 
     # Build the path components conditionally
     if folder2:
@@ -55,7 +55,7 @@ def get_remembered_user_info():
     return {}
 
 
-def open_pdf(path):
+def open_file(path):
     if sys.platform.startswith('darwin'):  # macOS
         subprocess.call(('open', path))
     elif os.name == 'nt':  # Windows
