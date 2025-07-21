@@ -54,8 +54,6 @@ class HomePageLogic:
         # Get document statistics
         doc_stats = self.repository.get_document_statistics()
         dashboard_stats = self.repository.get_dashboard_stats(today_jalali)
-        print("most repeated doc: ", dashboard_stats.most_repeated_document)
-        print("most repeated doc in month: ", dashboard_stats.most_repeated_document_month)
 
         return DashboardStats(
             total_customers=total_customers,
@@ -118,12 +116,12 @@ class HomePageLogic:
             List of tuples containing (invoice, priority_label)
         """
         today = date.today()
-        threshold_date = today - timedelta(days=days_threshold)
+        threshold_date = today + timedelta(days=days_threshold)
 
         # Get invoices from repository with delivery dates within the threshold
         invoices = self.repository.get_invoices_by_delivery_date_range(
-            start_date=threshold_date,
-            end_date=today,
+            start_date=today,
+            end_date=threshold_date,
             exclude_completed=True
         )
         invoice_priority_list = []

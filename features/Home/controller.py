@@ -73,7 +73,6 @@ class HomePageController(QObject):
         try:
             stats = self.logic.get_dashboard_statistics()
             self.dashboard_updated.emit(stats)
-            print("controller stats: ", stats)
             return stats
         except Exception as e:
             self.error_occurred.emit("خطای داشبورد", f"خطا در بروزرسانی داشبورد: {str(e)}")
@@ -87,7 +86,7 @@ class HomePageController(QObject):
             List of tuples containing (invoice, priority_label)
         """
         try:
-            recent_invoices = self.logic.get_recent_invoices_with_priority(days_threshold=7)
+            recent_invoices = self.logic.get_recent_invoices_with_priority(days_threshold=15)
             self.recent_invoices.emit(recent_invoices)
         except Exception as e:
             self.error_occurred.emit("خطای بارگذاری", f"خطا در بارگذاری فاکتورها: {str(e)}")

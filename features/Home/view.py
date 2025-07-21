@@ -2,11 +2,10 @@
 import sys
 from typing import List, Dict, Tuple
 from PySide6.QtCore import Qt, QVariantAnimation, QEasingCurve, Signal, QTimer
-from PySide6.QtGui import QColor, QBrush, QFont, QPainter, QPixmap
+from PySide6.QtGui import QColor, QBrush, QFont, QPainter, QPixmap, QAction
 from PySide6.QtWidgets import (
-    QWidget, QMessageBox, QTableWidgetItem, QPushButton, QHeaderView,
-    QVBoxLayout, QHBoxLayout, QLabel, QTableWidget, QFrame, QGridLayout,
-    QScrollArea, QSizePolicy
+    QWidget, QMessageBox, QTableWidgetItem, QPushButton, QHeaderView, QMenu,
+    QVBoxLayout, QHBoxLayout, QLabel, QTableWidget, QFrame, QGridLayout
 )
 
 from features.Home.controller import HomePageController, HomePageControllerFactory
@@ -179,7 +178,7 @@ class HomePageView(QWidget):
         return section_widget
 
     def setup_invoices_table(self):
-        """Setup the recent invoices table."""
+        """Set up the recent invoices table."""
         self.invoices_table.setObjectName("invoicesTable")
         self.invoices_table.setAlternatingRowColors(True)
         self.invoices_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -187,7 +186,7 @@ class HomePageView(QWidget):
         self.invoices_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
         # Column headers (Persian)
-        headers = ["عملیات", "وضعیت", "مبلغ", "تاریخ", "شماره فاکتور", "مشتری"]
+        headers = ["عملیات‌ها", "وضعیت", "مانده (تومان)", "تاریخ تحویل", "مشتری", "شماره فاکتور"]
         self.invoices_table.setColumnCount(len(headers))
         self.invoices_table.setHorizontalHeaderLabels(headers)
 
@@ -261,6 +260,32 @@ class HomePageView(QWidget):
         except Exception as e:
             self.show_error_message(f"خطا در بارگذاری فاکتورها: {str(e)}")
 
+    def _create_operations_menu(self, row: int):
+        """
+        Create operation menu for on the last row of the table.
+
+        Args:
+            row: The row that needs to be selected for operations.
+        """
+        button = QPushButton("...")
+        menu = QMenu()
+
+        view_invoice = QAction("مشاهده فاکتور")
+        view_invoice.triggered.connect(lambda: self.controller.view_invoice(row))
+
+        mark_delivered = QAction("آماده تحویل")
+        mark_delivered.triggered.connect(lambda: self.controller.mark_invoice_delivered(row))
+
+        mark_collected = QAction("تحویل به مشتری")
+        mark_collected.triggered.connect(lambda: self.controller.mark_invoice_collected(row))
+
+        menu.addAction(view_invoice)
+        menu.addAction(mark_delivered)
+        menu.addAction(mark_collected)
+
+        button.setMenu(menu)
+        return button
+
     def populate_invoices_table(self, invoices_with_priority: List[Tuple]):
         """
         Populate the invoices table with data and apply color coding.
@@ -298,9 +323,7 @@ class HomePageView(QWidget):
             self.invoices_table.setItem(row, 1, status_item)
 
             # Actions button
-            action_btn = QPushButton("مشاهده")
-            action_btn.setObjectName("actionButton")
-            action_btn.clicked.connect(lambda checked, inv_id=invoice.id: self.on_invoice_view_clicked(inv_id))
+            action_btn = self._create_operations_menu(row)
             self.invoices_table.setCellWidget(row, 0, action_btn)
 
             # Apply row color based on priority
