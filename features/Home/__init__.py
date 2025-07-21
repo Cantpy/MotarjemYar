@@ -1,10 +1,14 @@
-from features.Home.ui.home_ui import HomePageUI
-from features.Home.backend.home_backend import HomePageBackend, AnimationManager
-from features.Home.controller.home_controller import HomePageController
-from features.Home.models.home_models import DatabaseManager, InvoiceItem, IssuedInvoice, Customer
+from features.Home.controller import HomePageController, HomePageControllerFactory
+from features.Home.logic import HomePageLogic
+from features.Home.models import (Customer, Service, InvoiceItem, Invoice, DashboardStats, TimeInfo,
+                                  InvoiceTableRow, DocumentStatistics)
+from features.Home.repo import (CustomerModel, ServiceModel, FixedPriceModel, OtherServiceModel,
+                                InvoiceItemModel, InvoiceModel, HomePageRepository)
+from features.Home.view import HomePageView
 
 
 __all__ = [
-    "HomePageUI", "HomePageBackend", "AnimationManager", "HomePageController", "DatabaseManager", "IssuedInvoice",
-    "InvoiceItem", "Customer"
+    "HomePageController", "HomePageControllerFactory", "HomePageLogic", "Customer", "Service", "InvoiceItem", "Invoice",
+    "DashboardStats", "TimeInfo", "InvoiceTableRow", "DocumentStatistics", "CustomerModel", "ServiceModel",
+    "FixedPriceModel", "OtherServiceModel", "InvoiceItemModel", "InvoiceModel", "HomePageRepository", "HomePageView"
 ]

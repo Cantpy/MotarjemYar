@@ -39,7 +39,7 @@ from shared.utils.validation_utils import (
     validate_text_length
 )
 from shared.widgets.clickablelabel import ClickableLabel
-from shared.widgets.color_delegate import ColorDelegate
+from shared.widgets.color_delegate import PriorityColorDelegate
 from shared.theming.palettes import (
     set_spring_palette,
     set_summer_palette,
