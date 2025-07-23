@@ -28,6 +28,7 @@ class HomePageController(QObject):
     error_occurred = Signal(str, str)  # title, message
     success_occurred = Signal(str, str)  # title, message
     recent_invoices = Signal(list)
+    context_menu_data = Signal(list)
 
     def __init__(self, logic: HomePageLogic, parent=None):
         """Initialize controller with business logic dependency."""
@@ -86,11 +87,20 @@ class HomePageController(QObject):
             List of tuples containing (invoice, priority_label)
         """
         try:
-            recent_invoices = self.logic.get_recent_invoices_with_priority(days_threshold=15)
+            recent_invoices = self.logic.get_recent_invoices_with_priority(days_threshold=10)
             self.recent_invoices.emit(recent_invoices)
         except Exception as e:
             self.error_occurred.emit("خطای بارگذاری", f"خطا در بارگذاری فاکتورها: {str(e)}")
         return self.logic.get_recent_invoices_with_priority()
+
+    def invoice_data_for_context_menu(self, invoice_number: int):
+
+        try:
+            invoice = self.logic.get_invoice_for_context_menu(invoice_number)
+            self.context_menu_data.emit(invoice)
+        except Exception as e:
+            self.error_occurred.emit("خطای دریافت اطلاعات", f"خطا در دریافت اطلاعات فاکتور: {str(e)}")
+        return self.logic.get_invoice_for_context_menu(invoice_number)
 
     def update_invoice_table(self):
         """Update invoice table data."""
@@ -100,7 +110,7 @@ class HomePageController(QObject):
         except Exception as e:
             self.error_occurred.emit("خطای جدول", f"خطا در بارگذاری فاکتورها: {str(e)}")
 
-    def handle_ready_delivery_request(self, invoice_number: str, parent_widget):
+    def handle_ready_delivery_request(self, invoice_number: int, parent_widget):
         """Handle ready for delivery notification request."""
         try:
             # Get invoice data
@@ -124,7 +134,7 @@ class HomePageController(QObject):
         except Exception as e:
             self.error_occurred.emit("خطای اطلاع‌رسانی", f"خطا در پردازش درخواست: {str(e)}")
 
-    def handle_delivery_confirmation_request(self, invoice_number: str, parent_widget):
+    def handle_delivery_confirmation_request(self, invoice_number: int, parent_widget):
         """Handle delivery confirmation request."""
         try:
             # Validate that invoice can be marked as delivered
