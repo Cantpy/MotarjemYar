@@ -28,7 +28,8 @@ from shared.utils.ui_utils import (
     show_field_error,
     clear_field_error,
     render_colored_svg,
-    set_svg_icon
+    set_svg_icon,
+    show_toast
 )
 from shared.utils.validation_utils import (
     validate_email,
@@ -39,7 +40,7 @@ from shared.utils.validation_utils import (
     validate_text_length
 )
 from shared.widgets.clickablelabel import ClickableLabel
-from shared.widgets.color_delegate import PriorityColorDelegate
+from shared.widgets.color_delegate import PriorityColorDelegate, PriorityColorDelegateNoRole
 from shared.theming.palettes import (
     set_spring_palette,
     set_summer_palette,
@@ -68,12 +69,12 @@ __all__ = [
     # ui_utils
     "show_error_message_box", "show_question_message_box", "show_warning_message_box",
     "show_information_message_box", "show_field_error_form", "show_field_error", "clear_field_error",
-    "render_colored_svg", "set_svg_icon",
+    "render_colored_svg", "set_svg_icon", "show_toast",
     # validation_utils
     "validate_email", "validate_phone_number", "validate_national_id",
     "validate_required_field", "validate_numeric_field", "validate_text_length",
     # widgets
-    "ClickableLabel", "ColorDelegate",
+    "ClickableLabel", "PriorityColorDelegate", "PriorityColorDelegateNoRole",
     # palettes
     "set_spring_palette", "set_summer_palette", "set_autumn_palette",
     "set_winter_palette", "set_dark_palette",

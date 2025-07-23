@@ -103,7 +103,7 @@ class InvoiceModel(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     invoice_number = Column(Integer, nullable=False, unique=True)
     name = Column(Text, nullable=False)
-    national_id = Column(Integer, nullable=False)  # Changed from Text to Integer
+    national_id = Column(Integer, nullable=False)
     phone = Column(Text, nullable=False)
     issue_date = Column(Date, nullable=False)
     delivery_date = Column(Date, nullable=False)
@@ -201,10 +201,9 @@ class HomePageRepository:
             )
 
             if exclude_completed:
-                query = query.filter(InvoiceModel.delivery_status != 4)
+                query = query.filter(InvoiceModel.delivery_status != 4)  # 4 means delivered to the customer
 
             result = query.order_by(asc(InvoiceModel.delivery_date)).all()
-
             return result
 
     def get_document_statistics(self) -> DocumentStatistics:
@@ -306,7 +305,7 @@ class HomePageRepository:
                 return True
             return False
 
-    def get_invoice_by_number(self, invoice_number: str) -> Optional[Invoice]:
+    def get_invoice_by_number(self, invoice_number: int) -> Optional[Invoice]:
         """Get a specific invoice by number."""
         with self.invoice_session_maker() as session:
             invoice_model = session.query(InvoiceModel).filter(

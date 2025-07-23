@@ -1,16 +1,17 @@
 """ View layer for home page. Handles UI display and user interactions using PySide6. """
 import sys
 from typing import List, Dict, Tuple
-from PySide6.QtCore import Qt, QVariantAnimation, QEasingCurve, Signal, QTimer
+from PySide6.QtCore import Qt, QVariantAnimation, QEasingCurve, Signal, QTimer, QSize, QPoint
 from PySide6.QtGui import QColor, QBrush, QFont, QPainter, QPixmap, QAction
 from PySide6.QtWidgets import (
     QWidget, QMessageBox, QTableWidgetItem, QPushButton, QHeaderView, QMenu,
-    QVBoxLayout, QHBoxLayout, QLabel, QTableWidget, QFrame, QGridLayout
+    QVBoxLayout, QHBoxLayout, QLabel, QTableWidget, QFrame, QGridLayout, QAbstractItemView
 )
 
 from features.Home.controller import HomePageController, HomePageControllerFactory
 from features.Home.models import DashboardStats, InvoiceTableRow
-from shared import return_resource, to_persian_number, PriorityColorDelegate
+from shared import (return_resource, to_persian_number, to_english_number,
+                    show_error_message_box, show_information_message_box, show_toast)
 from datetime import date
 
 
@@ -43,6 +44,7 @@ class HomePageView(QWidget):
         self.setObjectName("HomePageView")
         self.setStyleSheet(self.get_stylesheet())
 
+        self.setGeometry(100, 100, 1200, 800)
         # Main layout
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(20, 20, 20, 20)
@@ -172,6 +174,7 @@ class HomePageView(QWidget):
 
         # Invoices table
         self.invoices_table = QTableWidget()
+        self.invoices_table.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         self.setup_invoices_table()
         section_layout.addWidget(self.invoices_table)
 
@@ -184,9 +187,12 @@ class HomePageView(QWidget):
         self.invoices_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.invoices_table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.invoices_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.invoices_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.invoices_table.customContextMenuRequested.connect(self.contextMenuEvent)
+        self.invoices_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
 
         # Column headers (Persian)
-        headers = ["عملیات‌ها", "وضعیت", "مانده (تومان)", "تاریخ تحویل", "مشتری", "شماره فاکتور"]
+        headers = ["شماره فاکتور", "مشتری", "تاریخ تحویل", "مترجم", "مانده (تومان)", "وضعیت", "عملیات‌ها"]
         self.invoices_table.setColumnCount(len(headers))
         self.invoices_table.setHorizontalHeaderLabels(headers)
 
@@ -196,7 +202,7 @@ class HomePageView(QWidget):
         header.setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
 
         # Set table properties
-        self.invoices_table.setMaximumHeight(300)
+        self.invoices_table.setMaximumHeight(400)
         self.invoices_table.setSortingEnabled(True)
 
     def setup_connections(self):
@@ -260,31 +266,88 @@ class HomePageView(QWidget):
         except Exception as e:
             self.show_error_message(f"خطا در بارگذاری فاکتورها: {str(e)}")
 
-    def _create_operations_menu(self, row: int):
+    @staticmethod
+    def create_operations_menu(file_path: str, invoice_number: int, controller, parent=None) -> QMenu:
         """
-        Create operation menu for on the last row of the table.
+        Create and return a QMenu with actions related to an invoice.
 
         Args:
-            row: The row that needs to be selected for operations.
+            file_path (str): Path to the invoice PDF.
+            invoice_number (int): Invoice identifier.
+            controller: Controller instance to handle actions.
+            parent: Optional QWidget parent.
+
+        Returns:
+            QMenu: The menu with bound actions.
         """
-        button = QPushButton("...")
-        menu = QMenu()
+        menu = QMenu(parent)
 
-        view_invoice = QAction("مشاهده فاکتور")
-        view_invoice.triggered.connect(lambda: self.controller.view_invoice(row))
+        view_invoice = QAction("مشاهده فاکتور", menu)
+        view_invoice.triggered.connect(lambda: controller.handle_view_pdf_request(file_path))
 
-        mark_delivered = QAction("آماده تحویل")
-        mark_delivered.triggered.connect(lambda: self.controller.mark_invoice_delivered(row))
+        mark_delivered = QAction("آماده تحویل", menu)
+        mark_delivered.triggered.connect(lambda: controller.handle_ready_delivery_request(invoice_number, parent))
 
-        mark_collected = QAction("تحویل به مشتری")
-        mark_collected.triggered.connect(lambda: self.controller.mark_invoice_collected(row))
+        mark_collected = QAction("تحویل به مشتری", menu)
+        mark_collected.triggered.connect(
+            lambda: controller.handle_delivery_confirmation_request(invoice_number, parent))
 
-        menu.addAction(view_invoice)
-        menu.addAction(mark_delivered)
-        menu.addAction(mark_collected)
+        menu.addActions([view_invoice, mark_delivered, mark_collected])
+        return menu
 
-        button.setMenu(menu)
+    def create_operations_button(self, file_path: str, invoice_number: int, controller) -> QPushButton:
+        """
+        Create a button with a vertical ellipsis icon to show the operations menu.
+
+        Args:
+            file_path (str): Path to the invoice PDF.
+            invoice_number (int): Invoice identifier.
+            controller: Controller instance to handle actions.
+            parent: Optional QWidget parent.
+
+        Returns:
+            QPushButton: The button that shows the menu on click.
+        """
+        button = QPushButton("⋮", self)
+        button.setCursor(Qt.PointingHandCursor)
+        button.setFlat(True)
+        button.setFont(QFont("Tahoma", 15))
+
+        menu = self.create_operations_menu(file_path, invoice_number, controller, self)
+
+        def show_menu():
+            menu.popup(button.mapToGlobal(button.rect().bottomLeft()))
+
+        button.clicked.connect(show_menu)
         return button
+
+    def contextMenuEvent(self, pos: QPoint):
+        index = self.invoices_table.indexAt(pos)
+        if not index.isValid():
+            return
+
+        row = index.row()
+        item = self.invoices_table.item(row, 0)
+        if item is None:
+            return
+
+        try:
+            invoice_number = int(to_english_number(item.text()))
+        except ValueError:
+            return
+
+        invoice = self.controller.invoice_data_for_context_menu(invoice_number)
+        if invoice is None:
+            return
+
+        file_path = invoice.pdf_file_path
+
+        # Optional: visually select the row
+        self.invoices_table.selectRow(row)
+
+        # Create and show the menu
+        menu = self.create_operations_menu(file_path, invoice_number, self.controller, self)
+        menu.exec(self.invoices_table.viewport().mapToGlobal(pos))
 
     def populate_invoices_table(self, invoices_with_priority: List[Tuple]):
         """
@@ -296,59 +359,61 @@ class HomePageView(QWidget):
         self.invoices_table.setRowCount(len(invoices_with_priority))
 
         for row, (invoice, priority) in enumerate(invoices_with_priority):
+            # Invoice number - 1st row
+            invoice_num_item = QTableWidgetItem(to_persian_number(str(invoice.invoice_number)))
+            invoice_num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.invoices_table.setItem(row, 0, invoice_num_item)
+
             # Customer name
             customer_item = QTableWidgetItem(invoice.name)
             customer_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.invoices_table.setItem(row, 5, customer_item)
+            self.invoices_table.setItem(row, 1, customer_item)
 
-            # Invoice number
-            invoice_num_item = QTableWidgetItem(to_persian_number(str(invoice.invoice_number)))
-            invoice_num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.invoices_table.setItem(row, 4, invoice_num_item)
-
-            # Date (using delivery_date for urgency calculation)
+            # Due date
             date_item = QTableWidgetItem(invoice.delivery_date.strftime("%Y/%m/%d"))
             date_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.invoices_table.setItem(row, 3, date_item)
+            self.invoices_table.setItem(row, 2, date_item)
+
+            # Translator
+            translator_item = QTableWidgetItem(invoice.translator)
+            translator_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.invoices_table.setItem(row, 3, translator_item)
 
             # Amount
             amount_item = QTableWidgetItem(f"{to_persian_number(str(invoice.final_amount))} تومان")
             amount_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.invoices_table.setItem(row, 2, amount_item)
+            self.invoices_table.setItem(row, 4, amount_item)
 
             # Status
             status_text = self._get_status_text(invoice.delivery_status)
             status_item = QTableWidgetItem(status_text)
             status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.invoices_table.setItem(row, 1, status_item)
+            self.invoices_table.setItem(row, 5, status_item)
 
             # Actions button
-            action_btn = self._create_operations_menu(row)
-            self.invoices_table.setCellWidget(row, 0, action_btn)
+            action_btn = self.create_operations_button(invoice.pdf_file_path, invoice.invoice_number, self.controller)
+            self.invoices_table.setCellWidget(row, 6, action_btn)
 
-            # Apply row color based on priority
-            self._apply_row_color(row, priority)
+        # Apply row color based on priority
+        self._apply_color_on_rows(invoices_with_priority)
 
-    def _apply_row_color(self, row: int, priority: str):
-        """
-        Apply background color to a row based on priority.
+    def _apply_color_on_rows(self, invoice_rows_with_priority: List[Tuple]):
+        for row_index, (invoice, priority) in enumerate(invoice_rows_with_priority):
+            if priority == 'urgent':
+                color = QColor(255, 200, 200)  # Light red
+            elif priority == 'needs_attention':
+                color = QColor(255, 220, 150)  # Orange-yellow
+            else:
+                continue
 
-        Args:
-            row: Row index
-            priority: Priority level ('urgent', 'needs_attention', 'normal')
-        """
-        if priority == 'urgent':
-            color = QColor(255, 200, 200)  # Light red
-        elif priority == 'needs_attention':
-            color = QColor(255, 220, 150)  # Orange-yellow
-        else:
-            return  # No color for normal priority
-
-        # Apply color to all columns in the row
-        for col in range(self.invoices_table.columnCount()):
-            item = self.invoices_table.item(row, col)
-            if item:
-                item.setBackground(color)
+            for col_idx in range(self.invoices_table.columnCount() - 1):  # Skip column with button
+                item = self.invoices_table.item(row_index, col_idx)
+                if item is not None:
+                    # Use QBrush for more reliable color application
+                    brush = QBrush(color)
+                    item.setBackground(brush)
+                    # Also set a role-based approach as backup
+                    item.setData(Qt.ItemDataRole.BackgroundRole, brush)
 
     @staticmethod
     def _get_status_text(delivery_status: int) -> str:
@@ -375,11 +440,18 @@ class HomePageView(QWidget):
         self.refresh_requested.emit()
         self.load_initial_data()
 
-    def on_invoice_double_clicked(self, row: int, column: int):
+    def on_invoice_double_clicked(self, row: int):
         """Handle invoice table double click."""
-        invoice_id = self.get_invoice_id_from_row(row)
-        if invoice_id:
-            self.invoice_selected.emit(invoice_id)
+        invoice_number = self.get_invoice_id_from_row(row)
+        if invoice_number:
+            # Copy to clipboard
+            QApplication.clipboard().setText(str(invoice_number))
+
+            # Emit signal
+            self.invoice_selected.emit(invoice_number)
+
+            # Show confirmation
+            show_toast(self, "✅ شماره فاکتور کپی شد")
 
     def on_invoice_view_clicked(self, invoice_id: int):
         """Handle invoice view button click."""
@@ -388,31 +460,11 @@ class HomePageView(QWidget):
     def get_invoice_id_from_row(self, row: int) -> int:
         """Get invoice ID from table row."""
         try:
-            invoice_number = self.invoices_table.item(row, 4).text()
+            invoice_number = self.invoices_table.item(row, 0).text()
             # Convert from Persian number and return as int
-            return int(invoice_number.replace('۰', '0').replace('۱', '1').replace('۲', '2')
-                       .replace('۳', '3').replace('۴', '4').replace('۵', '5')
-                       .replace('۶', '6').replace('۷', '7').replace('۸', '8').replace('۹', '9'))
+            return int(to_english_number(invoice_number))
         except (AttributeError, ValueError):
             return 0
-
-    def show_error_message(self, message: str):
-        """Show error message dialog."""
-        msg_box = QMessageBox(self)
-        msg_box.setIcon(QMessageBox.Icon.Critical)
-        msg_box.setWindowTitle("خطا")
-        msg_box.setText(message)
-        msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
-        msg_box.exec()
-
-    def show_success_message(self, message: str):
-        """Show success message dialog."""
-        msg_box = QMessageBox(self)
-        msg_box.setIcon(QMessageBox.Icon.Information)
-        msg_box.setWindowTitle("موفقیت")
-        msg_box.setText(message)
-        msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
-        msg_box.exec()
 
     @staticmethod
     def get_stylesheet() -> str:
@@ -491,12 +543,7 @@ class HomePageView(QWidget):
             selection-background-color: #e3f2fd;
             gridline-color: #f0f0f0;
         }
-
-        QTableWidget#invoicesTable::item {
-            padding: 8px;
-            border-bottom: 1px solid #f0f0f0;
-        }
-
+        
         QTableWidget#invoicesTable::item:selected {
             background-color: #e3f2fd;
             color: #1976d2;
@@ -518,3 +565,5 @@ if __name__ == "__main__":
     window = HomePageView()
     window.show()
     sys.exit(app.exec())
+
+

@@ -47,9 +47,9 @@ class HomePageLogic:
         total_invoices = self.repository.get_total_invoices_count()
 
         # Get today's invoices
+        today = date.today()
         today_jalali = jdatetime.date.today().strftime("%Y/%m/%d")
-        persian_today = to_persian_number(today_jalali)
-        today_invoices = self.repository.get_today_invoices_count(persian_today)
+        today_invoices = self.repository.get_today_invoices_count(today)
 
         # Get document statistics
         doc_stats = self.repository.get_document_statistics()
@@ -101,7 +101,7 @@ class HomePageLogic:
         """Mark an invoice as delivered."""
         return self.repository.mark_invoice_as_delivered(invoice_number)
 
-    def get_invoice_for_notification(self, invoice_number: str) -> Optional[Invoice]:
+    def get_invoice_for_notification(self, invoice_number: int) -> Optional[Invoice]:
         """Get invoice data for notification purposes."""
         return self.repository.get_invoice_by_number(invoice_number)
 
@@ -232,10 +232,15 @@ class HomePageLogic:
         else:
             return "white"  # Normal
 
-    def validate_delivery_confirmation(self, invoice_number: str) -> bool:
+    def validate_delivery_confirmation(self, invoice_number: int) -> bool:
         """Validate that invoice can be marked as delivered."""
         invoice = self.repository.get_invoice_by_number(invoice_number)
         return invoice is not None and invoice.delivery_status == 0
+
+    def get_invoice_for_context_menu(self, invoice_number: int) -> Invoice | None:
+        """Get invoice items for context menu in view."""
+        invoice = self.repository.get_invoice_by_number(invoice_number)
+        return invoice
 
     def calculate_document_statistics(self) -> DocumentStatistics:
         """Calculate comprehensive document statistics."""
