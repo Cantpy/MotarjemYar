@@ -5,15 +5,12 @@ Handles all database operations using SQLAlchemy ORM.
 from typing import List, Optional, Tuple
 from sqlalchemy import (create_engine, Column, Integer, String, Text, Boolean,
                         Date, ForeignKey, func, Index, CheckConstraint, asc, extract)
-from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
+from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship, aliased
 from datetime import date
 import jdatetime
-from shared import to_persian_number
+from shared import to_persian_number, Customer, Service, Invoice, InvoiceItem
 
-from models import (
-    Customer, Service, Invoice, InvoiceItem, DashboardStats,
-    DocumentStatistics, InvoiceTableRow
-)
+from models import DashboardStats, DocumentStatistics, InvoiceTableRow
 
 Base = declarative_base()
 
@@ -207,26 +204,27 @@ class HomePageRepository:
             return result
 
     def get_document_statistics(self) -> DocumentStatistics:
-        """Get document statistics from invoice items."""
+        """Get document statistics from invoice items considering item quantity."""
         with self.invoice_session_maker() as session:
-            # Get totals from invoice table aggregated fields
-            total_query = session.query(
-                func.sum(InvoiceModel.total_official_docs_count + InvoiceModel.total_unofficial_docs_count).label('total'),
-                func.sum(InvoiceModel.total_official_docs_count + InvoiceModel.total_unofficial_docs_count).filter(
-                    InvoiceModel.delivery_status == 0
-                ).label('available'),
-                func.sum(InvoiceModel.total_official_docs_count + InvoiceModel.total_unofficial_docs_count).filter(
-                    InvoiceModel.delivery_status == 1
-                ).label('delivered')
-            ).first()
+            Invoice = aliased(InvoiceModel)
+            Item = aliased(InvoiceItemModel)
 
-            total_docs = total_query.total or 0
-            available_docs = total_query.available or 0
-            delivered_docs = total_query.delivered or 0
+            # Total number of documents (sum of item_qty across all items)
+            total_docs = session.query(func.sum(Item.item_qty)).scalar() or 0
+
+            # In-office documents (delivery_status != 4)
+            in_office_docs = session.query(func.sum(Item.item_qty)).join(
+                Invoice, Item.invoice_number == Invoice.invoice_number
+            ).filter(Invoice.delivery_status != 4).scalar() or 0
+
+            # Delivered documents (delivery_status == 4)
+            delivered_docs = session.query(func.sum(Item.item_qty)).join(
+                Invoice, Item.invoice_number == Invoice.invoice_number
+            ).filter(Invoice.delivery_status == 4).scalar() or 0
 
             return DocumentStatistics(
                 total_documents=total_docs,
-                in_office_documents=available_docs,
+                in_office_documents=in_office_docs,
                 delivered_documents=delivered_docs,
             )
 
@@ -580,27 +578,49 @@ class HomePageRepository:
                 return True
             except Exception as e:
                 session.rollback()
-                print(f"Error creating invoice: {e}")
                 return False
 
-    def update_invoice_status(self, invoice_number: str, payment_status: int = None,
-                              delivery_status: int = None) -> bool:
-        """Update invoice payment and/or delivery status."""
+    def update_invoice_status(self, invoice_number: int, new_status: int, translator: Optional[str] = None) -> bool:
+        """Update invoice delivery status and optionally translator."""
         with self.invoice_session_maker() as session:
-            invoice = session.query(InvoiceModel).filter(
-                InvoiceModel.invoice_number == int(invoice_number)
-            ).first()
+            try:
+                invoice_model = session.query(InvoiceModel).filter(
+                    InvoiceModel.invoice_number == invoice_number
+                ).first()
 
-            if not invoice:
-                return False
+                if not invoice_model:
+                    return False
 
-            if payment_status is not None:
-                invoice.payment_status = payment_status
-            if delivery_status is not None:
-                invoice.delivery_status = delivery_status
+                invoice_model.delivery_status = new_status
 
-            session.commit()
-            return True
+                if translator is not None:
+                    invoice_model.translator = translator
+
+                session.commit()
+                return True
+
+            except Exception as e:
+                session.rollback()
+                raise e
+
+    # def update_invoice_status(self, invoice_number: str, payment_status: int = None,
+    #                           delivery_status: int = None) -> bool:
+    #     """Update invoice payment and/or delivery status."""
+    #     with self.invoice_session_maker() as session:
+    #         invoice = session.query(InvoiceModel).filter(
+    #             InvoiceModel.invoice_number == int(invoice_number)
+    #         ).first()
+    #
+    #         if not invoice:
+    #             return False
+    #
+    #         if payment_status is not None:
+    #             invoice.payment_status = payment_status
+    #         if delivery_status is not None:
+    #             invoice.delivery_status = delivery_status
+    #
+    #         session.commit()
+    #         return True
 
     def get_invoices_by_status(self, delivery_status: int = None,
                               payment_status: int = None) -> List[Invoice]:

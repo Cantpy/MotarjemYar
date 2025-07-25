@@ -1,17 +1,17 @@
 """ View layer for home page. Handles UI display and user interactions using PySide6. """
 import sys
-from typing import List, Dict, Tuple
-from PySide6.QtCore import Qt, QVariantAnimation, QEasingCurve, Signal, QTimer, QSize, QPoint
-from PySide6.QtGui import QColor, QBrush, QFont, QPainter, QPixmap, QAction
+from typing import List, Tuple
+from PySide6.QtCore import Qt, QVariantAnimation, QEasingCurve, Signal, QPoint
+from PySide6.QtGui import QColor, QBrush, QFont, QAction
 from PySide6.QtWidgets import (
-    QWidget, QMessageBox, QTableWidgetItem, QPushButton, QHeaderView, QMenu,
-    QVBoxLayout, QHBoxLayout, QLabel, QTableWidget, QFrame, QGridLayout, QAbstractItemView
+    QWidget, QTableWidgetItem, QHeaderView, QMenu, QTableWidget, QFrame, QGridLayout, QAbstractItemView, QVBoxLayout,
+    QHBoxLayout, QLabel, QPushButton
 )
 
-from features.Home.controller import HomePageController, HomePageControllerFactory
-from features.Home.models import DashboardStats, InvoiceTableRow
-from shared import (return_resource, to_persian_number, to_english_number,
-                    show_error_message_box, show_information_message_box, show_toast)
+from features.Home.controller import HomePageControllerFactory
+from features.Home.models import DashboardStats
+from shared import (return_resource, to_persian_number, to_english_number, show_error_message_box,
+                    show_information_message_box, show_toast, convert_to_persian, StatusChangeDialog)
 from datetime import date
 
 
@@ -174,7 +174,6 @@ class HomePageView(QWidget):
 
         # Invoices table
         self.invoices_table = QTableWidget()
-        self.invoices_table.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         self.setup_invoices_table()
         section_layout.addWidget(self.invoices_table)
 
@@ -190,6 +189,8 @@ class HomePageView(QWidget):
         self.invoices_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.invoices_table.customContextMenuRequested.connect(self.contextMenuEvent)
         self.invoices_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.invoices_table.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self.invoices_table.verticalHeader().setDefaultAlignment(Qt.AlignCenter | Qt.AlignRight)
 
         # Column headers (Persian)
         headers = ["شماره فاکتور", "مشتری", "تاریخ تحویل", "مترجم", "مانده (تومان)", "وضعیت", "عملیات‌ها"]
@@ -216,7 +217,7 @@ class HomePageView(QWidget):
             self.refresh_dashboard_stats()
             self.refresh_recent_invoices()
         except Exception as e:
-            self.show_error_message(f"خطا در بارگذاری داده‌ها: {str(e)}")
+            show_error_message_box(self, "خطا", f"خطا در بارگذاری داده‌ها: {str(e)}")
 
     def refresh_dashboard_stats(self):
         """Refresh dashboard statistics."""
@@ -224,7 +225,7 @@ class HomePageView(QWidget):
             stats = self.controller.update_dashboard()
             self.update_stats_display(stats)
         except Exception as e:
-            self.show_error_message(f"خطا در بارگذاری آمار: {str(e)}")
+            show_error_message_box(self, "خطا", f"خطا در بارگذاری آمار: {str(e)}")
 
     def update_stats_display(self, stats: DashboardStats):
         """Update the statistics display with new data."""
@@ -264,7 +265,7 @@ class HomePageView(QWidget):
             invoices = self.controller.get_recent_invoices()
             self.populate_invoices_table(invoices)
         except Exception as e:
-            self.show_error_message(f"خطا در بارگذاری فاکتورها: {str(e)}")
+            show_error_message_box(self, "خطا", f"خطا در بارگذاری فاکتورها: {str(e)}")
 
     @staticmethod
     def create_operations_menu(file_path: str, invoice_number: int, controller, parent=None) -> QMenu:
@@ -285,26 +286,23 @@ class HomePageView(QWidget):
         view_invoice = QAction("مشاهده فاکتور", menu)
         view_invoice.triggered.connect(lambda: controller.handle_view_pdf_request(file_path))
 
-        mark_delivered = QAction("آماده تحویل", menu)
-        mark_delivered.triggered.connect(lambda: controller.handle_ready_delivery_request(invoice_number, parent))
+        change_status = QAction("تغییر وضعیت", menu)
+        change_status.triggered.connect(
+            lambda: controller.handle_change_invoice_status_request(invoice_number, StatusChangeDialog, parent)
+        )
 
-        mark_collected = QAction("تحویل به مشتری", menu)
-        mark_collected.triggered.connect(
-            lambda: controller.handle_delivery_confirmation_request(invoice_number, parent))
-
-        menu.addActions([view_invoice, mark_delivered, mark_collected])
+        # Then add it to the menu actions:
+        menu.addActions([view_invoice, change_status])
         return menu
 
     def create_operations_button(self, file_path: str, invoice_number: int, controller) -> QPushButton:
         """
-        Create a button with a vertical ellipsis icon to show the operations menu.
+        Create a button with a vertical ellipsis icon to show the operations' menu.
 
         Args:
             file_path (str): Path to the invoice PDF.
             invoice_number (int): Invoice identifier.
             controller: Controller instance to handle actions.
-            parent: Optional QWidget parent.
-
         Returns:
             QPushButton: The button that shows the menu on click.
         """
@@ -359,6 +357,9 @@ class HomePageView(QWidget):
         self.invoices_table.setRowCount(len(invoices_with_priority))
 
         for row, (invoice, priority) in enumerate(invoices_with_priority):
+            persian_number = to_persian_number(row + 1)
+            self.invoices_table.setVerticalHeaderItem(row, QTableWidgetItem(persian_number))
+
             # Invoice number - 1st row
             invoice_num_item = QTableWidgetItem(to_persian_number(str(invoice.invoice_number)))
             invoice_num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -370,9 +371,10 @@ class HomePageView(QWidget):
             self.invoices_table.setItem(row, 1, customer_item)
 
             # Due date
-            date_item = QTableWidgetItem(invoice.delivery_date.strftime("%Y/%m/%d"))
-            date_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.invoices_table.setItem(row, 2, date_item)
+            gregorian_date = invoice.delivery_date.strftime("%Y/%m/%d")
+            jalali_date_item = QTableWidgetItem(convert_to_persian(gregorian_date))
+            jalali_date_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.invoices_table.setItem(row, 2, jalali_date_item)
 
             # Translator
             translator_item = QTableWidgetItem(invoice.translator)
@@ -380,7 +382,8 @@ class HomePageView(QWidget):
             self.invoices_table.setItem(row, 3, translator_item)
 
             # Amount
-            amount_item = QTableWidgetItem(f"{to_persian_number(str(invoice.final_amount))} تومان")
+            raw_amount = f"{invoice.final_amount:,}"
+            amount_item = QTableWidgetItem(f"{to_persian_number(raw_amount)} تومان")
             amount_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.invoices_table.setItem(row, 4, amount_item)
 

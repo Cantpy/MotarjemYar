@@ -4,7 +4,8 @@ from shared.utils.date_utils import (
     get_persian_date,
     get_current_jalali_datetime,
     format_jalali_date,
-    parse_jalali_date
+    parse_jalali_date,
+    convert_to_persian
 )
 from shared.utils.number_utils import (
     persian_to_english_number,
@@ -29,7 +30,8 @@ from shared.utils.ui_utils import (
     clear_field_error,
     render_colored_svg,
     set_svg_icon,
-    show_toast
+    show_toast,
+    StatusChangeDialog
 )
 from shared.utils.validation_utils import (
     validate_email,
@@ -55,10 +57,11 @@ from shared.context.user_context import UserContext
 from shared.calendar.PersianCalendar import CalendarDialog, PersianCalendarWidget
 from shared.calendar.BirthdayCalendar import BirthdayPopup, BirthdayPickerLineEdit
 from shared.calendar.CalendadrPopup import DatePickerLineEdit
+from shared.entities.entities import Invoice, InvoiceItem, Service, Customer
 
 __all__ = [
     # date_utils
-    "get_persian_date", "get_current_jalali_datetime", "format_jalali_date", "parse_jalali_date",
+    "get_persian_date", "get_current_jalali_datetime", "format_jalali_date", "parse_jalali_date", "convert_to_persian",
     # number_utils
     "persian_to_english_number", "to_english_number", "to_persian_number",
     "format_number_with_separators", "clean_number_string",
@@ -69,7 +72,7 @@ __all__ = [
     # ui_utils
     "show_error_message_box", "show_question_message_box", "show_warning_message_box",
     "show_information_message_box", "show_field_error_form", "show_field_error", "clear_field_error",
-    "render_colored_svg", "set_svg_icon", "show_toast",
+    "render_colored_svg", "set_svg_icon", "show_toast", "StatusChangeDialog",
     # validation_utils
     "validate_email", "validate_phone_number", "validate_national_id",
     "validate_required_field", "validate_numeric_field", "validate_text_length",
@@ -84,6 +87,8 @@ __all__ = [
     "UserContext",
     # calendar
     "CalendarDialog", "PersianCalendarWidget",
-    "BirthdayPopup", "BirthdayPickerLineEdit", "DatePickerLineEdit"
+    "BirthdayPopup", "BirthdayPickerLineEdit", "DatePickerLineEdit",
+    # entities
+    "Invoice", "InvoiceItem", "Service", "Customer"
 ]
 

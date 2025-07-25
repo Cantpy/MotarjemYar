@@ -29,6 +29,31 @@ def get_current_jalali_datetime():
     return jdatetime.datetime.now()
 
 
+def convert_to_persian(date_str):
+    """
+    Convert a Gregorian date string (YYYY/MM/DD) to Persian date in YYYY/MM/DD format with Persian digits.
+    """
+    # Convert Persian digits map
+    persian_digits = {
+        '0': '۰', '1': '۱', '2': '۲', '3': '۳', '4': '۴',
+        '5': '۵', '6': '۶', '7': '۷', '8': '۸', '9': '۹'
+    }
+
+    # Parse the Gregorian date
+    year, month, day = map(int, date_str.split('/'))
+
+    # Convert to jdatetime
+    persian_date = jdatetime.date.fromgregorian(year=year, month=month, day=day)
+
+    # Format as YYYY/MM/DD
+    formatted = f"{persian_date.year:04}/{persian_date.month:02}/{persian_date.day:02}"
+
+    # Convert to Persian digits
+    persian_formatted = ''.join(persian_digits.get(c, c) for c in formatted)
+
+    return persian_formatted
+
+
 def format_jalali_date(dt, format_string="%Y/%m/%d"):
     """
     Format a Jalali datetime object to string.

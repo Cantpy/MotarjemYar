@@ -4,13 +4,14 @@ Handles coordination between the view and business logic.
 """
 from typing import Optional, Callable
 from PySide6.QtCore import QObject, QTimer, Signal
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox, QWidget
 from typing import List, Tuple
 
 from features.Home.logic import HomePageLogic
-from features.Home.models import DashboardStats
+from features.Home.models import DashboardStats, DeliveryStatus, StatusChangeRequest
 from features.Home.repo import InvoiceModel
-from shared import show_question_message_box, NotificationDialog, return_resource
+from shared import (show_question_message_box, show_information_message_box, NotificationDialog, return_resource,
+                    show_error_message_box, show_warning_message_box)
 
 customers_database = return_resource("databases", "customers.db")
 invoices_database = return_resource("databases", "invoices.db")
@@ -127,7 +128,7 @@ class HomePageController(QObject):
 
             show_question_message_box(
                 parent_widget, title, message, button1,
-                lambda: self._show_notification_dialog(invoice_number, parent_widget),
+                lambda: self._show_notification_dialog(str(invoice_number), parent_widget),
                 button2
             )
 
@@ -145,19 +146,19 @@ class HomePageController(QObject):
             # Show confirmation dialog
             title = "تأیید تحویل"
             message = "آیا مشتری فاکتور خود را دریافت کرده است؟"
+            button1 = "بله"
+            button2 = "خیر"
 
-            reply = QMessageBox.question(parent_widget, title, message,
-                                         QMessageBox.Yes | QMessageBox.No,
-                                         QMessageBox.No)
-
-            if reply == QMessageBox.Yes:
-                success = self.logic.mark_invoice_delivered(invoice_number)
+            def _is_delivered():
+                success = self.logic.mark_invoice_delivered(str(invoice_number))
                 if success:
                     self.success_occurred.emit("موفقیت", "فاکتور به عنوان تحویل شده علامت‌گذاری شد.")
                     # Refresh data to show updated status
                     self.refresh_data()
                 else:
                     self.error_occurred.emit("خطا", "خطا در به‌روزرسانی وضعیت تحویل.")
+
+            show_question_message_box(parent_widget, title, message, button1, _is_delivered, button2)
 
         except Exception as e:
             self.error_occurred.emit("خطای تحویل", f"خطا در پردازش تحویل: {str(e)}")
@@ -169,6 +170,90 @@ class HomePageController(QObject):
             open_file(pdf_path)
         except Exception as e:
             self.error_occurred.emit("خطای نمایش", f"خطا در نمایش فایل PDF: {str(e)}")
+
+    def handle_change_invoice_status_request(
+            self,
+            invoice_number: int,
+            StatusChangeDialogClass,
+            parent: QWidget = None
+    ):
+        """
+        Handle the status change dialog request.
+        Accepts the dialog class to avoid circular imports.
+        """
+        try:
+            # Get current invoice information
+            invoice = self.logic.repository.get_invoice_by_number(invoice_number)
+
+            if not invoice:
+                show_error_message_box(parent, "خطا", "فاکتور یافت نشد")
+                return
+
+            # Check if invoice can be advanced
+            next_status, step_text = self.logic.get_available_next_step(invoice_number)
+
+            if next_status is None:
+                show_information_message_box(parent, "موفقیت", str(step_text))
+                return
+
+            # Instantiate and show the injected dialog class
+            dialog = StatusChangeDialogClass(
+                invoice=invoice,
+                next_status=next_status,
+                step_text=step_text,
+                parent=parent
+            )
+
+            # Connect dialog signals
+            dialog.status_change_requested.connect(
+                lambda request: self._handle_status_change_request(request, parent)
+            )
+
+            dialog.exec()
+
+        except Exception as e:
+            show_error_message_box(parent, "خطا", f"خطا در باز کردن پنجره تغییر وضعیت: {str(e)}")
+
+        finally:
+            self.refresh_data()
+
+    def _handle_status_change_request(self, request: StatusChangeRequest, parent: QWidget = None):
+        """Handle the actual status change request from the dialog."""
+        try:
+            success = False
+            message = ""
+
+            if request.target_status == DeliveryStatus.ASSIGNED:
+                # Step 1: Assign translator
+                success, message = self.logic.change_status_to_assigned(request)
+
+            elif request.target_status == DeliveryStatus.TRANSLATED:
+                # Step 2: Mark as translated
+                success, message = self.logic.change_status_to_translated(request)
+
+            elif request.target_status == DeliveryStatus.READY:
+                # Step 3: Mark as ready (call existing controller method)
+                success, message = self.logic.change_status_to_ready(request)
+                if success:
+                    # Call the existing method
+                    self.handle_ready_delivery_request(request.invoice_number, parent)
+                    message = "فاکتور آماده تحویل شد"
+
+            elif request.target_status == DeliveryStatus.COLLECTED:
+                # Step 4: Mark as collected (call existing controller method)
+                success, message = self.logic.change_status_to_collected(request)
+                if success:
+                    # Call the existing method
+                    self.handle_delivery_confirmation_request(request.invoice_number, parent)
+                    message = "فاکتور تحویل داده شد"
+
+            if success:
+                show_information_message_box(parent, "موفقیت", message)
+            else:
+                show_error_message_box(parent, "خطا", message)
+
+        except Exception as e:
+            show_error_message_box(parent, "خطا", f"خطا در تغییر وضعیت:\n {str(e)}")
 
     def _show_notification_dialog(self, invoice_number: str, parent_widget):
         """Show SMS/Email notification dialog."""

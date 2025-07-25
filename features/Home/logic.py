@@ -7,10 +7,10 @@ from typing import List, Tuple, Optional
 from datetime import date, timedelta
 
 from features.Home.models import (
-    DashboardStats, TimeInfo, InvoiceTableRow, Invoice, DocumentStatistics
+    DashboardStats, TimeInfo, InvoiceTableRow, DocumentStatistics, DeliveryStatus, StatusChangeRequest
 )
 from features.Home.repo import HomePageRepository, InvoiceModel
-from shared import to_persian_number
+from shared import to_persian_number, Invoice
 
 
 class HomePageLogic:
@@ -236,6 +236,180 @@ class HomePageLogic:
         """Validate that invoice can be marked as delivered."""
         invoice = self.repository.get_invoice_by_number(invoice_number)
         return invoice is not None and invoice.delivery_status == 0
+
+    def validate_status_change(self, invoice_number: int, target_status: int) -> Tuple[bool, str, Optional[Invoice]]:
+        """
+        Validate if a status change is allowed.
+
+        Returns:
+            Tuple of (is_valid, error_message, invoice)
+        """
+        invoice = self.repository.get_invoice_by_number(invoice_number)
+
+        if not invoice:
+            return False, "فاکتور یافت نشد", None
+
+        current_status = invoice.delivery_status
+
+        # Check if the target status is exactly one step ahead
+        if target_status != current_status + 1:
+            return False, "تنها می‌توانید یک مرحله جلوتر بروید", invoice
+
+        # Check if already at final status
+        if current_status >= DeliveryStatus.COLLECTED:
+            return False, "فاکتور در آخرین مرحله قرار دارد", invoice
+
+        # Check if target status is valid
+        if target_status > DeliveryStatus.COLLECTED or target_status < DeliveryStatus.ISSUED:
+            return False, "وضعیت مقصد نامعتبر است", invoice
+
+        return True, "", invoice
+
+    def change_status_to_assigned(self, request: StatusChangeRequest) -> Tuple[bool, str]:
+        """
+        Change status from ISSUED (0) to ASSIGNED (1).
+        Requires translator assignment.
+        """
+        is_valid, error, invoice = self.validate_status_change(
+            request.invoice_number,
+            DeliveryStatus.ASSIGNED
+        )
+
+        if not is_valid:
+            return False, error
+
+        if invoice.delivery_status != DeliveryStatus.ISSUED:
+            return False, "فاکتور باید در وضعیت 'صادر شده' باشد"
+
+        # For now, set translator as "نامشخص" as requested
+        translator = request.translator or "نامشخص"
+
+        try:
+            success = self.repository.update_invoice_status(
+                request.invoice_number,
+                DeliveryStatus.ASSIGNED,
+                translator
+            )
+
+            if success:
+                return True, f"مترجم '{translator}' تعیین شد"
+            else:
+                return False, "خطا در به‌روزرسانی پایگاه داده"
+
+        except Exception as e:
+            return False, f"خطا در تغییر وضعیت: {str(e)}"
+
+    def change_status_to_translated(self, request: StatusChangeRequest) -> Tuple[bool, str]:
+        """
+        Change status from ASSIGNED (1) to TRANSLATED (2).
+        No special processing required for now.
+        """
+        is_valid, error, invoice = self.validate_status_change(
+            request.invoice_number,
+            DeliveryStatus.TRANSLATED
+        )
+
+        if not is_valid:
+            return False, error
+
+        if invoice.delivery_status != DeliveryStatus.ASSIGNED:
+            return False, "فاکتور باید در وضعیت 'مترجم تعیین شده' باشد"
+
+        try:
+            success = self.repository.update_invoice_status(
+                request.invoice_number,
+                DeliveryStatus.TRANSLATED
+            )
+
+            if success:
+                return True, "وضعیت به 'ترجمه شده' تغییر یافت"
+            else:
+                return False, "خطا در به‌روزرسانی پایگاه داده"
+
+        except Exception as e:
+            return False, f"خطا در تغییر وضعیت: {str(e)}"
+
+    def change_status_to_ready(self, request: StatusChangeRequest) -> Tuple[bool, str]:
+        """
+        Change status from TRANSLATED (2) to READY (3).
+        This will be handled by controller.handle_ready_delivery_request
+        """
+        is_valid, error, invoice = self.validate_status_change(
+            request.invoice_number,
+            DeliveryStatus.READY
+        )
+
+        if not is_valid:
+            return False, error
+
+        if invoice.delivery_status != DeliveryStatus.TRANSLATED:
+            return False, "فاکتور باید در وضعیت 'ترجمه شده' باشد"
+
+        try:
+            success = self.repository.update_invoice_status(
+                request.invoice_number,
+                DeliveryStatus.READY
+            )
+
+            if success:
+                return True, "وضعیت به 'ترجمه شده' تغییر یافت"
+            else:
+                return False, "خطا در به‌روزرسانی پایگاه داده"
+
+        except Exception as e:
+            return False, f"خطا در تغییر وضعیت: {str(e)}"
+
+    def change_status_to_collected(self, request: StatusChangeRequest) -> Tuple[bool, str]:
+        """
+        Change status from READY (3) to COLLECTED (4).
+        This will be handled by controller.handle_delivery_confirmation_request
+        """
+        is_valid, error, invoice = self.validate_status_change(
+            request.invoice_number,
+            DeliveryStatus.COLLECTED
+        )
+
+        if not is_valid:
+            return False, error
+
+        if invoice.delivery_status != DeliveryStatus.READY:
+            return False, "فاکتور باید در وضعیت 'آماده تحویل' باشد"
+
+        try:
+            success = self.repository.update_invoice_status(
+                request.invoice_number,
+                DeliveryStatus.COLLECTED
+            )
+
+            if success:
+                return True, "وضعیت به 'ترجمه شده' تغییر یافت"
+            else:
+                return False, "خطا در به‌روزرسانی پایگاه داده"
+
+        except Exception as e:
+            return False, f"خطا در تغییر وضعیت: {str(e)}"
+
+    def get_available_next_step(self, invoice_number: int) -> Tuple[Optional[int], str]:
+        """
+        Get the next available step for an invoice.
+
+        Returns:
+            Tuple of (next_status, step_description)
+        """
+        invoice = self.repository.get_invoice_by_number(invoice_number)
+
+        if not invoice:
+            return None, "فاکتور یافت نشد"
+
+        current_status = invoice.delivery_status
+
+        if current_status >= DeliveryStatus.COLLECTED:
+            return None, "فاکتور در آخرین مرحله قرار دارد"
+
+        next_status = current_status + 1
+        step_text = DeliveryStatus.get_next_step_text(current_status)
+
+        return next_status, step_text
 
     def get_invoice_for_context_menu(self, invoice_number: int) -> Invoice | None:
         """Get invoice items for context menu in view."""

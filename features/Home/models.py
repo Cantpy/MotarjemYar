@@ -3,79 +3,8 @@ Domain models for the home page functionality.
 These represent the business entities and data structures.
 """
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Optional
 from datetime import date
-
-
-@dataclass
-class Customer:
-    """Customer entity."""
-    national_id: str
-    name: str
-    phone: str
-    telegram_id: Optional[str] = None
-    email: Optional[str] = None
-    address: Optional[str] = None
-    passport_image: Optional[str] = None
-
-
-@dataclass
-class Service:
-    """Service entity."""
-    id: int
-    name: str
-    base_price: int
-    dynamic_price_name_1: Optional[str] = None
-    dynamic_price_1: Optional[int] = None
-    dynamic_price_name_2: Optional[str] = None
-    dynamic_price_2: Optional[int] = None
-
-
-@dataclass
-class InvoiceItem:
-    """Invoice item entity."""
-    id: int
-    service_name: str
-    quantity: int
-    unit_price: str
-    total_price: str
-    officiality: bool
-    judiciary_seal: bool
-    foreign_affairs_seal: bool
-    remarks: str
-
-
-@dataclass
-class Invoice:
-    """Invoice entity."""
-    id: int
-    invoice_number: str
-    name: str
-    national_id: str
-    phone: str
-    issue_date: date
-    delivery_date: date
-    translator: str
-    total_items: int
-    total_amount: int
-    total_translation_price: int
-    advance_payment: int
-    discount_amount: int
-    force_majeure: int
-    final_amount: int
-    payment_status: int
-    delivery_status: int
-    total_official_docs_count: int
-    total_unofficial_docs_count: int
-    total_pages_count: int
-    total_judiciary_count: int
-    total_foreign_affairs_count: int
-    total_additional_doc_count: int
-    source_language: str
-    target_language: str
-    remarks: str
-    username: str
-    pdf_file_path: str
 
 
 @dataclass
@@ -120,3 +49,49 @@ class DocumentStatistics:
     delivered_documents: int
     most_repeated_document: str = None
     most_repeated_document_month: str = None
+
+
+@dataclass
+class StatusChangeRequest:
+    """Data class for status change requests."""
+    invoice_number: int
+    current_status: int
+    target_status: int
+    translator: Optional[str] = None
+
+
+class DeliveryStatus:
+    """Constants for delivery status values."""
+    ISSUED = 0          # فاکتور صادر شده، هنوز برای ترجمه ارسال نشده
+    ASSIGNED = 1        # مترجم تعیین شده
+    TRANSLATED = 2      # اسناد ترجمه شده، آماده امضا و مهر
+    READY = 3          # کاملاً آماده، منتظر دریافت توسط مشتری
+    COLLECTED = 4      # توسط مشتری دریافت شده
+
+    @classmethod
+    def get_status_text(cls, status: int) -> str:
+        """Get Persian text for status."""
+        status_map = {
+            cls.ISSUED: "صادر شده",
+            cls.ASSIGNED: "مترجم تعیین شده",
+            cls.TRANSLATED: "ترجمه شده",
+            cls.READY: "آماده تحویل",
+            cls.COLLECTED: "تحویل داده شده"
+        }
+        return status_map.get(status, "نامشخص")
+
+    @classmethod
+    def get_next_step_text(cls, current_status: int) -> str:
+        """Get text for the next step button."""
+        step_map = {
+            cls.ISSUED: "تعیین مترجم",
+            cls.ASSIGNED: "تأیید ترجمه",
+            cls.TRANSLATED: "آماده تحویل",
+            cls.READY: "تحویل به مشتری"
+        }
+        return step_map.get(current_status, "")
+
+    @classmethod
+    def can_advance(cls, current_status: int) -> bool:
+        """Check if status can be advanced."""
+        return current_status < cls.COLLECTED
