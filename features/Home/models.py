@@ -3,8 +3,19 @@ Domain models for the home page functionality.
 These represent the business entities and data structures.
 """
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, List
 from datetime import date
+
+
+@dataclass
+class Settings:
+    """Settings storage entity for homepage."""
+    row_count: int
+    threshold_days: int
+    orange_threshold_days: int
+    red_threshold_days: int
+    total_cards_number: int
+    stat_cards: Optional[List[tuple]] = None
 
 
 @dataclass

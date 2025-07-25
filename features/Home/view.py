@@ -9,7 +9,8 @@ from PySide6.QtWidgets import (
 )
 
 from features.Home.controller import HomePageControllerFactory
-from features.Home.models import DashboardStats
+from features.Home.models import DashboardStats, Settings
+from features.Home.home_settings_view import show_homepage_settings_dialog
 from shared import (return_resource, to_persian_number, to_english_number, show_error_message_box,
                     show_information_message_box, show_toast, convert_to_persian, StatusChangeDialog)
 from datetime import date
@@ -79,7 +80,15 @@ class HomePageView(QWidget):
         self.refresh_btn.setObjectName("refreshButton")
         self.refresh_btn.setMaximumWidth(120)
 
+        # Settings button
+        self.settings_btn = QPushButton("⚙️")
+        self.settings_btn.setFont(QFont("Tahoma", 18))
+        self.settings_btn.setObjectName("settingsButton")
+        self.settings_btn.clicked.connect(lambda: show_homepage_settings_dialog(Settings, self))
+
+        # Add buttons and title
         header_layout.addWidget(self.refresh_btn)
+        header_layout.addWidget(self.settings_btn)
         header_layout.addStretch()
         header_layout.addWidget(title_label)
 
@@ -507,6 +516,19 @@ class HomePageView(QWidget):
 
         QPushButton#refreshButton:pressed {
             background-color: #21618c;
+        }
+        
+        QPushButton#settingsButton {
+            background-color: #95a5a6;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 6px 12px;
+            font-size: 18px;
+        }
+
+        QPushButton#settingsButton:hover {
+            background-color: #7f8c8d;
         }
 
         QPushButton#viewAllButton {

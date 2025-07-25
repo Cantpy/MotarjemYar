@@ -7,7 +7,7 @@ from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtWidgets import QMessageBox, QWidget
 from typing import List, Tuple
 
-from features.Home.logic import HomePageLogic
+from features.Home.logic import HomePageLogic, Settings
 from features.Home.models import DashboardStats, DeliveryStatus, StatusChangeRequest
 from features.Home.repo import InvoiceModel
 from shared import (show_question_message_box, show_information_message_box, NotificationDialog, return_resource,
@@ -17,6 +17,20 @@ customers_database = return_resource("databases", "customers.db")
 invoices_database = return_resource("databases", "invoices.db")
 services_database = return_resource('databases', 'services.db')
 
+
+class HomepageSettingsManager(QObject):
+    settings_updated = Signal(Settings)  # signal to notify changes
+
+    def __init__(self, default_settings: Settings):
+        super().__init__()
+        self._settings = default_settings
+
+    def get_settings(self) -> Settings:
+        return self._settings
+
+    def update_settings(self, new_settings: Settings):
+        self._settings = new_settings
+        self.settings_updated.emit(self._settings)
 
 class HomePageController(QObject):
     """Controller for home page operations."""

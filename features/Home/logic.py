@@ -7,7 +7,7 @@ from typing import List, Tuple, Optional
 from datetime import date, timedelta
 
 from features.Home.models import (
-    DashboardStats, TimeInfo, InvoiceTableRow, DocumentStatistics, DeliveryStatus, StatusChangeRequest
+    DashboardStats, TimeInfo, InvoiceTableRow, DocumentStatistics, DeliveryStatus, StatusChangeRequest, Settings
 )
 from features.Home.repo import HomePageRepository, InvoiceModel
 from shared import to_persian_number, Invoice

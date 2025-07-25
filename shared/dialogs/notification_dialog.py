@@ -312,7 +312,8 @@ class NotificationDialog(QDialog):
         except Exception as e:
             QMessageBox.critical(self, "خطا در ارسال", f"خطا در ارسال پیامک: {str(e)}")
 
-    def _execute_sms_send(self, recipient, text):
+    @staticmethod
+    def _execute_sms_send(recipient, text):
         """Execute SMS sending using the provided API."""
         url = 'https://console.melipayamak.com/api/send/simple/02518acf41404001be90c2baafb85767'
 
