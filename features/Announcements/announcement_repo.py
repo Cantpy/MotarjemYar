@@ -7,8 +7,11 @@ from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, F
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship, Session
 from sqlalchemy.sql import and_, or_
-from features.Announcements.models import (SMSNotification, EmailNotification, EmailAttachment, NotificationStatus,
-                                           NotificationFilter)
+from features.Announcements.announcement_models import (SMSNotification, EmailNotification, EmailAttachment,
+                                                        NotificationStatus, NotificationFilter)
+from shared.utils.path_utils import return_resource
+
+announcements_db_path = return_resource("databases", "announcements.db")
 
 Base = declarative_base()
 
@@ -69,7 +72,7 @@ class EmailAttachmentORM(Base):
 class NotificationRepository:
     """Repository class for managing SMS and Email notifications."""
 
-    def __init__(self, database_url: str = "sqlite:///notifications.db"):
+    def __init__(self, database_url: str = f"sqlite:///{announcements_db_path}"):
         """Initialize repository with database connection."""
         self.engine = create_engine(database_url, echo=False)
         Base.metadata.create_all(self.engine)

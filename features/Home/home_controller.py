@@ -7,9 +7,10 @@ from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtWidgets import QMessageBox, QWidget
 from typing import List, Tuple
 
-from features.Home.logic import HomePageLogic, Settings
-from features.Home.models import DashboardStats, DeliveryStatus, StatusChangeRequest
-from features.Home.repo import InvoiceModel
+from features.Home.home_logic import HomePageLogic
+from features.Home.home_models import DashboardStats, DeliveryStatus, StatusChangeRequest
+from features.Home.home_settings_models import Settings
+from features.Home.home_repo import InvoiceModel
 from shared import (show_question_message_box, show_information_message_box, NotificationDialog, return_resource,
                     show_error_message_box, show_warning_message_box)
 
@@ -301,7 +302,7 @@ class HomePageControllerFactory:
     @staticmethod
     def create_controller(customers_db_path: str, invoices_db_path: str, documents_db_path: str) -> HomePageController:
         """Create a fully configured home page controller."""
-        from repo import HomePageRepository
+        from home_repo import HomePageRepository
 
         # Create repository
         repository = HomePageRepository(customers_db_path=customers_database,

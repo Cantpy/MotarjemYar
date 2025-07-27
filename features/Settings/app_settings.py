@@ -5,8 +5,8 @@ import sqlite3
 from PySide6.QtWidgets import *
 from PySide6.QtCore import *
 from PySide6.QtGui import *
-from modules.helper_functions import (return_resource, show_question_message_box, show_error_message_box,
-                                      show_warning_message_box, show_information_message_box)
+from shared import (return_resource, show_question_message_box, show_error_message_box, show_warning_message_box,
+                    show_information_message_box)
 import datetime
 
 # Assuming DB_PATH is defined somewhere in your project

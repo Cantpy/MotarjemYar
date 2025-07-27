@@ -6,11 +6,12 @@ import jdatetime
 from typing import List, Tuple, Optional
 from datetime import date, timedelta
 
-from features.Home.models import (
-    DashboardStats, TimeInfo, InvoiceTableRow, DocumentStatistics, DeliveryStatus, StatusChangeRequest, Settings
+from features.Home.home_models import (
+    DashboardStats, TimeInfo, InvoiceTableRow, DocumentStatistics, DeliveryStatus, StatusChangeRequest
 )
-from features.Home.repo import HomePageRepository, InvoiceModel
-from shared import to_persian_number, Invoice
+from features.Home.home_repo import HomePageRepository, InvoiceModel
+from shared.utils.number_utils import to_persian_number
+from shared.entities.entities import Invoice
 
 
 class HomePageLogic:
@@ -40,20 +41,19 @@ class HomePageLogic:
 
     def get_dashboard_statistics(self) -> DashboardStats:
         """Get all dashboard statistics."""
-        # Get customer count
+
+        today_gregorian = date.today()
+        today_jalali_str = jdatetime.date.today().strftime("%Y/%m/%d")
+
+        # Fetch all counts from repository
         total_customers = self.repository.get_customer_count()
-
-        # Get invoice counts
         total_invoices = self.repository.get_total_invoices_count()
+        today_invoices = self.repository.get_today_invoices_count(today_gregorian)
 
-        # Get today's invoices
-        today = date.today()
-        today_jalali = jdatetime.date.today().strftime("%Y/%m/%d")
-        today_invoices = self.repository.get_today_invoices_count(today)
-
-        # Get document statistics
+        # Fetch document statistics
         doc_stats = self.repository.get_document_statistics()
-        dashboard_stats = self.repository.get_dashboard_stats(today_jalali)
+        most_repeated_doc = doc_stats.most_repeated_document
+        most_repeated_doc_month = doc_stats.most_repeated_document_month
 
         return DashboardStats(
             total_customers=total_customers,
@@ -61,8 +61,8 @@ class HomePageLogic:
             today_invoices=today_invoices,
             total_documents=doc_stats.total_documents,
             available_documents=doc_stats.in_office_documents,
-            most_repeated_document=dashboard_stats.most_repeated_document,
-            most_repeated_document_month=dashboard_stats.most_repeated_document_month
+            most_repeated_document=most_repeated_doc,
+            most_repeated_document_month=most_repeated_doc_month
         )
 
     def get_invoice_table_data(self, limit: int = 20) -> List[InvoiceTableRow]:

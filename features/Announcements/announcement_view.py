@@ -14,8 +14,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QDate, QTimer, Signal
 from PySide6.QtGui import QFont, QIcon, QPixmap, QAction
-from features.Announcements.models import NotificationStatus, SMSNotification, EmailNotification
-from features.Announcements.controller import NotificationController
+from features.Announcements.announcement_models import NotificationStatus, SMSNotification, EmailNotification
+from features.Announcements.announcemnet_controller import NotificationController
 
 
 class NotificationHistoryWidget(QWidget):
@@ -26,7 +26,7 @@ class NotificationHistoryWidget(QWidget):
         self.controller = NotificationController()
         self.setup_ui()
         self.connect_signals()
-        self.setup_styling()
+        self.get_notification_history_stylesheet()
 
     def setup_ui(self):
         """Setup the user interface."""
@@ -729,6 +729,346 @@ class NotificationHistoryWidget(QWidget):
     def update_status(self, message: str):
         """Update status bar."""
         self.status_bar.showMessage(message, 3000)
+
+    @staticmethod
+    def get_notification_history_stylesheet() -> str:
+        """Return the CSS stylesheet for the NotificationHistoryWidget."""
+        return """
+        QWidget#NotificationHistoryWidget {
+            background-color: #f5f5f5;
+            font-family: IranSANS;
+        }
+
+        QLabel#titleLabel {
+            font-family: IranSANS;
+            font-size: 28px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        QPushButton#newNotificationButton {
+            background-color: #007acc;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 8px 16px;
+            font-family: IranSANS;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        QPushButton#newNotificationButton:hover {
+            background-color: #005999;
+        }
+
+        QPushButton#newNotificationButton:pressed {
+            background-color: #004580;
+        }
+
+        QPushButton#refreshButton {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 8px 16px;
+            font-family: IranSANS;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        QPushButton#refreshButton:hover {
+            background-color: #2980b9;
+        }
+
+        QPushButton#refreshButton:pressed {
+            background-color: #21618c;
+        }
+
+        QTabWidget {
+            background-color: transparent;
+            font-family: IranSANS;
+        }
+
+        QTabWidget::pane {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: white;
+            margin-top: 2px;
+        }
+
+        QTabBar::tab {
+            background-color: #f8f9fa;
+            color: #495057;
+            padding: 10px 20px;
+            margin-right: 2px;
+            border: 1px solid #dee2e6;
+            border-bottom: none;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+            font-family: IranSANS;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        QTabBar::tab:selected {
+            background-color: white;
+            color: #2c3e50;
+            border-bottom: 2px solid #007acc;
+        }
+
+        QTabBar::tab:hover:!selected {
+            background-color: #e9ecef;
+        }
+
+        QGroupBox {
+            font-family: IranSANS;
+            font-weight: bold;
+            font-size: 14px;
+            color: #34495e;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            margin-top: 15px;
+            padding-top: 15px;
+            background-color: white;
+        }
+
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            left: 15px;
+            padding: 0 10px 0 10px;
+            background-color: white;
+        }
+
+        QLineEdit {
+            border: 2px solid #dee2e6;
+            border-radius: 5px;
+            padding: 8px 12px;
+            font-family: IranSANS;
+            font-size: 13px;
+            background-color: white;
+        }
+
+        QLineEdit:focus {
+            border-color: #007acc;
+            outline: none;
+        }
+
+        QComboBox {
+            border: 2px solid #dee2e6;
+            border-radius: 5px;
+            padding: 8px 12px;
+            font-family: IranSANS;
+            font-size: 13px;
+            background-color: white;
+            min-width: 100px;
+        }
+
+        QComboBox:focus {
+            border-color: #007acc;
+        }
+
+        QComboBox::drop-down {
+            border: none;
+            width: 20px;
+        }
+
+        QComboBox::down-arrow {
+            image: url(down_arrow.png);
+            width: 12px;
+            height: 12px;
+        }
+
+        QDateEdit {
+            border: 2px solid #dee2e6;
+            border-radius: 5px;
+            padding: 8px 12px;
+            font-family: IranSANS;
+            font-size: 13px;
+            background-color: white;
+            min-width: 120px;
+        }
+
+        QDateEdit:focus {
+            border-color: #007acc;
+        }
+
+        QPushButton#quickDateButton {
+            background-color: #e9ecef;
+            color: #495057;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            padding: 6px 12px;
+            font-family: IranSANS;
+            font-size: 12px;
+            margin: 2px;
+        }
+
+        QPushButton#quickDateButton:hover {
+            background-color: #dee2e6;
+            color: #212529;
+        }
+
+        QPushButton#quickDateButton:pressed {
+            background-color: #ced4da;
+        }
+
+        QPushButton#filterActionButton {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 6px 12px;
+            font-family: IranSANS;
+            font-size: 12px;
+            margin: 2px;
+        }
+
+        QPushButton#filterActionButton:hover {
+            background-color: #5a6268;
+        }
+
+        QPushButton#exportButton {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 6px 12px;
+            font-family: IranSANS;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        QPushButton#exportButton:hover {
+            background-color: #218838;
+        }
+
+        QTableWidget#smsTable, QTableWidget#emailTable {
+            background-color: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            selection-background-color: #e3f2fd;
+            gridline-color: #f8f9fa;
+            font-family: IranSANS;
+            font-size: 13px;
+        }
+
+        QTableWidget#smsTable::item:selected, QTableWidget#emailTable::item:selected {
+            background-color: #e3f2fd;
+            color: #1976d2;
+        }
+
+        QTableWidget#smsTable::item:alternate, QTableWidget#emailTable::item:alternate {
+            background-color: #f8f9fa;
+        }
+
+        QHeaderView::section {
+            background-color: #f1f3f4;
+            color: #2c3e50;
+            padding: 12px 8px;
+            border: 1px solid #dee2e6;
+            border-left: none;
+            font-family: IranSANS;
+            font-weight: bold;
+            font-size: 13px;
+        }
+
+        QHeaderView::section:first {
+            border-left: 1px solid #dee2e6;
+            border-top-left-radius: 8px;
+        }
+
+        QHeaderView::section:last {
+            border-top-right-radius: 8px;
+        }
+
+        QPushButton#paginationButton {
+            background-color: #f8f9fa;
+            color: #495057;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 6px 12px;
+            font-family: IranSANS;
+            font-size: 12px;
+            min-width: 60px;
+        }
+
+        QPushButton#paginationButton:hover:enabled {
+            background-color: #e9ecef;
+        }
+
+        QPushButton#paginationButton:pressed:enabled {
+            background-color: #dee2e6;
+        }
+
+        QPushButton#paginationButton:disabled {
+            background-color: #f8f9fa;
+            color: #adb5bd;
+            border-color: #e9ecef;
+        }
+
+        QLabel#paginationLabel {
+            font-family: IranSANS;
+            font-size: 13px;
+            color: #495057;
+            font-weight: bold;
+            margin: 0 10px;
+        }
+
+        QLabel#countLabel {
+            font-family: IranSANS;
+            font-size: 13px;
+            color: #6c757d;
+            font-weight: normal;
+        }
+
+        QStatusBar {
+            background-color: #f8f9fa;
+            color: #495057;
+            border-top: 1px solid #dee2e6;
+            font-family: IranSANS;
+            font-size: 12px;
+        }
+
+        QProgressBar {
+            border: 1px solid #dee2e6;
+            border-radius: 3px;
+            background-color: #f8f9fa;
+            text-align: center;
+            font-family: IranSANS;
+            font-size: 11px;
+        }
+
+        QProgressBar::chunk {
+            background-color: #007acc;
+            border-radius: 2px;
+        }
+
+        QMenu {
+            background-color: white;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 4px 0;
+            font-family: IranSANS;
+            font-size: 13px;
+        }
+
+        QMenu::item {
+            padding: 8px 20px;
+            color: #495057;
+        }
+
+        QMenu::item:selected {
+            background-color: #e3f2fd;
+            color: #1976d2;
+        }
+
+        QMenu::separator {
+            height: 1px;
+            background-color: #dee2e6;
+            margin: 4px 0;
+        }
+        """
 
 
 class SMSDetailsDialog(QDialog):

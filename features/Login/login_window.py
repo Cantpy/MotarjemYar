@@ -6,8 +6,7 @@ from datetime import datetime, timedelta
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QCheckBox,
                                QSpacerItem, QSizePolicy)
 from PySide6.QtCore import Qt, Signal, QTimer, QSize
-from modules.helper_functions import (return_resource, show_error_message_box, show_warning_message_box,
-                                      show_information_message_box)
+from shared import (return_resource, show_error_message_box, show_warning_message_box, show_information_message_box)
 from contextlib import contextmanager
 
 # SQLAlchemy imports

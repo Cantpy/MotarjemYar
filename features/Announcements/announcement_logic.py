@@ -11,8 +11,9 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
 from typing import List, Optional, Tuple, Dict, Any
-from features.Announcements.models import SMSNotification, EmailNotification, EmailAttachment, NotificationStatus, NotificationFilter
-from features.Announcements.repo import NotificationRepository
+from features.Announcements.announcement_models import (SMSNotification, EmailNotification, EmailAttachment,
+                                                        NotificationStatus, NotificationFilter)
+from features.Announcements.announcement_repo import NotificationRepository
 
 
 class NotificationService:
@@ -147,20 +148,20 @@ class NotificationService:
         if not self.email_config['username'] or not self.email_config['password']:
             raise Exception("Email configuration not set")
 
-        msg = MimeMultipart()
+        msg = MIMEMultipart()
         msg['From'] = self.email_config['username']
         msg['To'] = recipient_email
         msg['Subject'] = subject
 
         # Add message body
-        msg.attach(MimeText(message, 'plain', 'utf-8'))
+        msg.attach(MIMEText(message, 'plain', 'utf-8'))
 
         # Add attachments
         if attachments:
             for attachment in attachments:
                 if os.path.exists(attachment.file_path):
                     with open(attachment.file_path, 'rb') as file:
-                        part = MimeBase('application', 'octet-stream')
+                        part = MIMEBase('application', 'octet-stream')
                         part.set_payload(file.read())
                         encoders.encode_base64(part)
                         part.add_header(

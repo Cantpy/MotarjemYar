@@ -6,9 +6,10 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 from PySide6.QtCore import QObject, Signal, QTimer
 from PySide6.QtWidgets import QMessageBox, QWidget
-from models import SMSNotification, EmailNotification, NotificationStatus, NotificationFilter
-from logic import NotificationService
-from repo import NotificationRepository
+from features.Announcements.announcement_models import (SMSNotification, EmailNotification, NotificationStatus,
+                                                        NotificationFilter)
+from features.Announcements.announcement_logic import NotificationService
+from features.Announcements.announcement_repo import NotificationRepository
 
 
 class NotificationController(QObject):

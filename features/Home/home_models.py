@@ -8,17 +8,6 @@ from datetime import date
 
 
 @dataclass
-class Settings:
-    """Settings storage entity for homepage."""
-    row_count: int
-    threshold_days: int
-    orange_threshold_days: int
-    red_threshold_days: int
-    total_cards_number: int
-    stat_cards: Optional[List[tuple]] = None
-
-
-@dataclass
 class DashboardStats:
     """Dashboard statistics entity."""
     total_customers: int
@@ -28,6 +17,19 @@ class DashboardStats:
     available_documents: int
     most_repeated_document: Optional[str] = None
     most_repeated_document_month: Optional[str] = None
+
+    def get_value_by_id(self, stat_id: str) -> str:
+        """Get formatted value by stat card ID."""
+        value_map = {
+            'total_customers': str(self.total_customers),
+            'total_invoices': str(self.total_invoices),
+            'today_invoices': str(self.today_invoices),
+            'total_documents': str(self.total_documents),
+            'available_documents': str(self.available_documents),
+            'most_repeated_document': self.most_repeated_document or "نامشخص",
+            'most_repeated_document_month': self.most_repeated_document_month or "نامشخص"
+        }
+        return value_map.get(stat_id, "0")
 
 
 @dataclass

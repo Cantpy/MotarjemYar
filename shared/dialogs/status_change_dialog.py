@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (QDialog, QFrame, QScrollArea, QWidget, QVBoxLayou
                                QLineEdit)
 from PySide6.QtCore import Qt, Signal
 
-from features.Home.models import StatusChangeRequest, DeliveryStatus
+from features.Home.home_models import StatusChangeRequest, DeliveryStatus
 from shared.utils.number_utils import to_persian_number
 from shared.entities.entities import Invoice
 

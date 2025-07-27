@@ -2,15 +2,16 @@
 Repository layer for home page data access.
 Handles all database operations using SQLAlchemy ORM.
 """
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 from sqlalchemy import (create_engine, Column, Integer, String, Text, Boolean,
                         Date, ForeignKey, func, Index, CheckConstraint, asc, extract)
 from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship, aliased
 from datetime import date
 import jdatetime
-from shared import to_persian_number, Customer, Service, Invoice, InvoiceItem
+from shared.utils.number_utils import to_persian_number
+from shared.entities.entities import Customer, Service, Invoice, InvoiceItem
 
-from models import DashboardStats, DocumentStatistics, InvoiceTableRow
+from features.Home.home_models import DashboardStats, DocumentStatistics, InvoiceTableRow
 
 Base = declarative_base()
 

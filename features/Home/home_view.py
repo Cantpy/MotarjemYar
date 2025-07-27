@@ -1,24 +1,34 @@
 """ View layer for home page. Handles UI display and user interactions using PySide6. """
 import sys
-from typing import List, Tuple
-from PySide6.QtCore import Qt, QVariantAnimation, QEasingCurve, Signal, QPoint
+from typing import List, Tuple, Dict, Optional
+from PySide6.QtCore import Qt, QVariantAnimation, QEasingCurve, Signal, QPoint, QTimer
 from PySide6.QtGui import QColor, QBrush, QFont, QAction
 from PySide6.QtWidgets import (
     QWidget, QTableWidgetItem, QHeaderView, QMenu, QTableWidget, QFrame, QGridLayout, QAbstractItemView, QVBoxLayout,
     QHBoxLayout, QLabel, QPushButton
 )
 
-from features.Home.controller import HomePageControllerFactory
-from features.Home.models import DashboardStats, Settings
-from features.Home.home_settings_view import show_homepage_settings_dialog
-from shared import (return_resource, to_persian_number, to_english_number, show_error_message_box,
-                    show_information_message_box, show_toast, convert_to_persian, StatusChangeDialog)
+from features.Home.home_controller import HomePageControllerFactory
+from features.Home.home_models import DashboardStats
+from features.Home.home_settings import SettingsManager, StatCardConfig
+from features.Home.home_settings_view import HomepageSettingsDialog
+from shared.utils.path_utils import return_resource
+from shared.utils.number_utils import to_persian_number, to_english_number
+from shared.utils.ui_utils import (show_error_message_box, show_information_message_box, show_question_message_box,
+                                   show_warning_message_box)
+from shared.utils.date_utils import convert_to_persian
+from shared.widgets.toast_widget import show_toast
+
+from pathlib import Path
 from datetime import date
 
+import logging
 
 customers_database = return_resource('databases', 'customers.db')
 invoices_database = return_resource('databases', 'invoices.db')
 services_database = return_resource('databases', 'services.db')
+
+logger = logging.getLogger(__name__)
 
 
 class HomePageView(QWidget):
@@ -30,32 +40,40 @@ class HomePageView(QWidget):
     # Signals
     invoice_selected = Signal(int)  # Emitted when an invoice is selected
     refresh_requested = Signal()  # Emitted when refresh is requested
+    settings_changed = Signal()  # Emitted when settings are changed
+    settings_requested = Signal()  # Emitted when settings button is clicked
 
-    def __init__(self, parent=None):
+    def __init__(self, max_cards: int = 6, parent=None):
         super().__init__(parent)
         self.controller = HomePageControllerFactory.create_controller(customers_db_path=customers_database,
                                                                       documents_db_path=invoices_database,
                                                                       invoices_db_path=services_database)
-        self.setup_ui()
+        self.max_cards = max_cards
+        self.current_settings = SettingsManager.load_settings(max_cards)
+        self.stats_cards: Dict[str, QFrame] = {}  # Map card ID to widget
+        self.current_stats: Optional[DashboardStats] = None
+        logger.info(f"Loaded settings: {self.current_settings}")
+
+        self._settings_changed = False
+        self._init_ui()
+        self.apply_settings()  # Apply loaded settings immediately
         self.setup_connections()
         self.load_initial_data()
 
-    def setup_ui(self):
-        """Initialize the user interface components."""
+    def _init_ui(self):
+        """Initialize the user interface."""
         self.setObjectName("HomePageView")
-        self.setStyleSheet(self.get_stylesheet())
-
         self.setGeometry(100, 100, 1200, 800)
-        # Main layout
+
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(20, 20, 20, 20)
         main_layout.setSpacing(20)
 
-        # Header
+        # Header section
         header_layout = self.create_header()
         main_layout.addLayout(header_layout)
 
-        # Dashboard stats
+        # Stats section (will be populated based on settings)
         stats_widget = self.create_dashboard_stats()
         main_layout.addWidget(stats_widget)
 
@@ -63,8 +81,153 @@ class HomePageView(QWidget):
         invoices_widget = self.create_recent_invoices_section()
         main_layout.addWidget(invoices_widget)
 
-        # Stretch to fill remaining space
-        main_layout.addStretch()
+        # Apply stylesheet
+        self.setStyleSheet(self.get_stylesheet())
+
+    def _setup_settings_menu(self):
+        """Setup the settings dropdown menu."""
+        settings_menu = QMenu(self)
+
+        # Main settings action
+        settings_action = QAction("تنظیمات داشبورد", self)
+        settings_action.triggered.connect(self._open_settings_dialog)
+        settings_menu.addAction(settings_action)
+
+        settings_menu.addSeparator()
+
+        # Reset to defaults
+        reset_action = QAction("بازگردانی به پیش‌فرض", self)
+        reset_action.triggered.connect(self.reset_settings_to_default)
+        settings_menu.addAction(reset_action)
+
+        # Export settings
+        export_action = QAction("صادرات تنظیمات", self)
+        export_action.triggered.connect(self.export_settings)
+        settings_menu.addAction(export_action)
+
+        # Import settings
+        import_action = QAction("واردات تنظیمات", self)
+        import_action.triggered.connect(self.import_settings)
+        settings_menu.addAction(import_action)
+
+        self.settings_btn.setMenu(settings_menu)
+
+    def reset_settings_to_default(self):
+        """Reset settings to default values."""
+        title = "تایید بازگردانی"
+        message = "آیا مطمئن هستید که می‌خواهید تنظیمات را به حالت پیش‌فرض بازگردانید؟"
+        button1 = "بله"
+        button2 = "خیر"
+
+        def yes_func():
+            try:
+                self.current_settings = SettingsManager.reset_to_defaults()
+                self.apply_settings()
+                show_information_message_box(self, "موفقیت", "تنظیمات به پیش‌فرض بازگردانده شد")
+                logger.info("Settings reset to defaults")
+            except Exception as e:
+                logger.error(f"Error resetting settings: {e}")
+                show_information_message_box(self, "خطا", f"خطا در بازگردانی تنظیمات: {str(e)}")
+
+        show_question_message_box(self, title, message, button1, yes_func, button2)
+
+    def reload_settings(self):
+        """Reload settings from file and update display."""
+        self.current_settings = SettingsManager.load_settings(self.max_cards)
+        self._update_stats_cards()
+        logger.info("Settings reloaded from file")
+
+    def export_settings(self):
+        """Export settings to file."""
+        from PySide6.QtWidgets import QFileDialog
+
+        try:
+            file_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "صادرات تنظیمات",
+                "homepage_settings_export.json",
+                "JSON Files (*.json)"
+            )
+
+            if file_path:
+                success = SettingsManager.export_settings(Path(file_path), self.current_settings)
+                if success:
+                    show_information_message_box(self, "موفقیت", f"تنظیمات در {file_path} ذخیره شد")
+                else:
+                    show_error_message_box(self, "خطا", "خطا در صادرات تنظیمات")
+
+        except Exception as e:
+            logger.error(f"Error exporting settings: {e}")
+            show_error_message_box(self, "خطا", f"خطا در صادرات: {str(e)}")
+
+    def import_settings(self):
+        """Import settings from file."""
+        from PySide6.QtWidgets import QFileDialog
+
+        try:
+            file_path, _ = QFileDialog.getOpenFileName(
+                self,
+                "واردات تنظیمات",
+                "",
+                "JSON Files (*.json)"
+            )
+
+            if file_path:
+                imported_settings = SettingsManager.import_settings(Path(file_path))
+                if imported_settings:
+                    # Ask for confirmation
+                    title = "تایید بارگذاری"
+                    message = "آیا مطمئن هستید که می‌خواهید تنظیمات انتخاب شده را جایگزین کنید؟"
+                    button1 = "بله"
+                    button2 = "خیر"
+
+                    def yes_func():
+                        self.current_settings = imported_settings
+                        success = SettingsManager.save_settings(self.current_settings)
+
+                        if success:
+                            self.apply_settings()
+                            show_information_message_box(self, "موفقیت", "تنظیمات با موفقیت وارد شد")
+                        else:
+                            show_error_message_box(self, "خطا", "خطا در ذخیره تنظیمات وارد شده")
+
+                    show_question_message_box(self, title, message, button1, yes_func, button2)
+
+                else:
+                    show_error_message_box(self, "خطا", "فایل تنظیمات نامعتبر است")
+
+        except Exception as e:
+            logger.error(f"Error importing settings: {e}")
+            show_error_message_box(self, "خطا", f"خطا در واردات: {str(e)}")
+
+    def apply_settings(self):
+        """Apply the current settings to the UI elements."""
+        try:
+            logger.info(f"Applying settings: {self.current_settings}")
+
+            # Apply table settings
+            if hasattr(self, 'invoices_table'):
+                # Set row count (this might need adjustment based on your data loading logic)
+                self.invoices_table.setRowCount(self.current_settings.row_count)
+
+            # Update stats cards count
+            self._update_stats_cards()
+
+            # Update section title to reflect current settings
+            if hasattr(self, 'section_title'):
+                self.section_title.setText(
+                    f"فاکتورهای {self.current_settings.threshold_days} روز اخیر"
+                )
+
+            # Refresh data with new settings
+            self.on_refresh_clicked()
+            self.settings_changed.emit()
+
+            logger.info("Settings applied successfully")
+
+        except Exception as e:
+            logger.error(f"Error applying settings: {e}")
+            show_warning_message_box(self, "هشدار", f"خطا در اعمال تنظیمات: {str(e)}")
 
     def create_header(self) -> QHBoxLayout:
         """Create the header section with title and refresh button."""
@@ -84,7 +247,7 @@ class HomePageView(QWidget):
         self.settings_btn = QPushButton("⚙️")
         self.settings_btn.setFont(QFont("Tahoma", 18))
         self.settings_btn.setObjectName("settingsButton")
-        self.settings_btn.clicked.connect(lambda: show_homepage_settings_dialog(Settings, self))
+        self._setup_settings_menu()
 
         # Add buttons and title
         header_layout.addWidget(self.refresh_btn)
@@ -99,64 +262,141 @@ class HomePageView(QWidget):
         stats_widget = QWidget()
         stats_widget.setObjectName("statsWidget")
 
-        stats_layout = QGridLayout(stats_widget)
-        stats_layout.setSpacing(15)
+        self.stats_layout = QGridLayout(stats_widget)
+        self.stats_layout.setSpacing(15)
 
-        # Create stat cards
-        self.total_customers_card = self.create_stat_card("تعداد مشتریان", "0", "#2980b9")
-        self.total_invoices_card = self.create_stat_card("کل فاکتورها", "0", "#3498db")
-        self.today_invoices_card = self.create_stat_card("فاکتورهای امروز", "0", "#1abc9c")
-        self.total_documents_card = self.create_stat_card("کل مدارک", "0", "#8e44ad")
-        self.available_documents_card = self.create_stat_card("مدارک موجود در دفتر", "0", "#e67e22")
-        self.most_repeated_document_card = self.create_stat_card("پرتکرارترین مدرک", "0", "#27ae60")
-
-        # Add cards to grid (3 per row)
-        stats_layout.addWidget(self.total_customers_card, 0, 0)
-        stats_layout.addWidget(self.total_invoices_card, 0, 1)
-        stats_layout.addWidget(self.today_invoices_card, 0, 2)
-        stats_layout.addWidget(self.total_documents_card, 1, 0)
-        stats_layout.addWidget(self.available_documents_card, 1, 1)
-        stats_layout.addWidget(self.most_repeated_document_card, 1, 2)
+        # Create stats cards based on current settings
+        self._update_stats_cards()
 
         return stats_widget
 
     @staticmethod
-    def create_stat_card(title: str, value: str, color: str) -> QFrame:
-        """Create a single statistics card."""
+    def _create_stat_card(card_config: StatCardConfig) -> QFrame:
+        """Create a single statistics card based on configuration."""
         card = QFrame()
         card.setObjectName("statCard")
         card.setFrameStyle(QFrame.Shape.Box)
+
+        # Apply dynamic styling with the card's color
         card.setStyleSheet(f"""
             QFrame#statCard {{
                 background-color: white;
                 border: 1px solid #e0e0e0;
                 border-radius: 10px;
                 padding: 20px;
-                border-right: 4px solid {color};
+                border-right: 4px solid {card_config.color};
+                min-height: 100px;
             }}
             QFrame#statCard:hover {{
                 box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                border-color: #d0d0d0;
             }}
         """)
 
         layout = QVBoxLayout(card)
         layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(10)
 
         # Title
-        title_label = QLabel(title)
+        title_label = QLabel(card_config.title)
         title_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+        title_label.setObjectName("statTitle")
         title_label.setStyleSheet("font-size: 14px; color: #666; margin-bottom: 5px;")
 
         # Value
-        value_label = QLabel(value)
+        value_label = QLabel("در حال بارگذاری...")
         value_label.setObjectName("statValue")
         value_label.setAlignment(Qt.AlignmentFlag.AlignRight)
-        value_label.setStyleSheet(f"font-size: 24px; font-weight: bold; color: {color};")
+        value_label.setStyleSheet(f"""
+            font-size: 24px; 
+            font-weight: bold; 
+            color: {card_config.color};
+            margin-top: 5px;
+        """)
 
         layout.addWidget(title_label)
         layout.addWidget(value_label)
 
+        # Store card config in the widget for later reference
+        card.card_config = card_config
+
         return card
+
+    def _update_card_values(self):
+        """Update the values displayed in all stat cards."""
+        if not self.current_stats:
+            return
+
+        for card_id, card_widget in self.stats_cards.items():
+            # Find the value label (it's the second child in the layout)
+            layout = card_widget.layout()
+            if layout and layout.count() >= 2:
+                value_label = layout.itemAt(1).widget()
+                if isinstance(value_label, QLabel):
+                    # Get value from stats
+                    value = self.current_stats.get_value_by_id(card_id)
+                    value_label.setText(value)
+
+    def _update_stats_cards(self):
+        """Update statistics cards based on current settings."""
+        # Clear existing cards
+        self._clear_stats_layout()
+        self.stats_cards.clear()
+
+        # Get enabled cards from settings
+        enabled_cards = self.current_settings.get_enabled_cards()
+
+        if not enabled_cards:
+            # Show "no cards configured" message
+            no_cards_label = QLabel("هیچ کارت آماری انتخاب نشده است")
+            no_cards_label.setObjectName("noCardsLabel")
+            no_cards_label.setAlignment(Qt.AlignCenter)
+            self.stats_layout.addWidget(no_cards_label, 0, 0, 1, 3)
+            return
+
+        # Create and arrange cards in grid (3 cards per row)
+        for index, card_config in enumerate(enabled_cards):
+            row = index // 3
+            col = index % 3
+
+            # Create card widget
+            card_widget = self._create_stat_card(card_config)
+            self.stats_cards[card_config.id] = card_widget
+
+            # Add to grid layout
+            self.stats_layout.addWidget(card_widget, row, col)
+
+        # Update card values if we have current stats
+        if self.current_stats:
+            self._update_card_values()
+
+    def update_stats_display(self, stats: DashboardStats):
+        """
+        Update all stat cards with the latest data from the stats object.
+        """
+        self.current_stats = stats  # Save reference for later refreshes
+
+        for card_id, card_widget in self.stats_cards.items():
+            layout = card_widget.layout()
+            if layout and layout.count() >= 2:
+                value_label = layout.itemAt(1).widget()
+                if isinstance(value_label, QLabel):
+                    value = stats.get_value_by_id(card_id)
+                    if isinstance(value, int):
+                        value_label.setText(to_persian_number(str(value)))
+                    elif isinstance(value, str):
+                        value_label.setText(value if value else "نامشخص")
+                    else:
+                        value_label.setText("نامشخص")
+
+        self.animate_stats_update()
+
+    def _clear_stats_layout(self):
+        """Clear all widgets from the stats layout."""
+        while self.stats_layout.count():
+            child = self.stats_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
 
     def create_recent_invoices_section(self) -> QWidget:
         """Create the recent invoices table section."""
@@ -197,7 +437,7 @@ class HomePageView(QWidget):
         self.invoices_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.invoices_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.invoices_table.customContextMenuRequested.connect(self.contextMenuEvent)
-        self.invoices_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.invoices_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.invoices_table.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         self.invoices_table.verticalHeader().setDefaultAlignment(Qt.AlignCenter | Qt.AlignRight)
 
@@ -236,28 +476,37 @@ class HomePageView(QWidget):
         except Exception as e:
             show_error_message_box(self, "خطا", f"خطا در بارگذاری آمار: {str(e)}")
 
-    def update_stats_display(self, stats: DashboardStats):
-        """Update the statistics display with new data."""
-        self.total_customers_card.findChild(QLabel, "statValue").setText(
-            to_persian_number(str(stats.total_customers))
-        )
-        self.total_invoices_card.findChild(QLabel, "statValue").setText(
-            to_persian_number(str(stats.total_invoices))
-        )
-        self.today_invoices_card.findChild(QLabel, "statValue").setText(
-            to_persian_number(str(stats.today_invoices))
-        )
-        self.total_documents_card.findChild(QLabel, "statValue").setText(
-            to_persian_number(str(stats.total_documents))
-        )
-        self.available_documents_card.findChild(QLabel, "statValue").setText(
-            to_persian_number(str(stats.available_documents))
-        )
-        self.most_repeated_document_card.findChild(QLabel, "statValue").setText(
-            f"{(str(stats.most_repeated_document)) if stats.most_repeated_document else "نامشخص"}"
-        )
+    def _setup_auto_save(self):
+        """Setup auto-save timer for settings."""
+        self.auto_save_timer = QTimer()
+        self.auto_save_timer.timeout.connect(self._auto_save_settings)
+        self.auto_save_timer.start(300000)  # 5 minutes
+        self._settings_changed = False
 
-        self.animate_stats_update()
+    def _auto_save_settings(self):
+        """Auto-save settings if they were changed."""
+        if self._settings_changed:
+            success = SettingsManager.save_settings(self.current_settings)
+            if success:
+                logger.info("Auto-saved settings")
+                self._settings_changed = False
+
+    def _open_settings_dialog(self):
+        """Open the settings dialog."""
+        dialog = HomepageSettingsDialog(self.current_settings, self.max_cards, self)
+
+        if dialog.exec() == HomepageSettingsDialog.Accepted:
+            # Get updated settings
+            updated_settings = dialog.get_updated_settings()
+
+            # Save settings
+            if SettingsManager.save_settings(updated_settings):
+                self.current_settings = updated_settings
+                # Refresh the stats cards display
+                self._update_stats_cards()
+                logger.info("Settings updated and saved successfully")
+            else:
+                logger.error("Failed to save updated settings")
 
     def animate_stats_update(self):
         """Animate the statistics update."""
@@ -290,6 +539,7 @@ class HomePageView(QWidget):
         Returns:
             QMenu: The menu with bound actions.
         """
+        from shared.dialogs.status_change_dialog import StatusChangeDialog
         menu = QMenu(parent)
 
         view_invoice = QAction("مشاهده فاکتور", menu)
@@ -316,7 +566,7 @@ class HomePageView(QWidget):
             QPushButton: The button that shows the menu on click.
         """
         button = QPushButton("⋮", self)
-        button.setCursor(Qt.PointingHandCursor)
+        button.setCursor(Qt.CursorShape.PointingHandCursor)
         button.setFlat(True)
         button.setFont(QFont("Tahoma", 15))
 
@@ -487,6 +737,7 @@ class HomePageView(QWidget):
         }
 
         QLabel#pageTitle {
+            font-family: IranSANS;
             font-size: 28px;
             font-weight: bold;
             color: #2c3e50;
@@ -494,6 +745,7 @@ class HomePageView(QWidget):
         }
 
         QLabel#sectionTitle {
+            font-family: IranSANS;
             font-size: 18px;
             font-weight: bold;
             color: #34495e;
@@ -506,6 +758,7 @@ class HomePageView(QWidget):
             border: none;
             border-radius: 5px;
             padding: 8px 16px;
+            font-family: IranSANS;
             font-size: 14px;
             font-weight: bold;
         }
@@ -517,13 +770,14 @@ class HomePageView(QWidget):
         QPushButton#refreshButton:pressed {
             background-color: #21618c;
         }
-        
+
         QPushButton#settingsButton {
             background-color: #95a5a6;
             color: white;
             border: none;
             border-radius: 5px;
             padding: 6px 12px;
+            font-family: IranSANS;
             font-size: 18px;
         }
 
@@ -537,6 +791,7 @@ class HomePageView(QWidget):
             border: none;
             border-radius: 5px;
             padding: 6px 12px;
+            font-family: IranSANS;
             font-size: 12px;
         }
 
@@ -550,6 +805,7 @@ class HomePageView(QWidget):
             border: none;
             border-radius: 3px;
             padding: 4px 8px;
+            font-family: IranSANS;
             font-size: 12px;
         }
 
@@ -568,7 +824,7 @@ class HomePageView(QWidget):
             selection-background-color: #e3f2fd;
             gridline-color: #f0f0f0;
         }
-        
+
         QTableWidget#invoicesTable::item:selected {
             background-color: #e3f2fd;
             color: #1976d2;
@@ -579,6 +835,7 @@ class HomePageView(QWidget):
             color: #495057;
             padding: 10px;
             border: 1px solid #dee2e6;
+            font-family: IranSANS;
             font-weight: bold;
         }
         """
@@ -586,9 +843,8 @@ class HomePageView(QWidget):
 
 if __name__ == "__main__":
     from PySide6.QtWidgets import QApplication
+
     app = QApplication([])
     window = HomePageView()
     window.show()
     sys.exit(app.exec())
-
-
