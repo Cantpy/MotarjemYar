@@ -1,12 +1,13 @@
+"""fixed_costs.py"""
+
 import sqlite3
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QCheckBox, QLabel, QPushButton, QLineEdit,
                                QTableWidget, QDialog, QTableWidgetItem, QMenu)
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction
-from modules.helper_functions import (show_question_message_box, show_error_message_box, show_warning_message_box,
-                                      show_information_message_box, to_persian_number, persian_to_english_number,
-                                      return_resource)
+from shared import (show_question_message_box, show_error_message_box, show_warning_message_box,
+                    show_information_message_box, to_persian_number, persian_to_english_number, return_resource)
 from modules.Documents.helper_functions import InputDialog
 from typing import Dict, Optional
 

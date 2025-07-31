@@ -1,9 +1,11 @@
+"""documents_widget.py"""
+
 import pandas as pd
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QTabWidget)
-from modules.Documents.ui.fixed_costs_ui import FixedCostsWidget
-from modules.Documents.other_services_widget import OtherServicesWidget
-from modules.Documents.service_management_widget import ServicesManagerWidget
+from ui.fixed_costs_ui import FixedCostsWidget
+from other_services_widget import OtherServicesWidget
+from service_management_widget import ServicesManagerWidget
 
 
 class TabbedServicesManager(QWidget):

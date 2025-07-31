@@ -1,3 +1,5 @@
+"""helper_functions.py"""
+
 import sqlite3
 import os
 import sys

@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (QTableWidget, QTableWidgetItem, QHeaderView, QDia
                                QMessageBox, QVBoxLayout)
 from PySide6.QtCore import Qt
 import jdatetime
+from shared.utils.number_utils import to_persian_number
 
 
 class CalendarDialog(QDialog):
@@ -34,7 +35,7 @@ class CalendarDialog(QDialog):
 
         # Set initial selections
         today = jdatetime.date.today()
-        self.year_combo.setCurrentText(str(today.year))
+        self.year_combo.setCurrentText(to_persian_number(today.year))
         self.month_combo.setCurrentIndex(today.month - 1)
 
         # Connect signals

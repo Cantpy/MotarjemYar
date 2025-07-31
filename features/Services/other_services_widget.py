@@ -1,3 +1,5 @@
+"""other_services.py"""
+
 import sqlite3
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QCheckBox, QLabel, QPushButton, QLineEdit,
