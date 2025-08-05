@@ -8,7 +8,7 @@ from typing import Optional
 Base = declarative_base()
 
 
-class Service(Base):
+class ServicesModel(Base):
     """Model for services/documents table"""
     __tablename__ = 'Services'
 
@@ -21,7 +21,7 @@ class Service(Base):
     dynamic_price_2 = Column(Integer, nullable=False, default=0)
 
     def __repr__(self):
-        return f"<Service(id={self.id}, name='{self.name}', base_price={self.base_price})>"
+        return f"<ServicesModel(id={self.id}, name='{self.name}', base_price={self.base_price})>"
 
     def to_dict(self):
         """Convert model instance to dictionary"""
@@ -48,7 +48,7 @@ class Service(Base):
         )
 
 
-class FixedPrice(Base):
+class FixedPricesModel(Base):
     """Model for fixed prices table"""
     __tablename__ = 'fixed_prices'
 
@@ -58,7 +58,7 @@ class FixedPrice(Base):
     is_default = Column(Boolean, nullable=False, default=False)
 
     def __repr__(self):
-        return f"<FixedPrice(id={self.id}, name='{self.name}', price={self.price}, is_default={self.is_default})>"
+        return f"<FixedPricesModel(id={self.id}, name='{self.name}', price={self.price}, is_default={self.is_default})>"
 
     def to_dict(self):
         """Convert model instance to dictionary"""
@@ -79,7 +79,7 @@ class FixedPrice(Base):
         )
 
 
-class OtherService(Base):
+class OtherServicesModel(Base):
     """Model for other services table"""
     __tablename__ = 'other_services'
 
@@ -89,7 +89,7 @@ class OtherService(Base):
     is_default = Column(Boolean, nullable=False, default=False)
 
     def __repr__(self):
-        return f"<OtherService(id={self.id}, name='{self.name}', price={self.price}, is_default={self.is_default})>"
+        return f"<OtherServicesModel(id={self.id}, name='{self.name}', price={self.price}, is_default={self.is_default})>"
 
     def to_dict(self):
         """Convert model instance to dictionary"""

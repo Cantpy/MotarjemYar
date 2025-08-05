@@ -159,7 +159,7 @@ class CustomerFormWidget(BaseWidget):
         """Setup the user interface."""
         layout = QVBoxLayout(self)
 
-        # Customer group box
+        # CustomerModel group box
         self.customer_group = QGroupBox("اطلاعات مشتری")
         self.customer_group.setFont(self.bold_font)
         layout.addWidget(self.customer_group)
@@ -563,14 +563,14 @@ class ServiceInputWidget(BaseWidget):
         """Setup the user interface."""
         layout = QVBoxLayout(self)
 
-        # Service selection group
+        # ServicesModel selection group
         service_group = QGroupBox("اضافه کردن سند")
         service_group.setFont(self.bold_font)
         layout.addWidget(service_group)
 
         service_layout = QVBoxLayout(service_group)
 
-        # Service name input
+        # ServicesModel name input
         name_layout = QHBoxLayout()
         name_layout.addWidget(QLabel("نام سند:"))
         self.service_name_edit = QLineEdit()
@@ -893,7 +893,7 @@ class InvoiceMainWidget(BaseWidget):
         self.tab_widget = QTabWidget()
         layout.addWidget(self.tab_widget)
 
-        # Customer tab
+        # CustomerModel tab
         self.customer_widget = CustomerFormWidget()
         self.tab_widget.addTab(self.customer_widget, "اطلاعات مشتری")
 
@@ -905,7 +905,7 @@ class InvoiceMainWidget(BaseWidget):
         self.invoice_header = InvoiceHeaderWidget()
         invoice_layout.addWidget(self.invoice_header)
 
-        # Service input
+        # ServicesModel input
         self.service_input = ServiceInputWidget()
         invoice_layout.addWidget(self.service_input)
 
@@ -937,7 +937,7 @@ class InvoiceMainWidget(BaseWidget):
 
     def connect_signals(self):
         """Connect widget signals."""
-        # Service input to documents table
+        # ServicesModel input to documents table
         self.service_input.service_requested.connect(self.on_service_requested)
 
         # Action buttons

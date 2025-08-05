@@ -43,7 +43,7 @@ def get_remembered_user_info():
     Get remembered user information from settings file.
 
     Returns:
-        dict: User information or empty dict if not found
+        dict: UsersModel information or empty dict if not found
     """
     try:
         settings_path = return_resource("databases", "login_settings.json")

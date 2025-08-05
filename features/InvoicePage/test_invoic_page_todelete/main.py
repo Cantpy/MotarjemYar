@@ -340,11 +340,11 @@ def example_basic_usage():
         customer.national_id, customer.name, customer.phone, customer.address,
         email=customer.email
     )
-    print(f"Customer save result: {result.message}")
+    print(f"CustomerModel save result: {result.message}")
 
     # Save service
     saved_service = service_repo.save(service)
-    print(f"Service saved: {saved_service.name}")
+    print(f"ServicesModel saved: {saved_service.name}")
 
     # Create invoice
     invoice_result = invoice_service.create_invoice(
@@ -381,7 +381,7 @@ def example_validation():
 
     # Test customer validation
     errors = validator.validate_customer_data("", "123", "12345", "addr")
-    print("Customer validation errors:")
+    print("CustomerModel validation errors:")
     for error in errors:
         print(f"  {error.field}: {error.message}")
 

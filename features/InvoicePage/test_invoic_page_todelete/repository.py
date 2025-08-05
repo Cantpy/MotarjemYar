@@ -532,7 +532,7 @@ class SQLAlchemyCustomerRepository(ICustomerRepository):
                     orm_customer.email = customer.email
                     orm_customer.passport_image = customer.passport_image
                 else:
-                    raise ValueError("Customer not found")
+                    raise ValueError("CustomerModel not found")
             else:
                 # Create new
                 orm_customer = self._domain_to_orm(customer)
@@ -609,7 +609,7 @@ class SQLAlchemyServiceRepository(IServiceRepository):
                     orm_service.dynamic_price_name_1 = service.dynamic_price_name_1
                     orm_service.dynamic_price_name_2 = service.dynamic_price_name_2
                 else:
-                    raise ValueError("Service not found")
+                    raise ValueError("ServicesModel not found")
             else:
                 # Create new
                 orm_service = ServiceORM(

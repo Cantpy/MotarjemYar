@@ -34,7 +34,7 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationship to user profile
-    profile = relationship("UserProfile", back_populates="user", uselist=False)
+    profile = relationship("UserProfileModel", back_populates="user", uselist=False)
 
 
 class UserProfile(Base):
@@ -45,7 +45,7 @@ class UserProfile(Base):
     role_fa = Column(String(100), nullable=True)
 
     # Relationship back to user
-    user = relationship("User", back_populates="profile")
+    user = relationship("UsersModel", back_populates="profile")
 
 
 class LoginWidget(QWidget):

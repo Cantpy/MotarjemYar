@@ -21,7 +21,7 @@ class DeliveryStatus(IntEnum):
 
 @dataclass
 class Customer:
-    """Customer domain model."""
+    """CustomerModel domain model."""
     national_id: str
     name: str
     phone: str
@@ -45,7 +45,7 @@ class Customer:
 
 @dataclass
 class Service:
-    """Service domain model."""
+    """ServicesModel domain model."""
     name: str
     base_price: int
     dynamic_price_1: Optional[int] = None
@@ -267,7 +267,7 @@ class OperationResult:
 
 @dataclass
 class CustomerSearchCriteria:
-    """Customer search criteria."""
+    """CustomerModel search criteria."""
     name: Optional[str] = None
     phone: Optional[str] = None
     national_id: Optional[str] = None

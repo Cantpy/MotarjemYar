@@ -4,7 +4,7 @@ from PySide6.QtCore import Qt, Signal
 
 from features.Home.home_models import StatusChangeRequest, DeliveryStatus
 from shared.utils.number_utils import to_persian_number
-from shared.entities.entities import Invoice
+from shared.entities.common_entities import InvoiceDetailsEntity
 
 
 class StepIndicator(QFrame):
@@ -179,7 +179,7 @@ class StatusChangeDialog(QDialog):
 
     status_change_requested = Signal(StatusChangeRequest)
 
-    def __init__(self, invoice: Invoice, next_status: int, step_text: str, parent=None):
+    def __init__(self, invoice: InvoiceDetailsEntity, next_status: int, step_text: str, parent=None):
         super().__init__(parent)
         self.invoice = invoice
         self.next_status = next_status
@@ -273,7 +273,7 @@ class StatusChangeDialog(QDialog):
         invoice_layout.addWidget(invoice_num_label)
         invoice_layout.addWidget(invoice_val_label)
 
-        # Customer name
+        # CustomerModel name
         customer_layout = QVBoxLayout()
         customer_label = QLabel("نام مشتری")
         customer_label.setObjectName("cardLabel")

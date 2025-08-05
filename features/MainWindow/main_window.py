@@ -117,7 +117,7 @@ class MainWindow(QMainWindow):
     def __init__(self, app_manager=None):  # user_context: UserContext,
         super().__init__()
 
-        # User context variables
+        # UsersModel context variables
         # self.user_context = user_context
         # self.current_user = self.user_context.username
         # self.current_role = self.user_context.role
@@ -266,7 +266,7 @@ class MainWindow(QMainWindow):
         for button, page_name in button_page_map.items():
             button.clicked.connect(lambda _, name=page_name: self.page_manager.show(name))
 
-        # User and window controls
+        # UsersModel and window controls
         self.ui.large_user_pic.clicked.connect(self.show_users_page)
         self.ui.x_button.clicked.connect(self.show_exit_dialog)
         self.ui.maximize_button.clicked.connect(self.smooth_maximize)
@@ -287,7 +287,7 @@ class MainWindow(QMainWindow):
     #         self.ui.large_user_pic.setPixmap(QPixmap(avatar) if avatar else QPixmap(user_icon))
     #         self.ui.large_user_pic.setScaledContents(True)
     #
-    #     print(f"User context set: {user_full_name} with role {user_role_fa}")
+    #     print(f"UsersModel context set: {user_full_name} with role {user_role_fa}")
 
     def get_role_display_name(self, role):
         """Get Persian display name for role"""
@@ -393,7 +393,7 @@ class MainWindow(QMainWindow):
     #                                         role_fa=role_fa,
     #                                         avatar=avatar_path)
     #
-    #         print(f"User {username} ({full_name}) logged in with role: {role}")
+    #         print(f"UsersModel {username} ({full_name}) logged in with role: {role}")
     #
     #         # IMPORTANT: Update application_manager state too
     #         if self.app_manager:
@@ -497,7 +497,7 @@ class MainWindow(QMainWindow):
     #         # Show the login window again
     #         self.show_login_window()
     #
-    #         print("User logged out successfully")
+    #         print("UsersModel logged out successfully")
     #
     #     except Exception as e:
     #         print(f"Error during logout: {e}")

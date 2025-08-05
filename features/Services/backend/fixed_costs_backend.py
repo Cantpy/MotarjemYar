@@ -7,7 +7,7 @@ from modules.helper_functions import (show_question_message_box, show_error_mess
 
 
 class FixedCostsService:
-    """Service class for managing fixed costs business logic."""
+    """ServicesModel class for managing fixed costs business logic."""
 
     DEFAULT_FIXED_COSTS = [
         "کپی برابر اصل",

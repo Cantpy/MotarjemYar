@@ -1,8 +1,8 @@
 import importlib
 
 __all__ = [
-    "InvoiceBackend", "ValidationService", "InvoicePage", "DatabaseManager", "Customer", "Service", "InvoiceItem",
-    "IssuedInvoice", "OtherService", "FixedPrice", "get_customer_by_national_id", "get_service_by_name",
+    "InvoiceBackend", "ValidationService", "InvoicePage", "DatabaseManager", "CustomerModel", "ServicesModel", "InvoiceItemModel",
+    "IssuedInvoiceModel", "OtherServicesModel", "FixedPricesModel", "get_customer_by_national_id", "get_service_by_name",
     "get_fixed_price_by_name", "get_other_service_by_name", "InvoicePageUI",
 ]
 
@@ -13,8 +13,8 @@ def __getattr__(name: str):
     elif name in {"InvoicePage"}:
         module = importlib.import_module("features.InvoicePage.controller.invoice_page_controller")
     elif name in {
-        "DatabaseManager", "Customer", "Service", "InvoiceItem",
-        "IssuedInvoice", "OtherService", "FixedPrice",
+        "DatabaseManager", "CustomerModel", "ServicesModel", "InvoiceItemModel",
+        "IssuedInvoiceModel", "OtherServicesModel", "FixedPricesModel",
         "get_customer_by_national_id", "get_service_by_name",
         "get_fixed_price_by_name", "get_other_service_by_name"
     }:

@@ -14,9 +14,10 @@ from features.InvoicePage.customer_info.customer_info_logic import CustomerInfoL
 from features.InvoicePage.customer_info.customer_info_controller import CustomerInfoController, ControllerFactory
 from features.InvoicePage.customer_info.customer_info_view import CustomerInfoView
 
+from shared.entities.common_sqlalchemy_bases import CustomerModel
+from shared import return_resource
 
-# Your existing database model (example)
-# from your_database_models import Customer, Base
+customers_database = return_resource('databases', 'customers.db')
 
 
 class MainWindow(QMainWindow):
@@ -24,7 +25,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Customer Management System")
+        self.setWindowTitle("CustomerModel Management System")
         self.setGeometry(100, 100, 1200, 800)
 
         # Setup database (example with in-memory for demo)
@@ -36,14 +37,14 @@ class MainWindow(QMainWindow):
     def setup_database(self):
         """Setup database connection and repository."""
         # Option 1: Use SQLAlchemy with real database
-        # engine = create_engine('sqlite:///customers.db')
-        # Base.metadata.create_all(engine)
-        # Session = sessionmaker(bind=engine)
-        # db_session = Session()
-        # self.customer_repository = CustomerRepository(db_session)
+        engine = create_engine('sqlite:///customers.db')
+        CustomerModel.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db_session = Session()
+        self.customer_repository = CustomerRepository(db_session)
 
         # Option 2: Use in-memory repository for demo
-        self.customer_repository = InMemoryCustomerRepository()
+        # self.customer_repository = InMemoryCustomerRepository()
 
         # Add some demo data
         self._add_demo_data()
@@ -87,7 +88,7 @@ class MainWindow(QMainWindow):
 
     def on_customer_data_changed(self, data):
         """Handle customer data changes."""
-        print(f"Customer data changed: {data}")
+        print(f"CustomerModel data changed: {data}")
 
     def on_validation_changed(self, is_valid):
         """Handle validation state changes."""
@@ -142,20 +143,20 @@ def demonstrate_logic_layer():
     # Test customer creation
     customer_data = CustomerData(
         national_id="1234567890",
-        name="Test Customer",
+        name="Test CustomerModel",
         phone="09123456789",
         email="test@example.com"
     )
 
     result = logic.set_customer_data(customer_data)
-    print(f"Customer validation: {result.is_valid}")
+    print(f"CustomerModel validation: {result.is_valid}")
     if not result.is_valid:
         print(f"Errors: {result.errors}")
 
     # Test companion addition
     logic.set_companions_status(True)
-    companion_index, companion_result = logic.add_companion("Companion Name", "0987654321")
-    print(f"Companion added at index {companion_index}, valid: {companion_result.is_valid}")
+    companion_index, companion_result = logic.add_companion("CompanionModel Name", "0987654321")
+    print(f"CompanionModel added at index {companion_index}, valid: {companion_result.is_valid}")
 
     # Get summary
     summary = logic.get_summary()
@@ -183,7 +184,7 @@ def demonstrate_repository_layer():
 
     # Test CRUD operations
     print(f"Creating customer: {repository.create_customer(customer)}")
-    print(f"Customer exists: {repository.customer_exists('1111111111')}")
+    print(f"CustomerModel exists: {repository.customer_exists('1111111111')}")
 
     # Retrieve customer
     retrieved = repository.get_by_national_id("1111111111")
@@ -208,12 +209,12 @@ def demonstrate_models():
     # Test CustomerData
     customer = CustomerData(
         national_id="1234567890",
-        name="Test Customer",
+        name="Test CustomerModel",
         phone="09123456789"
     )
 
-    print(f"Customer valid: {customer.is_valid()}")
-    print(f"Customer dict: {customer.to_dict()}")
+    print(f"CustomerModel valid: {customer.is_valid()}")
+    print(f"CustomerModel dict: {customer.to_dict()}")
 
     # Test validation errors
     invalid_customer = CustomerData(
@@ -226,12 +227,12 @@ def demonstrate_models():
 
     # Test CompanionData
     companion = CompanionData(
-        name="Companion Name",
+        name="CompanionModel Name",
         national_id="0987654321",
         ui_number=1
     )
 
-    print(f"Companion valid: {companion.is_valid()}")
+    print(f"CompanionModel valid: {companion.is_valid()}")
 
     # Test CustomerInfoData
     customer_info = CustomerInfoData(
@@ -240,7 +241,7 @@ def demonstrate_models():
         companions=[companion]
     )
 
-    print(f"Customer info valid: {customer_info.is_valid()}")
+    print(f"CustomerModel info valid: {customer_info.is_valid()}")
     print(f"Total people: {customer_info.get_total_people()}")
     print(f"Summary: {customer_info.get_summary()}")
 
@@ -273,7 +274,7 @@ def example_with_real_database():
     # Your existing database model
     Base = declarative_base()
 
-    class Customer(Base):
+    class CustomerModel(Base):
         __tablename__ = 'customers'
 
         national_id = Column(String, primary_key=True)
@@ -299,14 +300,14 @@ def example_with_real_database():
     # Example usage
     customer = CustomerData(
         national_id="1234567890",
-        name="Real DB Customer",
+        name="Real DB CustomerModel",
         phone="09123456789"
     )
 
     result = logic.set_customer_data(customer)
     if result.is_valid:
         save_result = logic.save_customer()
-        print(f"Customer saved: {save_result.is_valid}")
+        print(f"CustomerModel saved: {save_result.is_valid}")
 
 
 def example_controller_usage():
@@ -336,7 +337,7 @@ def example_controller_usage():
 
     # Simulate companion field changes
     # Note: This would normally come from UI widgets
-    controller.on_companion_field_changed(1, 'name', 'Companion Name')
+    controller.on_companion_field_changed(1, 'name', 'CompanionModel Name')
     controller.on_companion_field_changed(1, 'national_id', '0987654321')
 
 
@@ -375,13 +376,13 @@ def example_error_handling():
     # Test duplicate national ID
     customer1 = CustomerData(
         national_id="1234567890",
-        name="First Customer",
+        name="First CustomerModel",
         phone="09111111111"
     )
 
     customer2 = CustomerData(
         national_id="1234567890",  # Same national ID
-        name="Second Customer",
+        name="Second CustomerModel",
         phone="09222222222"
     )
 
@@ -413,20 +414,20 @@ def example_data_import_export():
     # Create sample data
     sample_data = {
         'national_id': '1234567890',
-        'name': 'Export Test Customer',
+        'name': 'Export Test CustomerModel',
         'phone': '09123456789',
         'email': 'export@test.com',
         'address': 'Test Address',
         'has_companions': True,
         'companions': [
             {
-                'name': 'Companion 1',
+                'name': 'CompanionModel 1',
                 'national_id': '0987654321',
                 'phone': '09987654321',
                 'ui_number': 1
             },
             {
-                'name': 'Companion 2',
+                'name': 'CompanionModel 2',
                 'national_id': '1122334455',
                 'phone': '09112233445',
                 'ui_number': 2
@@ -494,18 +495,18 @@ def example_integration_testing():
     )
 
     result = logic.set_customer_data(customer_data)
-    assert result.is_valid, f"Customer creation failed: {result.errors}"
-    print("   ✓ Customer created successfully")
+    assert result.is_valid, f"CustomerModel creation failed: {result.errors}"
+    print("   ✓ CustomerModel created successfully")
 
     # Step 2: Add companions
     print("2. Adding companions...")
     logic.set_companions_status(True)
 
-    companion1_idx, comp1_result = logic.add_companion("Companion 1", "0987654321")
-    assert comp1_result.is_valid, f"Companion 1 failed: {comp1_result.errors}"
+    companion1_idx, comp1_result = logic.add_companion("CompanionModel 1", "0987654321")
+    assert comp1_result.is_valid, f"CompanionModel 1 failed: {comp1_result.errors}"
 
-    companion2_idx, comp2_result = logic.add_companion("Companion 2", "1122334455")
-    assert comp2_result.is_valid, f"Companion 2 failed: {comp2_result.errors}"
+    companion2_idx, comp2_result = logic.add_companion("CompanionModel 2", "1122334455")
+    assert comp2_result.is_valid, f"CompanionModel 2 failed: {comp2_result.errors}"
     print("   ✓ Companions added successfully")
 
     # Step 3: Validate all data
@@ -518,13 +519,13 @@ def example_integration_testing():
     print("4. Saving customer...")
     save_result = logic.save_customer()
     assert save_result.is_valid, f"Save failed: {save_result.errors}"
-    print("   ✓ Customer saved successfully")
+    print("   ✓ CustomerModel saved successfully")
 
     # Step 5: Verify customer exists
     print("5. Verifying customer exists...")
     exists = repository.customer_exists("1234567890")
-    assert exists, "Customer not found in repository"
-    print("   ✓ Customer verified in repository")
+    assert exists, "CustomerModel not found in repository"
+    print("   ✓ CustomerModel verified in repository")
 
     # Step 6: Export and reimport data
     print("6. Testing export/import...")
@@ -580,8 +581,8 @@ class CustomerSystemFactory:
 
         # Add test data
         test_customers = [
-            CustomerData("1111111111", "Test User 1", "09111111111"),
-            CustomerData("2222222222", "Test User 2", "09222222222"),
+            CustomerData("1111111111", "Test UsersModel 1", "09111111111"),
+            CustomerData("2222222222", "Test UsersModel 2", "09222222222"),
         ]
 
         for customer in test_customers:

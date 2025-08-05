@@ -27,7 +27,7 @@ class BaseRepository:
 
 
 class ServiceRepository(BaseRepository):
-    """Repository for Service model operations"""
+    """Repository for ServicesModel model operations"""
 
     def get_all(self) -> List[Service]:
         """Get all services"""
@@ -133,7 +133,7 @@ class ServiceRepository(BaseRepository):
 
 
 class FixedPriceRepository(BaseRepository):
-    """Repository for FixedPrice model operations"""
+    """Repository for FixedPricesModel model operations"""
 
     def get_all(self) -> List[FixedPrice]:
         """Get all fixed prices"""
@@ -238,7 +238,7 @@ class FixedPriceRepository(BaseRepository):
 
 
 class OtherServiceRepository(BaseRepository):
-    """Repository for OtherService model operations"""
+    """Repository for OtherServicesModel model operations"""
 
     def get_all(self) -> List[OtherService]:
         """Get all other services"""

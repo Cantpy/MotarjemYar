@@ -624,7 +624,7 @@ class HomePageView(QWidget):
             invoice_num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.invoices_table.setItem(row, 0, invoice_num_item)
 
-            # Customer name
+            # CustomerModel name
             customer_item = QTableWidgetItem(invoice.name)
             customer_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.invoices_table.setItem(row, 1, customer_item)

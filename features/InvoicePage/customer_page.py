@@ -134,7 +134,7 @@ class EditCustomerDialog(QDialog):
 class CustomerTable(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Customer Table")
+        self.setWindowTitle("CustomerModel Table")
         self.setGeometry(100, 100, 800, 600)
 
         # Main layout

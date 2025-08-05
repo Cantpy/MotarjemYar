@@ -31,7 +31,7 @@ class ServicesLogic:
 
         # Check for duplicates
         if self.service_repo.exists_by_name(service_data['name']):
-            raise ValidationError(f"Service with name '{service_data['name']}' already exists")
+            raise ValidationError(f"ServicesModel with name '{service_data['name']}' already exists")
 
         # Convert string prices to integers
         service_data = self._normalize_service_data(service_data)
@@ -45,7 +45,7 @@ class ServicesLogic:
 
         # Check for duplicates (excluding current service)
         if self.service_repo.exists_by_name(service_data['name'], exclude_id=service_id):
-            raise ValidationError(f"Service with name '{service_data['name']}' already exists")
+            raise ValidationError(f"ServicesModel with name '{service_data['name']}' already exists")
 
         # Convert string prices to integers
         service_data = self._normalize_service_data(service_data)
@@ -126,7 +126,7 @@ class ServicesLogic:
     def _validate_service_data(self, data: Dict[str, Any]) -> None:
         """Validate service data"""
         if not data.get('name', '').strip():
-            raise ValidationError("Service name is required")
+            raise ValidationError("ServicesModel name is required")
 
         base_price = data.get('base_price', 0)
         if not isinstance(base_price, (int, str)) or (isinstance(base_price, str) and not base_price.strip()):

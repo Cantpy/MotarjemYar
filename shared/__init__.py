@@ -60,7 +60,7 @@ from shared.calendar.PersianCalendar import CalendarDialog, PersianCalendarWidge
 from shared.calendar.BirthdayCalendar import BirthdayPopup, BirthdayPickerLineEdit
 from shared.calendar.CalendadrPopup import DatePickerLineEdit
 
-from shared.entities.entities import Invoice, InvoiceItem, Service, Customer
+from shared.entities.common_entities import InvoiceDetailsEntity, InvoiceDocumentsEntity, ServicesEntity, CustomerEntity
 
 
 __all__ = [
@@ -93,5 +93,5 @@ __all__ = [
     "CalendarDialog", "PersianCalendarWidget",
     "BirthdayPopup", "BirthdayPickerLineEdit", "DatePickerLineEdit",
     # entities
-    "Invoice", "InvoiceItem", "Service", "Customer"
+    "InvoiceDetailsEntity", "InvoiceDocumentsEntity", "ServicesEntity", "CustomerEntity"
 ]

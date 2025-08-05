@@ -150,10 +150,10 @@ class UserManagementWidget(QWidget):
         # Create splitter for resizable panels
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
-        # Left panel - User list
+        # Left panel - UsersModel list
         left_panel = self.create_user_list_panel()
 
-        # Right panel - User details
+        # Right panel - UsersModel details
         right_panel = self.create_user_details_panel()
 
         # Add panels to splitter
@@ -174,7 +174,7 @@ class UserManagementWidget(QWidget):
         header.setStyleSheet("QLabel { background-color: #2196F3; color: white; padding: 10px; }")
         left_layout.addWidget(header)
 
-        # User list controls
+        # UsersModel list controls
         controls_layout = QHBoxLayout()
 
         self.add_user_btn = QPushButton("افزودن کاربر جدید")
@@ -264,7 +264,7 @@ class UserManagementWidget(QWidget):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
-        # User account group
+        # UsersModel account group
         account_group = QGroupBox("حساب کاربری")
         account_layout = QFormLayout(account_group)
 
@@ -424,7 +424,7 @@ class UserManagementWidget(QWidget):
 
         layout.addWidget(history_group)
 
-        # User statistics
+        # UsersModel statistics
         stats_group = QGroupBox("آمار کاربر")
         stats_layout = QFormLayout(stats_group)
 

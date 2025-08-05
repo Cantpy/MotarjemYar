@@ -9,7 +9,7 @@ from modules.RBAC.helper_functions import DatabaseWorker
 
 
 class UserInformationWidget(QWidget):
-    """User information display widget with scroll area"""
+    """UsersModel information display widget with scroll area"""
 
     def __init__(self, parent, username):
         super().__init__()
@@ -65,7 +65,7 @@ class UserInformationWidget(QWidget):
         self.avatar_label.setAlignment(Qt.AlignCenter)
         self.avatar_label.setText("تصویر")
 
-        # User basic info
+        # UsersModel basic info
         info_layout = QVBoxLayout()
         self.name_label = QLabel("نام: در حال بارگذاری...")
         self.name_label.setFont(QFont("Arial", 16, QFont.Bold))

@@ -17,7 +17,7 @@ from features.Announcements.announcement_repo import NotificationRepository
 
 
 class NotificationService:
-    """Service class for handling SMS and Email notifications."""
+    """ServicesModel class for handling SMS and Email notifications."""
 
     def __init__(self, repository: NotificationRepository):
         """Initialize with repository."""

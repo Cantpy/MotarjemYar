@@ -70,7 +70,7 @@ class InvoiceDetailsView(QWidget):
         self.office_phone = QLabel("نامشخص")
         self.office_email = QLabel("نامشخص")
 
-        # Customer info widgets
+        # CustomerModel info widgets
         self.customer_name = QLabel("نامشخص")
         self.customer_phone = QLabel("نامشخص")
         self.customer_national_id = QLabel("نامشخص")
@@ -98,7 +98,7 @@ class InvoiceDetailsView(QWidget):
         # First column - Invoice details
         invoice_group = self._create_invoice_group()
 
-        # Second column - Customer information
+        # Second column - CustomerModel information
         customer_group = self._create_customer_group()
 
         # Third column - Financial details
@@ -171,7 +171,7 @@ class InvoiceDetailsView(QWidget):
         self._style_info_label(self.customer_email)
         self._style_info_label(self.customer_address)
 
-        # Customer information section
+        # CustomerModel information section
         form.addRow("نام مشتری:", self.customer_name)
         form.addRow("تلفن مشتری:", self.customer_phone)
         form.addRow("کد ملی:", self.customer_national_id)

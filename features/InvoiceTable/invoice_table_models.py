@@ -105,8 +105,8 @@ class IssuedInvoice(Base):
     username = Column(Text)  # FK to users.username, not enforced in SQLAlchemy yet
     pdf_file_path = Column(Text)
 
-    items = relationship("InvoiceItem", back_populates="invoice", cascade="all, delete-orphan",
-                         primaryjoin="IssuedInvoice.invoice_number==InvoiceItem.invoice_number")
+    items = relationship("InvoiceItemModel", back_populates="invoice", cascade="all, delete-orphan",
+                         primaryjoin="IssuedInvoiceModel.invoice_number==InvoiceItemModel.invoice_number")
 
     def to_dataclass(self) -> InvoiceData:
         """Convert SQLAlchemy model to InvoiceData dataclass"""
@@ -155,7 +155,7 @@ class InvoiceItem(Base):
     foreign_affairs_seal = Column(Integer, default=0)
     remarks = Column(Text)
 
-    invoice = relationship("IssuedInvoice", back_populates="items")
+    invoice = relationship("IssuedInvoiceModel", back_populates="items")
 
     def get_document_count(self) -> int:
         """Returns the number of documents represented by this invoice item"""
@@ -191,8 +191,8 @@ class User(Base):
     created_at = Column(String)
     updated_at = Column(String)
 
-    profile = relationship("UserProfile", back_populates="user", uselist=False)
-    logs = relationship("LoginLog", back_populates="user", cascade="all, delete-orphan")
+    profile = relationship("UserProfileModel", back_populates="user", uselist=False)
+    logs = relationship("LoginLogsModel", back_populates="user", cascade="all, delete-orphan")
 
 
 class UserProfile(Base):
@@ -214,7 +214,7 @@ class UserProfile(Base):
     created_at = Column(String)
     updated_at = Column(String)
 
-    user = relationship("User", back_populates="profile")
+    user = relationship("UsersModel", back_populates="profile")
 
 
 class LoginLog(Base):
@@ -230,7 +230,7 @@ class LoginLog(Base):
     ip_address = Column(String)
     user_agent = Column(String)
 
-    user = relationship("User", back_populates="logs")
+    user = relationship("UsersModel", back_populates="logs")
 
 
 class TranslationOffice(Base):

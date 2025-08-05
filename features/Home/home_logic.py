@@ -9,9 +9,9 @@ from datetime import date, timedelta
 from features.Home.home_models import (
     DashboardStats, TimeInfo, InvoiceTableRow, DocumentStatistics, DeliveryStatus, StatusChangeRequest
 )
-from features.Home.home_repo import HomePageRepository, InvoiceModel
+from features.Home.home_repo import HomePageRepository, IssuedInvoiceModel
 from shared.utils.number_utils import to_persian_number
-from shared.entities.entities import Invoice
+from shared.entities.common_entities import InvoiceDetailsEntity
 
 
 class HomePageLogic:
@@ -101,11 +101,11 @@ class HomePageLogic:
         """Mark an invoice as delivered."""
         return self.repository.mark_invoice_as_delivered(invoice_number)
 
-    def get_invoice_for_notification(self, invoice_number: int) -> Optional[Invoice]:
+    def get_invoice_for_notification(self, invoice_number: int) -> Optional[InvoiceDetailsEntity]:
         """Get invoice data for notification purposes."""
         return self.repository.get_invoice_by_number(invoice_number)
 
-    def get_recent_invoices_with_priority(self, days_threshold: int = 7) -> List[Tuple[InvoiceModel, str]]:
+    def get_recent_invoices_with_priority(self, days_threshold: int = 7) -> List[Tuple[IssuedInvoiceModel, str]]:
         """
         Get recent invoices within the specified threshold with priority labels.
 
@@ -177,7 +177,7 @@ class HomePageLogic:
         return (f"{weekday}، {to_persian_number(jalali_date.day)} "
                 f"{month} {to_persian_number(jalali_date.year)}")
 
-    def _filter_and_sort_invoices(self, invoices: List[Invoice]) -> List[Invoice]:
+    def _filter_and_sort_invoices(self, invoices: List[InvoiceDetailsEntity]) -> List[InvoiceDetailsEntity]:
         """Filter out invalid dates and sort by delivery date."""
         today = jdatetime.date.today().togregorian()
         valid_invoices = []
@@ -237,7 +237,7 @@ class HomePageLogic:
         invoice = self.repository.get_invoice_by_number(invoice_number)
         return invoice is not None and invoice.delivery_status == 0
 
-    def validate_status_change(self, invoice_number: int, target_status: int) -> Tuple[bool, str, Optional[Invoice]]:
+    def validate_status_change(self, invoice_number: int, target_status: int) -> Tuple[bool, str, Optional[InvoiceDetailsEntity]]:
         """
         Validate if a status change is allowed.
 
@@ -411,7 +411,7 @@ class HomePageLogic:
 
         return next_status, step_text
 
-    def get_invoice_for_context_menu(self, invoice_number: int) -> Invoice | None:
+    def get_invoice_for_context_menu(self, invoice_number: int) -> InvoiceDetailsEntity | None:
         """Get invoice items for context menu in view."""
         invoice = self.repository.get_invoice_by_number(invoice_number)
         return invoice

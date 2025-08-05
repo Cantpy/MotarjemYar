@@ -9,7 +9,7 @@ Base = declarative_base()
 documents_database = return_resource('databases', 'documents.db')
 
 
-class FixedPrice(Base):
+class FixedPricesModel(Base):
     """SQLAlchemy model for fixed_prices table."""
     __tablename__ = 'fixed_prices'
 
@@ -19,7 +19,7 @@ class FixedPrice(Base):
     is_default = Column(Boolean, nullable=False, default=False)
 
     def __repr__(self):
-        return f"<FixedPrice(id={self.id}, name='{self.name}', price={self.price}, is_default={self.is_default})>"
+        return f"<FixedPricesModel(id={self.id}, name='{self.name}', price={self.price}, is_default={self.is_default})>"
 
     def to_dict(self):
         """Convert model instance to dictionary."""

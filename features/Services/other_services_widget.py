@@ -506,7 +506,7 @@ class OtherServicesWidget(QWidget):
                     show_information_message_box(self, title, message)
                     return True
                 else:
-                    return False  # User cancelled
+                    return False  # UsersModel cancelled
 
         except sqlite3.IntegrityError as e:
             if "UNIQUE constraint failed" in str(e):

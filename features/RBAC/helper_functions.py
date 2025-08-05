@@ -194,7 +194,7 @@ def add_user_and_profile(user_data, profile_data):
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, profile_data)
 
-            print("✅ User and profile created.")
+            print("✅ UsersModel and profile created.")
         except sqlite3.Error as e:
             print("❌ Failed:", e)
 

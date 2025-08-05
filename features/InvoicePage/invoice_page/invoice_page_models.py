@@ -201,7 +201,7 @@ class WizardData:
 
     def is_step_valid(self, step_index: int) -> bool:
         """Check if a specific step has valid data."""
-        if step_index == 0:  # Customer info
+        if step_index == 0:  # CustomerModel info
             return bool(self.customer.name.strip())
         elif step_index == 1:  # Documents
             return len(self.documents) > 0

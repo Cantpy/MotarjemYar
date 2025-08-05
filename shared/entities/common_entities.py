@@ -4,20 +4,19 @@ from datetime import date
 
 
 @dataclass
-class Customer:
-    """Customer entity."""
+class CustomerEntity:
     national_id: str
     name: str
     phone: str
-    telegram_id: Optional[str] = None
-    email: Optional[str] = None
-    address: Optional[str] = None
-    passport_image: Optional[str] = None
+    telegram_id: str
+    email: str
+    address: str
+    passport_image: str
 
 
 @dataclass
-class Service:
-    """Service entity."""
+class ServicesEntity:
+    """ServicesModel entity."""
     id: int
     name: str
     base_price: int
@@ -28,7 +27,7 @@ class Service:
 
 
 @dataclass
-class InvoiceItem:
+class InvoiceDocumentsEntity:
     """Invoice item entity."""
     id: int
     service_name: str
@@ -42,7 +41,7 @@ class InvoiceItem:
 
 
 @dataclass
-class Invoice:
+class InvoiceDetailsEntity:
     """Invoice entity."""
     id: int
     invoice_number: str

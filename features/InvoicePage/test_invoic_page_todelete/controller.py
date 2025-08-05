@@ -68,7 +68,7 @@ class BaseController(QObject):
 class CustomerController(BaseController):
     """Controller for customer operations."""
 
-    # Customer-specific signals
+    # CustomerModel-specific signals
     customer_saved = Signal(Customer)
     customer_deleted = Signal(str)  # national_id
     customer_found = Signal(Customer)
@@ -165,7 +165,7 @@ class CustomerController(BaseController):
 class ServiceController(BaseController):
     """Controller for service operations."""
 
-    # Service-specific signals
+    # ServicesModel-specific signals
     services_loaded = Signal(list)
     service_found = Signal(Service)
     service_names_loaded = Signal(list)
@@ -460,7 +460,7 @@ class MainInvoiceController(BaseController):
 
     def _connect_signals(self):
         """Connect signals between controllers."""
-        # Customer signals
+        # CustomerModel signals
         self.customer_controller.customer_found.connect(self._on_customer_found)
 
         # Invoice signals
@@ -627,10 +627,10 @@ class MainInvoiceController(BaseController):
         )
 
         if existing_customer_result.success:
-            # Customer exists, create invoice
+            # CustomerModel exists, create invoice
             self.create_invoice_with_customer(form_data, form_data)
         else:
-            # Customer doesn't exist, create both
+            # CustomerModel doesn't exist, create both
             self.save_new_customer_and_create_invoice(form_data, form_data)
 
         return True

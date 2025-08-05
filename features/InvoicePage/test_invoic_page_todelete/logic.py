@@ -14,7 +14,7 @@ from repository import (
 
 
 class ValidationService:
-    """Service for validating business rules and data integrity."""
+    """ServicesModel for validating business rules and data integrity."""
 
     @staticmethod
     def validate_customer_data(name: str, phone: str, national_id: str, address: str) -> List[ValidationError]:
@@ -654,7 +654,7 @@ class ReportService:
 
 
 class BusinessRulesService:
-    """Service for implementing complex business rules."""
+    """ServicesModel for implementing complex business rules."""
 
     def __init__(self):
         pass

@@ -175,7 +175,7 @@ class InvoiceWizardUI(QWidget):
             """
 
     def _create_step_1_customer(self):
-        """Create Step 1: Customer Information."""
+        """Create Step 1: CustomerModel Information."""
         step1_widget = QWidget()
         step1_layout = QVBoxLayout(step1_widget)
         step1_layout.setSpacing(20)
@@ -187,7 +187,7 @@ class InvoiceWizardUI(QWidget):
         title.setStyleSheet("color: #495057; margin-bottom: 10px;")
         step1_layout.addWidget(title)
 
-        # Customer info form
+        # CustomerModel info form
         customer_group = QGroupBox("اطلاعات شخصی مشتری")
         customer_layout = QFormLayout(customer_group)
         customer_layout.setSpacing(15)
@@ -478,7 +478,7 @@ class InvoiceWizardUI(QWidget):
 
         layout.addLayout(header_layout)
 
-        # Customer info section
+        # CustomerModel info section
         customer_group = QGroupBox("اطلاعات مشتری")
         customer_layout = QHBoxLayout(customer_group)
 
@@ -853,7 +853,7 @@ class InvoiceWizardUI(QWidget):
 
     def _validate_current_step(self):
         """Validate current step data."""
-        if self.current_step == 0:  # Customer info
+        if self.current_step == 0:  # CustomerModel info
             return bool(self.customer_name.text().strip())
         elif self.current_step == 1:  # Documents
             return self.documents_table.rowCount() > 0
@@ -867,7 +867,7 @@ class InvoiceWizardUI(QWidget):
 
     def _save_current_step_data(self):
         """Save current step data to wizard_data."""
-        if self.current_step == 0:  # Customer info
+        if self.current_step == 0:  # CustomerModel info
             self.wizard_data['customer'] = {
                 'name': self.customer_name.text(),
                 'national_id': self.customer_national_id.text(),

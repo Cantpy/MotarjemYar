@@ -123,7 +123,7 @@ class ApplicationManager:
                 self.log_user_login(self.current_user, status='auto_login_success')
                 self.show_splash_and_main_window()
             else:
-                print("User did not check remember me")
+                print("UsersModel did not check remember me")
                 self.timer.checkpoint("Auto-login check completed (failed)")
                 self.show_login()
 

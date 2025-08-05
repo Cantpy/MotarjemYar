@@ -9,7 +9,7 @@ import re
 
 @dataclass
 class CustomerData:
-    """Customer data model."""
+    """CustomerModel data model."""
     national_id: str = ""
     name: str = ""
     phone: str = ""
@@ -124,30 +124,37 @@ class CustomerData:
 
 @dataclass
 class CompanionData:
-    """Companion data model."""
+    """CompanionModel data model - now represents a separate entity in database."""
+    id: Optional[int] = None
     name: str = ""
     national_id: str = ""
-    phone: str = ""
-    ui_number: int = 0
+    customer_national_id: str = ""
+    ui_number: int = 0  # For UI ordering/display purposes
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        result = {
+            'name': self.name,
+            'national_id': self.national_id,
+            'customer_national_id': self.customer_national_id,
+            'ui_number': self.ui_number,  # Include ui_number in dict
+            '_ui_number': self.ui_number  # For backward compatibility
+        }
+        if self.id is not None:
+            result['id'] = self.id
+        return result
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'CompanionData':
         """Create CompanionData from dictionary."""
+        ui_number = data.get('ui_number', 0) or data.get('_ui_number', 0)
         return cls(
+            id=data.get('id'),
             name=data.get('name', ''),
             national_id=data.get('national_id', ''),
-            phone=data.get('phone', ''),
-            ui_number=data.get('_ui_number', 0) or data.get('ui_number', 0)
+            customer_national_id=data.get('customer_national_id', ''),
+            ui_number=ui_number
         )
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary."""
-        return {
-            'name': self.name,
-            'national_id': self.national_id,
-            'phone': self.phone,
-            '_ui_number': self.ui_number
-        }
 
     def is_valid(self) -> bool:
         """Check if companion data is valid."""
@@ -276,6 +283,11 @@ class CustomerInfoData:
             'companions': self.companions if self.has_companions else [],
             'total_people': self.get_total_people()
         }
+
+    def prepare_for_save(self):
+        """Prepare companions for database save by setting customer_national_id."""
+        for companion in self.companions:
+            companion.customer_national_id = self.customer.national_id
 
 
 @dataclass

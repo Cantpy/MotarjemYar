@@ -167,13 +167,13 @@ class InvoiceWizardView(QWidget):
 
     def _create_step_views(self):
         """Create step view widgets."""
-        # Note: Customer and Documents views are excluded as requested
+        # Note: CustomerModel and Documents views are excluded as requested
         # They should be added externally using add_step_view method
 
         # Add placeholder widgets for customer and documents steps
         placeholder1 = QWidget()
         placeholder1_layout = QVBoxLayout(placeholder1)
-        placeholder1_label = QLabel("Customer View (External)")
+        placeholder1_label = QLabel("CustomerModel View (External)")
         placeholder1_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         placeholder1_label.setStyleSheet("color: #6c757d; font-size: 16px;")
         placeholder1_layout.addWidget(placeholder1_label)

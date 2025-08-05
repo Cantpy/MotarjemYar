@@ -568,7 +568,7 @@ class AdminDashboardWidget(QWidget):
         stats_card = self.create_stats_card()
         self.dashboard_layout.addWidget(stats_card, 0, 0)
 
-        # User Activity Card
+        # UsersModel Activity Card
         activity_card = self.create_activity_card()
         self.dashboard_layout.addWidget(activity_card, 0, 1)
 
@@ -1220,7 +1220,7 @@ class AdminDashboardWidget(QWidget):
             # Set RTL direction for Persian text
             sheet.sheet_view.rightToLeft = True
 
-            # User info header
+            # UsersModel info header
             sheet.merge_cells('A1:E1')
             user_title = f"گزارش فعالیت: {full_name or username}"
             sheet.cell(row=1, column=1, value=user_title)
@@ -1228,7 +1228,7 @@ class AdminDashboardWidget(QWidget):
             sheet.cell(row=1, column=1).alignment = Alignment(horizontal="center")
             sheet.cell(row=1, column=1).fill = PatternFill(start_color="D9E2F3", end_color="D9E2F3", fill_type="solid")
 
-            # User details
+            # UsersModel details
             sheet.cell(row=2, column=1, value="نام کاربری:")
             sheet.cell(row=2, column=2, value=username)
             sheet.cell(row=3, column=1, value="نقش:")
