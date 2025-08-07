@@ -131,7 +131,7 @@ class CustomerInfoApp:
         """Initialize application."""
         self.app = QApplication(sys.argv)
 
-        # Create main window (database setup is handled in MainWindow)
+        # Create main window (database setup is handled in MainWindow_gaming)
         self.main_window = MainWindow()
 
     def run(self):

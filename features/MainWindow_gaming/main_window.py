@@ -15,10 +15,7 @@ import os
 # ----------------------  Resources  ----------------------  #
 
 # Databases
-invoices_database = return_resource('databases', 'invoices.db')
 users_database = return_resource('databases', 'users.db')
-documents_database = return_resource('databases', 'documents.db')
-customers_database = return_resource('databases', 'customers.db')
 
 # Logos
 logo_file = return_resource("resources", "png-icon.png", "Designs")
@@ -70,7 +67,7 @@ class ExitDialog(QDialog):
         #     self.setStyleSheet(styles.read())
 
     def confirm_exit(self):
-        """Animate fade-out for ExitDialog first, then MainWindow before quitting."""
+        """Animate fade-out for ExitDialog first, then MainWindow_gaming before quitting."""
         if not self.main_window:  # Fallback if there's no parent
             self.close_and_exit()
             return
@@ -82,13 +79,13 @@ class ExitDialog(QDialog):
         self.exit_animation.setEndValue(0.0)
         self.exit_animation.setEasingCurve(QEasingCurve.InOutQuad)
 
-        # Step 2: Animate MainWindow fade-out AFTER ExitDialog animation finishes
+        # Step 2: Animate MainWindow_gaming fade-out AFTER ExitDialog animation finishes
         self.exit_animation.finished.connect(self.fade_out_main_window)
 
         self.exit_animation.start()  # Start exit animation for ExitDialog
 
     def fade_out_main_window(self):
-        """Animate MainWindow fade-out after ExitDialog fades out."""
+        """Animate MainWindow_gaming fade-out after ExitDialog fades out."""
         self.main_window.exit_animation = QPropertyAnimation(self.main_window, b"windowOpacity")
         self.main_window.exit_animation.setDuration(500)  # 500ms duration for main window
         self.main_window.exit_animation.setStartValue(1.0)
@@ -472,7 +469,7 @@ class MainWindow(QMainWindow):
     #         # Clear the remember me settings
     #         self.clear_remember_settings()
     #
-    #         # Clear current user context in MainWindow
+    #         # Clear current user context in MainWindow_gaming
     #         self.current_user = None
     #         self.current_role = None
     #         self.current_user_fullname = None

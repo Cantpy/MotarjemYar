@@ -29,9 +29,11 @@ class CustomerModel(Base):
     companions = relationship("CompanionModel", back_populates="customer", cascade="all, delete-orphan")
     invoices = relationship("IssuedInvoiceModel", back_populates="customer")
 
-    # Indexes
+    # Indexes for better query performance
     __table_args__ = (
         Index('idx_customers_national_id', 'national_id'),
+        Index('idx_customers_phone', 'phone'),
+        Index('idx_customers_name', 'name'),
     )
 
 
@@ -45,6 +47,13 @@ class CompanionModel(Base):
 
     # Relationships
     customer = relationship("CustomerModel", back_populates="companions")
+
+    # Indexes for better query performance and autocompletion
+    __table_args__ = (
+        Index('idx_companions_national_id', 'national_id'),
+        Index('idx_companions_customer_national_id', 'customer_national_id'),
+        Index('idx_companions_name', 'name'),
+    )
 
 
 # ============================================================================

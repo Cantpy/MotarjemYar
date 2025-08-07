@@ -44,10 +44,61 @@ class ICustomerRepository:
         raise NotImplementedError
 
     def phone_exists(self, phone: str, exclude_national_id: str = None) -> bool:
-        raise NotImplementedError
+        """Check if phone number exists (optionally excluding a specific customer)."""
+        try:
+            query = self.db_session.query(CustomerModel).filter(CustomerModel.phone == phone)
+            if exclude_national_id:
+                query = query.filter(CustomerModel.national_id != exclude_national_id)
+            return query.first() is not None
+
+        except SQLAlchemyError as e:
+            print(f"Database error in phone_exists: {e}")
+            return False
 
     def companion_national_id_exists(self, national_id: str, exclude_companion_id: int = None) -> bool:
-        raise NotImplementedError
+        """Check if companion national ID exists (optionally excluding a specific companion)."""
+        try:
+            query = self.db_session.query(CompanionModel).filter(CompanionModel.national_id == national_id)
+            if exclude_companion_id:
+                query = query.filter(CompanionModel.id != exclude_companion_id)
+            return query.first() is not None
+
+        except SQLAlchemyError as e:
+            print(f"Database error in companion_national_id_exists: {e}")
+            return False
+
+    def customer_national_id_exists_as_companion(self, national_id: str) -> bool:
+        """Check if a national ID is already used as a companion."""
+        try:
+            return self.db_session.query(CompanionModel).filter(
+                CompanionModel.national_id == national_id
+            ).first() is not None
+
+        except SQLAlchemyError as e:
+            print(f"Database error in customer_national_id_exists_as_companion: {e}")
+            return False
+
+    def _convert_to_customer_data(self, customer) -> CustomerData:
+        """Convert SQLAlchemy CustomerModel model to CustomerData dataclass."""
+        return CustomerData(
+            national_id=customer.national_id,
+            name=customer.name,
+            phone=customer.phone,
+            email=customer.email or "",
+            address=customer.address or "",
+            telegram_id=customer.telegram_id or "",
+            passport_image=customer.passport_image or ""
+        )
+
+    def _convert_to_companion_data(self, companion) -> CompanionData:
+        """Convert SQLAlchemy CompanionModel to CompanionData dataclass."""
+        return CompanionData(
+            id=companion.id,
+            name=companion.name,
+            national_id=companion.national_id,
+            customer_national_id=companion.customer_national_id,
+            ui_number=0  # Will be set by logic layer when loading
+        )
 
 
 class CustomerRepository(ICustomerRepository):
@@ -83,6 +134,57 @@ class CustomerRepository(ICustomerRepository):
             return [self._convert_to_companion_data(comp) for comp in companions]
         except SQLAlchemyError as e:
             print(f"Database error in get_companions_by_customer: {e}")
+            return []
+
+    def get_all_companions(self, limit: int = 1000) -> List[CompanionData]:
+        """Get all companions across all customers."""
+        try:
+            companions = self.db_session.query(CompanionModel).limit(limit).all()
+            return [self._convert_to_companion_data(comp) for comp in companions]
+        except SQLAlchemyError as e:
+            print(f"Database error in get_all_companions: {e}")
+            return []
+
+    def search_customers_by_partial_match(self, field: str, value: str, limit: int = 10) -> List[CustomerData]:
+        """Search customers by partial match on specific field."""
+        try:
+            query = self.db_session.query(CustomerModel)
+
+            if field == 'national_id':
+                query = query.filter(CustomerModel.national_id.like(f"{value}%"))
+            elif field == 'name':
+                query = query.filter(CustomerModel.name.like(f"%{value}%"))
+            elif field == 'phone':
+                query = query.filter(CustomerModel.phone.like(f"{value}%"))
+            elif field == 'email':
+                query = query.filter(CustomerModel.email.like(f"%{value}%"))
+            else:
+                return []
+
+            customers = query.limit(limit).all()
+            return [self._convert_to_customer_data(customer) for customer in customers]
+
+        except SQLAlchemyError as e:
+            print(f"Database error in search_customers_by_partial_match: {e}")
+            return []
+
+    def search_companions_by_partial_match(self, field: str, value: str, limit: int = 10) -> List[CompanionData]:
+        """Search companions by partial match on specific field."""
+        try:
+            query = self.db_session.query(CompanionModel)
+
+            if field == 'national_id':
+                query = query.filter(CompanionModel.national_id.like(f"{value}%"))
+            elif field == 'name':
+                query = query.filter(CompanionModel.name.like(f"%{value}%"))
+            else:
+                return []
+
+            companions = query.limit(limit).all()
+            return [self._convert_to_companion_data(comp) for comp in companions]
+
+        except SQLAlchemyError as e:
+            print(f"Database error in search_companions_by_partial_match: {e}")
             return []
 
     def get_by_national_id(self, national_id: str) -> Optional[CustomerData]:
@@ -397,6 +499,30 @@ class CustomerRepositoryFactory:
     def create(db_session: Session) -> CustomerRepository:
         """Create a customer repository instance."""
         return CustomerRepository(db_session)
+
+    def phone_exists(self, phone: str, exclude_national_id: str = None) -> bool:
+        raise NotImplementedError
+
+    def companion_national_id_exists(self, national_id: str, exclude_companion_id: int = None) -> bool:
+        raise NotImplementedError
+
+    def get_all_customers(self, limit: int = 100) -> List[CustomerData]:
+        raise NotImplementedError
+
+    def get_customer_count(self) -> int:
+        raise NotImplementedError
+
+    def get_companions_by_customer(self, customer_national_id: str) -> List[CompanionData]:
+        raise NotImplementedError
+
+    def get_all_companions(self, limit: int = 1000) -> List[CompanionData]:
+        raise NotImplementedError
+
+    def search_customers_by_partial_match(self, field: str, value: str, limit: int = 10) -> List[CustomerData]:
+        raise NotImplementedError
+
+    def search_companions_by_partial_match(self, field: str, value: str, limit: int = 10) -> List[CompanionData]:
+        raise NotImplementedError
 
 
 class InMemoryCustomerRepository(ICustomerRepository):

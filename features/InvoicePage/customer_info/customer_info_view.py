@@ -6,19 +6,19 @@ Optimized for compactness and responsiveness
 import sys
 from typing import List, Dict, Any, Optional
 
-from PySide6.QtCore import Qt, QSize, Signal, QRegularExpression
+from PySide6.QtCore import Qt, QSize, Signal, QRegularExpression, QStringListModel
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QLineEdit,
-    QPushButton, QSpacerItem, QSizePolicy, QFrame, QSpinBox, QScrollArea,
-    QCheckBox, QMessageBox, QDialog, QTableWidget, QTableWidgetItem,
-    QHeaderView, QDialogButtonBox, QTextEdit, QGridLayout
+    QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QLineEdit, QCompleter, QPushButton, QSpacerItem,
+    QSizePolicy, QFrame, QScrollArea, QCheckBox, QMessageBox, QDialog, QTableWidget, QTableWidgetItem,
+    QHeaderView, QTextEdit, QGridLayout
 )
 
 from features.InvoicePage.customer_info.customer_info_controller import (CustomerInfoController,
                                                                          CustomerManagementController,
                                                                          CustomerDialogController)
 from features.InvoicePage.customer_info.customer_info_repo import ICustomerRepository
+from features.InvoicePage.customer_info.customer_info_models import CustomerData, CompanionData
 
 
 class CustomerInfoView(QWidget):
@@ -40,12 +40,60 @@ class CustomerInfoView(QWidget):
         # Initialize controller
         self.controller = CustomerInfoController(customer_repository, self)
 
+        # Autocompletion setup
+        self._setup_autocompletion()
+
         self._setup_ui()
         self._connect_signals()
         self._setup_styles()
 
         # Initialize controller
         self.controller.initialize()
+
+    def _setup_autocompletion(self):
+        """Setup autocompletion data structures."""
+        self.customer_completers = {}
+        self.companion_completers = {}
+        self._load_autocompletion_data()
+
+    def _load_autocompletion_data(self):
+        """Load data for autocompletion from repository."""
+        try:
+            # Get all customers for autocompletion
+            customers = self.customer_repository.get_all_customers(limit=1000)
+
+            # Create dictionaries for quick lookup
+            self.customers_by_national_id = {c.national_id: c for c in customers}
+            self.customers_by_phone = {c.phone: c for c in customers}
+            self.customers_by_name = {}
+
+            # Index customers by name parts for fuzzy matching
+            for customer in customers:
+                name_parts = customer.name.strip().split()
+                for part in name_parts:
+                    if part not in self.customers_by_name:
+                        self.customers_by_name[part] = []
+                    self.customers_by_name[part].append(customer)
+
+            # Get all companions for autocompletion
+            all_companions = []
+            for customer in customers:
+                companions = self.customer_repository.get_companions_by_customer(customer.national_id)
+                all_companions.extend(companions)
+
+            self.companions_by_national_id = {c.national_id: c for c in all_companions}
+            self.companions_by_name = {}
+
+            # Index companions by name parts
+            for companion in all_companions:
+                name_parts = companion.name.strip().split()
+                for part in name_parts:
+                    if part not in self.companions_by_name:
+                        self.companions_by_name[part] = []
+                    self.companions_by_name[part].append(companion)
+
+        except Exception as e:
+            print(f"Error loading autocompletion data: {e}")
 
     def _setup_ui(self):
         """Setup the customer information UI - optimized for compactness with vertical stretch."""
@@ -168,7 +216,7 @@ class CustomerInfoView(QWidget):
         return group
 
     def _create_bottom_action_buttons(self):
-        """Create compact action buttons."""
+        """Create compact action buttons with clear form button."""
         buttons_frame = QFrame()
         buttons_frame.setObjectName("action_buttons_frame")
 
@@ -178,6 +226,13 @@ class CustomerInfoView(QWidget):
 
         # Add spacer to center buttons
         buttons_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
+
+        # Clear form button - new button
+        self.clear_form_btn = QPushButton("پاک کردن فرم")
+        self.clear_form_btn.setObjectName("clear_form_btn")
+        self.clear_form_btn.setMinimumSize(QSize(120, 35))
+        self.clear_form_btn.setFont(self._get_font(10, bold=True))
+        self.clear_form_btn.setToolTip("پاک کردن تمام فیلدهای فرم")
 
         # Add customer button - more compact
         self.add_customer_btn = QPushButton("ثبت مشتری")
@@ -193,6 +248,7 @@ class CustomerInfoView(QWidget):
         self.customer_affairs_btn.setFont(self._get_font(10, bold=True))
         self.customer_affairs_btn.setToolTip("مدیریت امور مشتریان")
 
+        buttons_layout.addWidget(self.clear_form_btn)
         buttons_layout.addWidget(self.add_customer_btn)
         buttons_layout.addWidget(self.customer_affairs_btn)
 
@@ -202,7 +258,7 @@ class CustomerInfoView(QWidget):
         return buttons_frame
 
     def _create_input_fields(self):
-        """Create customer input fields using responsive grid layout."""
+        """Create customer input fields using responsive grid layout with autocompletion."""
         # Use grid layout for better responsiveness
         fields_layout = QGridLayout()
         fields_layout.setSpacing(15)
@@ -278,7 +334,81 @@ class CustomerInfoView(QWidget):
         fields_layout.setColumnStretch(0, 1)
         fields_layout.setColumnStretch(1, 1)
 
+        # Setup autocompletion for customer fields
+        self._setup_customer_field_autocompletion()
+
         return fields_layout
+
+    def _setup_customer_field_autocompletion(self):
+        """Setup QCompleter for customer fields."""
+        # National ID completer
+        national_ids = list(self.customers_by_national_id.keys())
+        national_id_completer = QCompleter(national_ids, self)
+        national_id_completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self.national_id_le.setCompleter(national_id_completer)
+
+        # Phone completer
+        phones = list(self.customers_by_phone.keys())
+        phone_completer = QCompleter(phones, self)
+        phone_completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self.phone_le.setCompleter(phone_completer)
+
+        # Name completer (combine all name parts)
+        name_parts = list(self.customers_by_name.keys())
+        name_completer = QCompleter(name_parts, self)
+        name_completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self.full_name_le.setCompleter(name_completer)
+
+        # Connect completer activated signal to autofill logic
+        self.national_id_le.completer().activated.connect(
+            lambda text: self._autofill_customer_data(self.customers_by_national_id[text])
+        )
+        self.phone_le.completer().activated.connect(
+            lambda text: self._autofill_customer_data(self.customers_by_phone[text])
+        )
+        self.full_name_le.completer().activated.connect(
+            lambda text: self._autofill_customer_data(self.customers_by_name[text][0])  # First match
+        )
+
+    def _autofill_customer_data(self, customer: CustomerData):
+        """Autofill customer data without triggering signals."""
+        # Temporarily disconnect signals to avoid recursive calls
+        self._disconnect_customer_signals()
+
+        # Fill the fields
+        self.national_id_le.setText(customer.national_id)
+        self.full_name_le.setText(customer.name)
+        self.phone_le.setText(customer.phone)
+        self.email_le.setText(customer.email or "")
+        self.address_le.setText(customer.address or "")
+
+        # Reconnect signals
+        self._reconnect_customer_signals()
+
+        # Load companions if any
+        companions = self.customer_repository.get_companions_by_customer(customer.national_id)
+        if companions:
+            self.has_companions_cb.setChecked(True)
+            self.controller.load_customer_by_national_id(customer.national_id)
+
+        # Notify controller of the change
+        self.controller.set_data(customer.to_dict())
+
+    def _disconnect_customer_signals(self):
+        """Temporarily disconnect customer field signals."""
+        self.national_id_le.textChanged.disconnect()
+        self.full_name_le.textChanged.disconnect()
+        self.phone_le.textChanged.disconnect()
+        self.address_le.textChanged.disconnect()
+        self.email_le.textChanged.disconnect()
+
+    def _reconnect_customer_signals(self):
+        """Reconnect customer field signals."""
+        self.national_id_le.textChanged.connect(self.controller.on_national_id_changed)
+        self.full_name_le.textChanged.connect(self.controller.on_full_name_changed)
+        self.phone_le.textChanged.connect(self.controller.on_phone_changed)
+        self.address_le.textChanged.connect(self.controller.on_address_changed)
+        self.email_le.textChanged.connect(self.controller.on_email_changed)
 
     def _create_field_layout(self, label_text: str, required: bool = False):
         """Create a compact field layout with label."""
@@ -296,7 +426,7 @@ class CustomerInfoView(QWidget):
         return layout
 
     def _create_companion_widget(self, companion_num: int):
-        """Create widget for a single companion with better spacing."""
+        """Create widget for a single companion with better spacing and autocompletion."""
         companion_frame = QFrame()
         companion_frame.setObjectName(f"companion_frame_{companion_num}")
         companion_frame.setMinimumHeight(120)
@@ -344,8 +474,6 @@ class CustomerInfoView(QWidget):
         national_id_le.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         national_id_le.setMinimumSize(QSize(0, 26))  # Better height
         national_id_le.setMaximumSize(QSize(16777215, 26))
-        national_id_le.textChanged.connect(
-            lambda text: self.controller.on_companion_field_changed(companion_num, 'national_id', text))
 
         national_id_layout.addWidget(national_id_label)
         national_id_layout.addWidget(national_id_le)
@@ -364,8 +492,6 @@ class CustomerInfoView(QWidget):
         full_name_le.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         full_name_le.setMinimumSize(QSize(0, 26))  # Better height
         full_name_le.setMaximumSize(QSize(16777215, 26))
-        full_name_le.textChanged.connect(
-            lambda text: self.controller.on_companion_field_changed(companion_num, 'name', text))
 
         full_name_layout.addWidget(full_name_label)
         full_name_layout.addWidget(full_name_le)
@@ -376,7 +502,64 @@ class CustomerInfoView(QWidget):
         companion_layout.addLayout(header_layout)
         companion_layout.addLayout(fields_layout)
 
+        self._setup_companion_field_autocompletion(companion_num)
+
         return companion_frame
+
+    def _setup_companion_field_autocompletion(self, companion_num: int):
+        """Setup QCompleter for companion fields."""
+        companion_widget = self.companion_widgets.get(companion_num)
+        if not companion_widget:
+            return
+
+        name_field = companion_widget.findChild(QLineEdit, f"companion_full_name_{companion_num}")
+        national_id_field = companion_widget.findChild(QLineEdit, f"companion_national_id_{companion_num}")
+
+        if name_field:
+            name_parts = list(self.companions_by_name.keys())
+            name_completer = QCompleter(name_parts, self)
+            name_completer.setCaseSensitivity(Qt.CaseInsensitive)
+            name_field.setCompleter(name_completer)
+            name_completer.activated.connect(
+                lambda text: self._autofill_companion_data(companion_num, self.companions_by_name[text][0])
+            )
+
+        if national_id_field:
+            ids = list(self.companions_by_national_id.keys())
+            id_completer = QCompleter(ids, self)
+            id_completer.setCaseSensitivity(Qt.CaseInsensitive)
+            national_id_field.setCompleter(id_completer)
+            id_completer.activated.connect(
+                lambda text: self._autofill_companion_data(companion_num, self.companions_by_national_id[text])
+            )
+
+    def _autofill_companion_data(self, companion_num: int, companion: CompanionData):
+        """Autofill companion data without triggering signals."""
+        companion_widget = self.companion_widgets.get(companion_num)
+        if not companion_widget:
+            return
+
+        name_field = companion_widget.findChild(QLineEdit, f"companion_full_name_{companion_num}")
+        national_id_field = companion_widget.findChild(QLineEdit, f"companion_national_id_{companion_num}")
+
+        if name_field and national_id_field:
+            # Temporarily disconnect signals
+            name_field.textChanged.disconnect()
+            national_id_field.textChanged.disconnect()
+
+            # Fill the fields
+            name_field.setText(companion.name)
+            national_id_field.setText(companion.national_id)
+
+            # Reconnect signals
+            name_field.textChanged.connect(
+                lambda text: self.controller.on_companion_field_changed(companion_num, 'name', text))
+            national_id_field.textChanged.connect(
+                lambda text: self.controller.on_companion_field_changed(companion_num, 'national_id', text))
+
+            # Notify controller
+            self.controller.on_companion_field_changed(companion_num, 'name', companion.name)
+            self.controller.on_companion_field_changed(companion_num, 'national_id', companion.national_id)
 
     def _connect_signals(self):
         """Connect UI signals to controller methods."""
@@ -396,6 +579,7 @@ class CustomerInfoView(QWidget):
         # Action buttons
         self.add_customer_btn.clicked.connect(self._on_add_customer_clicked)
         self.customer_affairs_btn.clicked.connect(self._on_customer_affairs_clicked)
+        self.clear_form_btn.clicked.connect(self._on_clear_form_clicked)  # New clear form button
 
         # Controller signals
         self.controller.data_changed.connect(self.data_changed)
@@ -491,6 +675,23 @@ class CustomerInfoView(QWidget):
 
             QPushButton#customer_affairs_btn:pressed {
                 background-color: #004085;
+            }
+
+            QPushButton#clear_form_btn {
+                background-color: #dc3545;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 6px 12px;
+                font-weight: bold;
+            }
+
+            QPushButton#clear_form_btn:hover {
+                background-color: #c82333;
+            }
+
+            QPushButton#clear_form_btn:pressed {
+                background-color: #bd2130;
             }
 
             QPushButton#add_companion_btn {
@@ -630,23 +831,26 @@ class CustomerInfoView(QWidget):
     def _on_add_customer_clicked(self):
         """Handle add customer button click - save to database."""
         # Save customer and companions to database
-        success = self.controller.save_customer()
-        if success:
-            # Optionally clear form after successful save
-            reply = QMessageBox.question(
-                self,
-                "پیام",
-                "اطلاعات با موفقیت ذخیره شد. آیا می‌خواهید فرم را پاک کنید؟",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No
-            )
-            if reply == QMessageBox.StandardButton.Yes:
-                self.clear_form()
+        self.controller.save_customer()
 
     def _on_customer_affairs_clicked(self):
         """Handle customer affairs button click."""
         dialog = CustomerManagementDialog(self.customer_repository, self)
         dialog.exec()
+
+    def _on_clear_form_clicked(self):
+        """Handle clear form button click."""
+        reply = QMessageBox.question(
+            self,
+            "تأیید پاک کردن",
+            "آیا مطمئن هستید که می‌خواهید تمام فیلدهای فرم را پاک کنید؟",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            self.clear_form()
+            self._load_autocompletion_data()  # Refresh autocompletion data
 
     def _on_customer_loaded(self, customer_data: Dict[str, Any]):
         """Handle customer loaded signal from controller."""
@@ -791,6 +995,9 @@ class CustomerInfoView(QWidget):
         self.has_companions_cb.setChecked(False)
         self.clear_companions()
         self.show_companions_group(False)
+
+        # Clear controller data
+        self.controller.clear_all_data()
 
     def sync_companions_with_data(self, companions_data: List[Dict[str, Any]]):
         """Sync companion widgets with data - uses renumbering for proper sequencing."""

@@ -10,7 +10,7 @@ from typing import List, Tuple
 from features.Home.home_logic import HomePageLogic
 from features.Home.home_models import DashboardStats, DeliveryStatus, StatusChangeRequest
 from features.Home.home_settings_models import Settings
-from features.Home.home_repo import IssuedInvoiceModel
+from shared.entities.common_sqlalchemy_bases import IssuedInvoiceModel
 from shared import (show_question_message_box, show_information_message_box, NotificationDialog, return_resource,
                     show_error_message_box, show_warning_message_box)
 
@@ -32,6 +32,7 @@ class HomepageSettingsManager(QObject):
     def update_settings(self, new_settings: Settings):
         self._settings = new_settings
         self.settings_updated.emit(self._settings)
+
 
 class HomePageController(QObject):
     """Controller for home page operations."""

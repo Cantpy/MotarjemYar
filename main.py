@@ -2,7 +2,7 @@ import sys
 from features.Login import LoginWidget
 from PySide6.QtWidgets import QApplication
 # from modules.application_manager import CheckpointTimer, ApplicationManager
-from features.MainWindow import MainWindow
+from features.MainWindow_gaming import MainWindow
 
 # def main():
 #     """Main entry point with timing"""
@@ -39,7 +39,7 @@ from features.MainWindow import MainWindow
 
 
 def main():
-    """Main entry point from MainWindow"""
+    """Main entry point from MainWindow_gaming"""
     try:
         app = QApplication(sys.argv)
         app_manager = MainWindow(app_manager=None)

@@ -3,9 +3,10 @@ from sqlalchemy import create_engine, func
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import SQLAlchemyError
 from features.InvoiceTable.invoice_table_models import (
-    Base, IssuedInvoice, InvoiceItem, User, UserProfile,
     InvoiceData, InvoiceSummary, DocumentCount
 )
+from shared.entities.common_sqlalchemy_bases import (Base, IssuedInvoiceModel, InvoiceItemModel, UsersModel,
+                                                     UserProfileModel)
 import logging
 from shared import return_resource
 
@@ -40,7 +41,7 @@ class InvoiceRepository(DatabaseRepository):
         """Retrieve all invoices from database"""
         try:
             with self.InvoicesSession() as session:
-                invoices = session.query(IssuedInvoice).all()
+                invoices = session.query(IssuedInvoiceModel).all()
                 return [invoice.to_dataclass() for invoice in invoices]
         except SQLAlchemyError as e:
             logger.error(f"Error retrieving invoices: {e}")
@@ -50,8 +51,8 @@ class InvoiceRepository(DatabaseRepository):
         """Retrieve specific invoice by number"""
         try:
             with self.InvoicesSession() as session:
-                invoice = session.query(IssuedInvoice).filter(
-                    IssuedInvoice.invoice_number == invoice_number
+                invoice = session.query(IssuedInvoiceModel).filter(
+                    IssuedInvoiceModel.invoice_number == invoice_number
                 ).first()
                 return invoice.to_dataclass() if invoice else None
         except SQLAlchemyError as e:
@@ -62,8 +63,8 @@ class InvoiceRepository(DatabaseRepository):
         """Update invoice data"""
         try:
             with self.InvoicesSession() as session:
-                invoice = session.query(IssuedInvoice).filter(
-                    IssuedInvoice.invoice_number == invoice_number
+                invoice = session.query(IssuedInvoiceModel).filter(
+                    IssuedInvoiceModel.invoice_number == invoice_number
                 ).first()
 
                 if not invoice:
@@ -83,8 +84,8 @@ class InvoiceRepository(DatabaseRepository):
         """Delete multiple invoices"""
         try:
             with self.InvoicesSession() as session:
-                deleted_count = session.query(IssuedInvoice).filter(
-                    IssuedInvoice.invoice_number.in_(invoice_numbers)
+                deleted_count = session.query(IssuedInvoiceModel).filter(
+                    IssuedInvoiceModel.invoice_number.in_(invoice_numbers)
                 ).delete(synchronize_session=False)
 
                 session.commit()
@@ -99,8 +100,8 @@ class InvoiceRepository(DatabaseRepository):
             with self.InvoicesSession() as session:
                 total_docs = 0
 
-                items = session.query(InvoiceItem).filter(
-                    InvoiceItem.invoice_number == invoice_number
+                items = session.query(InvoiceItemModel).filter(
+                    InvoiceItemModel.invoice_number == invoice_number
                 ).all()
 
                 for item in items:
@@ -118,7 +119,7 @@ class InvoiceRepository(DatabaseRepository):
                 document_counts = {}
 
                 # Get all invoice items
-                items = session.query(InvoiceItem).all()
+                items = session.query(InvoiceItemModel).all()
 
                 for item in items:
                     if item.invoice_number not in document_counts:
@@ -143,19 +144,19 @@ class InvoiceRepository(DatabaseRepository):
         try:
             with self.InvoicesSession() as session:
                 # Total count
-                total_count = session.query(func.count(IssuedInvoice.id)).scalar()
+                total_count = session.query(func.count(IssuedInvoiceModel.id)).scalar()
 
                 # Total amount
-                total_amount = session.query(func.sum(IssuedInvoice.total_amount)).scalar() or 0
+                total_amount = session.query(func.sum(IssuedInvoiceModel.total_amount)).scalar() or 0
 
                 # Translator statistics
                 translator_stats = session.query(
-                    IssuedInvoice.translator,
-                    func.count(IssuedInvoice.id)
+                    IssuedInvoiceModel.translator,
+                    func.count(IssuedInvoiceModel.id)
                 ).filter(
-                    IssuedInvoice.translator.isnot(None),
-                    IssuedInvoice.translator != 'نامشخص'
-                ).group_by(IssuedInvoice.translator).all()
+                    IssuedInvoiceModel.translator.isnot(None),
+                    IssuedInvoiceModel.translator != 'نامشخص'
+                ).group_by(IssuedInvoiceModel.translator).all()
 
                 return InvoiceSummary(
                     total_count=total_count,
@@ -170,8 +171,8 @@ class InvoiceRepository(DatabaseRepository):
         """Export invoice data for given invoice numbers"""
         try:
             with self.InvoicesSession() as session:
-                invoices = session.query(IssuedInvoice).filter(
-                    IssuedInvoice.invoice_number.in_(invoice_numbers)
+                invoices = session.query(IssuedInvoiceModel).filter(
+                    IssuedInvoiceModel.invoice_number.in_(invoice_numbers)
                 ).all()
 
                 return [
@@ -202,10 +203,10 @@ class UserRepository(DatabaseRepository):
         try:
             with self.UsersSession() as session:
                 # Get active translators with their profiles
-                translators = session.query(User).join(UserProfile).filter(
-                    User.role == 'translator',
-                    User.active == True,
-                    UserProfile.full_name.isnot(None)
+                translators = session.query(UsersModel).join(UserProfileModel).filter(
+                    UsersModel.role == 'translator',
+                    UsersModel.active == True,
+                    UserProfileModel.full_name.isnot(None)
                 ).all()
 
                 for translator in translators:
@@ -223,7 +224,7 @@ class UserRepository(DatabaseRepository):
         """Get user data by username"""
         try:
             with self.UsersSession() as session:
-                user = session.query(User).filter(User.username == username).first()
+                user = session.query(UsersModel).filter(UsersModel.username == username).first()
                 if user:
                     return {
                         'username': user.username,
@@ -241,13 +242,13 @@ class UserRepository(DatabaseRepository):
         try:
             with self.UsersSession() as session:
                 # Create user
-                user = User(username=username, role=role)
+                user = UsersModel(username=username, role=role)
                 session.add(user)
                 session.flush()  # To get the user ID
 
                 # Create profile if full_name provided
                 if full_name:
-                    profile = UserProfile(username=username, full_name=full_name)
+                    profile = UserProfileModel(username=username, full_name=full_name)
                     session.add(profile)
 
                 session.commit()
@@ -260,14 +261,14 @@ class UserRepository(DatabaseRepository):
         """Update user profile"""
         try:
             with self.UsersSession() as session:
-                profile = session.query(UserProfile).filter(
-                    UserProfile.username == username
+                profile = session.query(UserProfileModel).filter(
+                    UserProfileModel.username == username
                 ).first()
 
                 if profile:
                     profile.full_name = full_name
                 else:
-                    profile = UserProfile(username=username, full_name=full_name)
+                    profile = UserProfileModel(username=username, full_name=full_name)
                     session.add(profile)
 
                 session.commit()

@@ -32,23 +32,40 @@ class CustomerInfoController(QObject):
         self.logic = CustomerInfoLogic(customer_repository)
         self.management_logic = CustomerManagementLogic(customer_repository)
         self._last_validation_state = True
+        self._autocompletion_enabled = True
 
     def initialize(self):
         """Initialize controller with default state."""
         self._emit_current_state()
+
+    def set_autocompletion_enabled(self, enabled: bool):
+        """Enable or disable autocompletion."""
+        self._autocompletion_enabled = enabled
 
     # CustomerModel field update methods (called by UI signals)
     def on_national_id_changed(self, value: str):
         """Handle national ID field change."""
         self.update_customer_field('national_id', value)
 
+        # Handle autocompletion if enabled
+        if self._autocompletion_enabled and len(value) >= 3:
+            self._try_autocomplete_customer_by_national_id(value)
+
     def on_full_name_changed(self, value: str):
         """Handle full name field change."""
         self.update_customer_field('name', value)
 
+        # Handle autocompletion if enabled
+        if self._autocompletion_enabled and len(value) >= 2:
+            self._try_autocomplete_customer_by_name(value)
+
     def on_phone_changed(self, value: str):
         """Handle phone field change."""
         self.update_customer_field('phone', value)
+
+        # Handle autocompletion if enabled
+        if self._autocompletion_enabled and len(value) >= 4:
+            self._try_autocomplete_customer_by_phone(value)
 
     def on_address_changed(self, value: str):
         """Handle address field change."""
@@ -81,8 +98,139 @@ class CustomerInfoController(QObject):
         if not result.is_valid:
             self.error_occurred.emit("; ".join(result.errors))
 
+        # Handle companion autocompletion if enabled
+        if self._autocompletion_enabled and len(value) >= 2:
+            if field_name == 'national_id':
+                self._try_autocomplete_companion_by_national_id(companion_num, value)
+            elif field_name == 'name':
+                self._try_autocomplete_companion_by_name(companion_num, value)
+
         self._emit_current_state()
         self._emit_companion_validation(companion_num)
+
+    # Autocompletion methods
+    def _try_autocomplete_customer_by_national_id(self, partial_national_id: str):
+        """Try to autocomplete customer by partial national ID."""
+        try:
+            # Exact match first
+            customer = self.customer_repository.get_by_national_id(partial_national_id)
+            if customer:
+                self._autocomplete_customer(customer)
+                return
+
+            # Partial match
+            customers = self.customer_repository.search_customers_by_partial_match(
+                'national_id', partial_national_id, limit=1
+            )
+            if customers:
+                self._autocomplete_customer(customers[0])
+
+        except Exception as e:
+            print(f"Error in customer autocompletion by national ID: {e}")
+
+    def _try_autocomplete_customer_by_phone(self, partial_phone: str):
+        """Try to autocomplete customer by partial phone number."""
+        try:
+            # Exact match first
+            customer = self.customer_repository.get_by_phone(partial_phone)
+            if customer:
+                self._autocomplete_customer(customer)
+                return
+
+            # Partial match
+            customers = self.customer_repository.search_customers_by_partial_match(
+                'phone', partial_phone, limit=1
+            )
+            if customers:
+                self._autocomplete_customer(customers[0])
+
+        except Exception as e:
+            print(f"Error in customer autocompletion by phone: {e}")
+
+    def _try_autocomplete_customer_by_name(self, partial_name: str):
+        """Try to autocomplete customer by partial name."""
+        try:
+            customers = self.customer_repository.search_customers_by_partial_match(
+                'name', partial_name, limit=1
+            )
+            if customers:
+                self._autocomplete_customer(customers[0])
+
+        except Exception as e:
+            print(f"Error in customer autocompletion by name: {e}")
+
+    def _autocomplete_customer(self, customer: CustomerData):
+        """Autocomplete customer data and load companions if any."""
+        try:
+            # Check if this is actually new data (avoid infinite loops)
+            current_data = self.logic.get_current_data()
+            if current_data.customer.national_id == customer.national_id:
+                return
+
+            # Load complete customer data with companions
+            customer_info = self.customer_repository.get_customer_with_companions(customer.national_id)
+            if customer_info:
+                # Import the complete data
+                result = self.logic.import_data(customer_info.to_dict())
+                if result.is_valid:
+                    # Renumber companions for proper UI display
+                    self._renumber_companions()
+
+                    # Emit signals to update UI
+                    self.customer_loaded.emit(customer_info.to_dict())
+                    self.companions_visibility_changed.emit(customer_info.has_companions)
+                    self._emit_current_state()
+
+                    # Emit companions data for UI synchronization
+                    companion_dicts = [comp.to_dict() for comp in customer_info.companions]
+                    self.companions_refreshed.emit(companion_dicts)
+
+        except Exception as e:
+            print(f"Error in customer autocompletion: {e}")
+
+    def _try_autocomplete_companion_by_national_id(self, companion_num: int, partial_national_id: str):
+        """Try to autocomplete companion by partial national ID."""
+        try:
+            companions = self.customer_repository.search_companions_by_partial_match(
+                'national_id', partial_national_id, limit=1
+            )
+            if companions:
+                self._autocomplete_companion(companion_num, companions[0])
+
+        except Exception as e:
+            print(f"Error in companion autocompletion by national ID: {e}")
+
+    def _try_autocomplete_companion_by_name(self, companion_num: int, partial_name: str):
+        """Try to autocomplete companion by partial name."""
+        try:
+            companions = self.customer_repository.search_companions_by_partial_match(
+                'name', partial_name, limit=1
+            )
+            if companions:
+                self._autocomplete_companion(companion_num, companions[0])
+
+        except Exception as e:
+            print(f"Error in companion autocompletion by name: {e}")
+
+    def _autocomplete_companion(self, companion_num: int, companion: CompanionData):
+        """Autocomplete companion data."""
+        try:
+            # Check if this is actually new data (avoid infinite loops)
+            current_companion = self.logic.get_companion_by_ui_number(companion_num)
+            if current_companion and current_companion.national_id == companion.national_id:
+                return
+
+            # Update companion data through logic
+            result = self.logic.update_companion_by_ui_number(companion_num, 'name', companion.name)
+            if result.is_valid:
+                result = self.logic.update_companion_by_ui_number(companion_num, 'national_id', companion.national_id)
+
+            # Notify parent view for UI update if possible
+            if hasattr(self.parent(), '_autofill_companion_data'):
+                self.parent()._autofill_companion_data(companion_num, companion)
+
+        except Exception as e:
+            print(f"Error in companion autocompletion: {e}")
 
     # Action button handlers
     def on_add_customer_clicked(self):
