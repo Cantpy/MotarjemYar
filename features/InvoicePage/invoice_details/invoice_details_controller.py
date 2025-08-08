@@ -1,231 +1,391 @@
-from PySide6.QtCore import QObject, Signal, QTimer
-from PySide6.QtWidgets import QMessageBox
-from typing import Optional, Dict, Any
-from datetime import datetime, date
-from invoice_details_models import InvoiceData, FinancialDetails, TranslationOfficeInfo, Language
+"""
+Controller layer for Invoice Details functionality.
+Connects the view with the business logic.
+"""
+import logging
+from datetime import datetime
+from typing import Optional
+
+from PySide6.QtCore import QObject, Signal
+from sqlalchemy.orm import Session
+
+from features.InvoicePage.invoice_details.invoice_details_models import (
+    InvoiceData, InvoiceDetailsRequest, InvoiceDetailsResponse,
+    TranslationOfficeInfo, UserInfo, CustomerInfo, Language
+)
+from logic import InvoiceDetailsLogic
+from repo import InvoiceDetailsRepository
+
+logger = logging.getLogger(__name__)
 
 
-class InvoiceController(QObject):
-    """Controller for managing invoice data and business logic."""
+class InvoiceDetailsController(QObject):
+    """Controller for managing invoice details operations."""
 
     # Signals
-    data_changed = Signal()
-    validation_changed = Signal(bool)  # True if valid, False if invalid
-    error_occurred = Signal(str)  # Error message
+    data_loaded = Signal(dict)  # Emitted when data is loaded
+    error_occurred = Signal(str)  # Emitted when an error occurs
+    validation_failed = Signal(list)  # Emitted when validation fails
+    office_info_updated = Signal(dict)  # Emitted when office info is updated
 
-    def __init__(self, parent=None):
+    def __init__(self, db_session: Session, current_user: str, parent=None):
+        """Initialize controller with database session and current user."""
         super().__init__(parent)
-        self._invoice_data = InvoiceData()
-        self._view = None
-        self._auto_save_timer = QTimer()
-        self._auto_save_timer.timeout.connect(self._auto_save)
-        self._auto_save_timer.setSingleShot(True)
+        self.db_session = db_session
+        self.current_user = current_user
+
+        # Initialize repository and logic layers
+        self.repository = InvoiceDetailsRepository(db_session)
+        self.logic = InvoiceDetailsLogic(self.repository)
+
+        # Current invoice data
+        self.current_invoice_data: Optional[InvoiceData] = None
+
+        # View reference (will be set by the view)
+        self.view = None
 
     def set_view(self, view):
-        """Set the associated view."""
-        self._view = view
-        if view:
-            view.data_changed.connect(self._on_view_data_changed)
+        """Set the view reference."""
+        self.view = view
 
-    def get_invoice_data(self) -> InvoiceData:
-        """Get current invoice data."""
-        return self._invoice_data
+        # Connect view signals to controller methods
+        if hasattr(view, 'data_changed'):
+            view.data_changed.connect(self.on_view_data_changed)
 
-    def set_invoice_data(self, data: InvoiceData):
-        """Set invoice data and update view."""
-        self._invoice_data = data
-        if self._view:
-            self._view.set_data(self._invoice_data)
-        self._validate_and_emit()
-
-    def load_from_dict(self, data: Dict[str, Any]):
-        """Load invoice data from dictionary."""
+    def initialize_invoice(self, document_count: Optional[int] = None,
+                           customer_info: Optional[CustomerInfo] = None):
+        """Initialize invoice with default data."""
         try:
-            self._invoice_data = InvoiceData.from_dict(data)
-            if self._view:
-                self._view.set_data(self._invoice_data)
-            self._validate_and_emit()
+            request = InvoiceDetailsRequest(
+                current_user=self.current_user,
+                document_count=document_count,
+                customer_info=customer_info
+            )
+
+            response = self.logic.initialize_invoice_data(request)
+
+            if response.success:
+                self.current_invoice_data = response.invoice_data
+
+                # Update view with initialized data
+                if self.view:
+                    self._update_view_with_invoice_data(response.invoice_data, response.office_info)
+
+                # Emit signal with loaded data
+                self.data_loaded.emit({
+                    'invoice_data': response.invoice_data,
+                    'office_info': response.office_info,
+                    'user_info': response.user_info,
+                    'next_receipt_number': response.next_receipt_number
+                })
+
+            else:
+                self.error_occurred.emit(response.message)
+
         except Exception as e:
-            self.error_occurred.emit(f"خطا در بارگذاری داده‌ها: {str(e)}")
+            logger.error(f"Error initializing invoice: {str(e)}")
+            self.error_occurred.emit(f"خطا در مقداردهی فاکتور: {str(e)}")
 
-    def save_to_dict(self) -> Dict[str, Any]:
-        """Save invoice data to dictionary."""
-        self._sync_data_from_view()
-        return self._invoice_data.to_dict()
+    def load_invoice_data(self, invoice_data: InvoiceData, office_info: TranslationOfficeInfo):
+        """Load existing invoice data into the view."""
+        try:
+            self.current_invoice_data = invoice_data
 
-    def clear_data(self):
-        """Clear all invoice data."""
-        self._invoice_data = InvoiceData()
-        if self._view:
-            self._view.clear_data()
-        self._validate_and_emit()
+            if self.view:
+                self._update_view_with_invoice_data(invoice_data, office_info)
 
-    def set_translation_costs(self, translation_cost: float, confirmation_cost: float = 0.0,
-                              office_affairs_cost: float = 0.0, copy_cert_cost: float = 0.0):
-        """Set translation-related costs."""
-        self._invoice_data.financial.translation_cost = translation_cost
-        self._invoice_data.financial.confirmation_cost = confirmation_cost
-        self._invoice_data.financial.office_affairs_cost = office_affairs_cost
-        self._invoice_data.financial.copy_certification_cost = copy_cert_cost
+            self.data_loaded.emit({
+                'invoice_data': invoice_data,
+                'office_info': office_info
+            })
 
-        # Update emergency cost if emergency is enabled
-        if self._invoice_data.financial.is_emergency:
-            self._calculate_emergency_cost()
+        except Exception as e:
+            logger.error(f"Error loading invoice data: {str(e)}")
+            self.error_occurred.emit(f"خطا در بارگذاری اطلاعات فاکتور: {str(e)}")
 
-        if self._view:
-            self._view.update_financial_display()
+    def validate_current_data(self) -> bool:
+        """Validate current invoice data."""
+        try:
+            if not self.current_invoice_data:
+                self.error_occurred.emit("هیچ داده‌ای برای اعتبارسنجی یافت نشد")
+                return False
 
-        self._validate_and_emit()
+            # Update current data from view
+            self._update_invoice_data_from_view()
 
-    def set_emergency_status(self, is_emergency: bool):
-        """Set emergency status and calculate emergency cost."""
-        self._invoice_data.financial.is_emergency = is_emergency
-        if is_emergency:
-            self._calculate_emergency_cost()
-        else:
-            self._invoice_data.financial.emergency_cost = 0.0
+            # Validate data
+            response = self.logic.validate_invoice_data(self.current_invoice_data)
 
-        if self._view:
-            self._view.update_emergency_cost(self._invoice_data.financial.emergency_cost)
+            if response.success:
+                return True
+            else:
+                if response.errors:
+                    self.validation_failed.emit(response.errors)
+                else:
+                    self.error_occurred.emit(response.message)
+                return False
 
-        self._validate_and_emit()
+        except Exception as e:
+            logger.error(f"Error validating invoice data: {str(e)}")
+            self.error_occurred.emit(f"خطا در اعتبارسنجی: {str(e)}")
+            return False
 
-    def set_emergency_cost(self, cost: float):
-        """Manually set emergency cost."""
-        self._invoice_data.financial.emergency_cost = max(0, cost)
-        self._validate_and_emit()
+    def get_current_invoice_data(self) -> Optional[InvoiceData]:
+        """Get current invoice data from view."""
+        try:
+            if self.view and self.current_invoice_data:
+                self._update_invoice_data_from_view()
+                return self.current_invoice_data
+            return None
 
-    def set_office_info(self, name: str = None, address: str = None, phone: str = None,
-                        email: str = None, license_number: str = None):
-        """Set translation office information."""
-        if name is not None:
-            self._invoice_data.office_info.name = name
-        if address is not None:
-            self._invoice_data.office_info.address = address
-        if phone is not None:
-            self._invoice_data.office_info.phone = phone
-        if email is not None:
-            self._invoice_data.office_info.email = email
-        if license_number is not None:
-            self._invoice_data.office_info.license_number = license_number
+        except Exception as e:
+            logger.error(f"Error getting current invoice data: {str(e)}")
+            return None
 
-        if self._view:
-            self._view.update_office_info_display()
+    def update_financial_calculations(self):
+        """Update financial calculations based on current data."""
+        try:
+            if not self.current_invoice_data or not self.current_invoice_data.financial:
+                return
 
-        self.data_changed.emit()
+            # Get updated financial data from view
+            if self.view:
+                view_data = self.view.get_data()
+                financial = self.current_invoice_data.financial
 
-    def set_languages(self, source_lang: Language, target_lang: Language):
-        """Set source and target languages."""
-        self._invoice_data.source_language = source_lang
-        self._invoice_data.target_language = target_lang
+                financial.translation_cost = view_data.get('translation_cost', 0)
+                financial.confirmation_cost = view_data.get('confirmation_cost', 0)
+                financial.office_affairs_cost = view_data.get('office_affairs_cost', 0)
+                financial.copy_certification_cost = view_data.get('copy_cert_cost', 0)
+                financial.is_emergency = view_data.get('is_emergency', False)
+                financial.discount_amount = view_data.get('discount_amount', 0)
+                financial.advance_payment = view_data.get('advance_payment', 0)
 
-        if self._view:
-            self._view.update_language_display()
+                # Calculate totals using business logic
+                updated_financial = self.logic.calculate_financial_totals(financial)
 
-        self.data_changed.emit()
+                # Update view with calculated values
+                self.view.update_emergency_cost(updated_financial.emergency_cost)
 
-    def validate(self) -> tuple[bool, list]:
-        """Validate current data and return validation status and errors."""
-        self._sync_data_from_view()
-        errors = self._invoice_data.get_validation_errors()
-        is_valid = len(errors) == 0
-        return is_valid, errors
+                # Store updated financial data
+                self.current_invoice_data.financial = updated_financial
 
-    def show_validation_errors(self):
-        """Show validation errors in a message box."""
-        is_valid, errors = self.validate()
-        if not is_valid and self._view:
-            error_text = "خطاهای اعتبارسنجی:\n\n" + "\n".join(f"• {error}" for error in errors)
-            QMessageBox.warning(self._view, "خطاهای اعتبارسنجی", error_text)
+        except Exception as e:
+            logger.error(f"Error updating financial calculations: {str(e)}")
+            self.error_occurred.emit(f"خطا در محاسبه مبالغ مالی: {str(e)}")
 
-    def calculate_totals(self) -> Dict[str, float]:
-        """Calculate and return financial totals."""
-        self._sync_data_from_view()
-        return {
-            'subtotal': self._invoice_data.financial.subtotal,
-            'discount': self._invoice_data.financial.discount_amount,
-            'advance': self._invoice_data.financial.advance_payment,
-            'final_amount': self._invoice_data.financial.final_amount
-        }
+    def update_office_information(self, office_info: TranslationOfficeInfo):
+        """Update translation office information."""
+        try:
+            response = self.logic.update_office_information(office_info, self.current_user)
 
-    def enable_auto_save(self, interval_ms: int = 2000):
-        """Enable auto-save functionality."""
-        self._auto_save_timer.setInterval(interval_ms)
+            if response.success:
+                # Update current invoice data
+                if self.current_invoice_data:
+                    self.current_invoice_data.office_info = office_info
 
-    def disable_auto_save(self):
-        """Disable auto-save functionality."""
-        self._auto_save_timer.stop()
+                # Update view
+                if self.view:
+                    self.view.set_office_info(
+                        name=office_info.name,
+                        registration_number=office_info.registration_number,
+                        translator=office_info.representative,
+                        address=office_info.address,
+                        phone=office_info.phone,
+                        email=getattr(office_info, 'email', '')
+                    )
 
-    def _calculate_emergency_cost(self):
-        """Calculate emergency cost as half of translation cost."""
-        emergency_cost = self._invoice_data.financial.translation_cost / 2
-        self._invoice_data.financial.emergency_cost = emergency_cost
+                self.office_info_updated.emit({
+                    'office_info': office_info,
+                    'message': response.message
+                })
 
-    def _sync_data_from_view(self):
-        """Synchronize data from view to model."""
-        if not self._view:
+            else:
+                if response.errors:
+                    self.validation_failed.emit(response.errors)
+                else:
+                    self.error_occurred.emit(response.message)
+
+        except Exception as e:
+            logger.error(f"Error updating office information: {str(e)}")
+            self.error_occurred.emit(f"خطا در به‌روزرسانی اطلاعات دارالترجمه: {str(e)}")
+
+    def get_suggested_receipt_number(self) -> str:
+        """Get suggested receipt number for new invoice."""
+        try:
+            return self.logic.get_suggested_receipt_number(self.current_user)
+        except Exception as e:
+            logger.error(f"Error getting suggested receipt number: {str(e)}")
+            return "1"
+
+    def clear_invoice_data(self):
+        """Clear current invoice data."""
+        try:
+            self.current_invoice_data = None
+
+            if self.view:
+                self.view.clear_data()
+
+        except Exception as e:
+            logger.error(f"Error clearing invoice data: {str(e)}")
+            self.error_occurred.emit(f"خطا در پاک‌سازی اطلاعات: {str(e)}")
+
+    def on_view_data_changed(self):
+        """Handle view data changes."""
+        try:
+            # Update financial calculations when view data changes
+            self.update_financial_calculations()
+
+        except Exception as e:
+            logger.error(f"Error handling view data change: {str(e)}")
+
+    def set_customer_info(self, customer_info: CustomerInfo):
+        """Set customer information."""
+        try:
+            if self.current_invoice_data:
+                self.current_invoice_data.customer_info = customer_info
+
+            if self.view:
+                self.view.set_customer_info(
+                    name=customer_info.name,
+                    phone=customer_info.phone,
+                    national_id=customer_info.national_id,
+                    email=customer_info.email,
+                    address=customer_info.address,
+                    companion_num=str(customer_info.total_companions)
+                )
+
+        except Exception as e:
+            logger.error(f"Error setting customer info: {str(e)}")
+            self.error_occurred.emit(f"خطا در تنظیم اطلاعات مشتری: {str(e)}")
+
+    def set_document_count(self, count: int):
+        """Set document count."""
+        try:
+            if self.current_invoice_data and self.current_invoice_data.document_counts:
+                self.current_invoice_data.document_counts.total_items = count
+
+        except Exception as e:
+            logger.error(f"Error setting document count: {str(e)}")
+
+    def update_costs(self, translation_cost: float = 0, confirmation_cost: float = 0,
+                     office_affairs_cost: float = 0, copy_cert_cost: float = 0):
+        """Update cost values in the view."""
+        try:
+            if self.view:
+                self.view.update_financial_display(
+                    translation_cost=translation_cost,
+                    confirmation_cost=confirmation_cost,
+                    office_affairs_cost=office_affairs_cost,
+                    copy_cert_cost=copy_cert_cost
+                )
+
+            # Update current invoice data
+            if self.current_invoice_data and self.current_invoice_data.financial:
+                financial = self.current_invoice_data.financial
+                financial.translation_cost = translation_cost
+                financial.confirmation_cost = confirmation_cost
+                financial.office_affairs_cost = office_affairs_cost
+                financial.copy_certification_cost = copy_cert_cost
+
+                # Recalculate totals
+                self.update_financial_calculations()
+
+        except Exception as e:
+            logger.error(f"Error updating costs: {str(e)}")
+            self.error_occurred.emit(f"خطا در به‌روزرسانی هزینه‌ها: {str(e)}")
+
+    def _update_view_with_invoice_data(self, invoice_data: InvoiceData, office_info: TranslationOfficeInfo):
+        """Update view with invoice data."""
+        if not self.view:
             return
 
-        view_data = self._view.get_data()
+        try:
+            # Set invoice data in view
+            self.view.set_data(invoice_data, office_info)
 
-        # Update basic info
-        self._invoice_data.receipt_number = view_data.get('receipt_number', 'نامشخص')
-        self._invoice_data.username = view_data.get('username', 'نامشخص')
-        self._invoice_data.delivery_date = view_data.get('delivery_date', date.today())
-        self._invoice_data.remarks = view_data.get('remarks', '')
+            # Set additional information
+            self.view.set_receipt_number(invoice_data.receipt_number)
+            self.view.set_username(invoice_data.username)
 
-        # Update financial data
-        self._invoice_data.financial.discount_amount = view_data.get('discount_amount', 0.0)
-        self._invoice_data.financial.advance_payment = view_data.get('advance_payment', 0.0)
-        self._invoice_data.financial.emergency_cost = view_data.get('emergency_cost', 0.0)
-        self._invoice_data.financial.is_emergency = view_data.get('is_emergency', False)
+            # Set customer info if available
+            if invoice_data.customer_info:
+                self.view.set_customer_info(
+                    name=invoice_data.customer_info.name,
+                    phone=invoice_data.customer_info.phone,
+                    national_id=invoice_data.customer_info.national_id,
+                    email=invoice_data.customer_info.email,
+                    address=invoice_data.customer_info.address,
+                    companion_num=str(invoice_data.customer_info.total_companions)
+                )
 
-        # Update languages
-        source_lang_text = view_data.get('source_language', 'فارسی')
-        target_lang_text = view_data.get('target_language', 'انگلیسی')
+            # Update language display
+            self.view.update_language_display()
 
-        for lang in Language:
-            if lang.value == source_lang_text:
-                self._invoice_data.source_language = lang
-            if lang.value == target_lang_text:
-                self._invoice_data.target_language = lang
+        except Exception as e:
+            logger.error(f"Error updating view with invoice data: {str(e)}")
+            raise
 
-        # Update office info
-        office_data = view_data.get('office_info', {})
-        if office_data:
-            self._invoice_data.office_info.name = office_data.get('name', 'نامشخص')
-            self._invoice_data.office_info.address = office_data.get('address', 'نامشخص')
-            self._invoice_data.office_info.phone = office_data.get('phone', 'نامشخص')
-            self._invoice_data.office_info.email = office_data.get('email', 'نامشخص')
-            self._invoice_data.office_info.license_number = office_data.get('license_number', 'نامشخص')
+    def _update_invoice_data_from_view(self):
+        """Update invoice data from view values."""
+        if not self.view or not self.current_invoice_data:
+            return
 
-    def _validate_and_emit(self):
-        """Validate data and emit appropriate signals."""
-        is_valid, _ = self.validate()
-        self.validation_changed.emit(is_valid)
-        self.data_changed.emit()
+        try:
+            view_data = self.view.get_data()
 
-    def _on_view_data_changed(self):
-        """Handle view data changes."""
-        self._validate_and_emit()
+            # Update basic info
+            self.current_invoice_data.receipt_number = view_data.get('receipt_number', '')
+            self.current_invoice_data.username = view_data.get('username', '')
 
-        # Start auto-save timer
-        if self._auto_save_timer.interval() > 0:
-            self._auto_save_timer.start()
+            # Update languages
+            source_lang_text = view_data.get('source_language', Language.FARSI.value)
+            target_lang_text = view_data.get('target_language', Language.ENGLISH.value)
 
-    def _auto_save(self):
-        """Auto-save functionality (can be overridden by subclasses)."""
-        # This method can be overridden to implement actual auto-save functionality
-        # For now, it just validates the data
-        self._sync_data_from_view()
-        self.data_changed.emit()
+            # Find matching Language enum values
+            for lang in Language:
+                if lang.value == source_lang_text:
+                    self.current_invoice_data.source_language = lang
+                    break
 
-    def format_currency(self, amount: float) -> str:
-        """Format currency amount in Persian."""
-        if amount == 0:
-            return "۰ تومان"
-        return f"{amount:,.0f} تومان".replace(',', '٬')
+            for lang in Language:
+                if lang.value == target_lang_text:
+                    self.current_invoice_data.target_language = lang
+                    break
 
-    def get_translation_direction_text(self) -> str:
-        """Get formatted translation direction text."""
-        return f"ترجمه از {self._invoice_data.source_language.value} به {self._invoice_data.target_language.value}"
+            # Update financial data
+            if self.current_invoice_data.financial:
+                financial = self.current_invoice_data.financial
+                financial.translation_cost = view_data.get('translation_cost', 0)
+                financial.confirmation_cost = view_data.get('confirmation_cost', 0)
+                financial.office_affairs_cost = view_data.get('office_affairs_cost', 0)
+                financial.copy_certification_cost = view_data.get('copy_cert_cost', 0)
+                financial.emergency_cost = view_data.get('emergency_cost', 0)
+                financial.is_emergency = view_data.get('is_emergency', False)
+                financial.discount_amount = view_data.get('discount_amount', 0)
+                financial.advance_payment = view_data.get('advance_payment', 0)
+                financial.final_amount = view_data.get('final_amount', 0)
+
+            # Update remarks
+            self.current_invoice_data.remarks = view_data.get('remarks', '')
+
+            # Update customer info
+            customer_data = view_data.get('customer_info', {})
+            if customer_data and self.current_invoice_data.customer_info:
+                customer = self.current_invoice_data.customer_info
+                customer.name = customer_data.get('name', '')
+                customer.phone = customer_data.get('phone', '')
+                customer.national_id = customer_data.get('national_id', '')
+                customer.email = customer_data.get('email', '')
+                customer.address = customer_data.get('address', '')
+
+                # Convert companions to int
+                try:
+                    companions_str = customer_data.get('total_companions', '0')
+                    customer.total_companions = int(companions_str) if companions_str.isdigit() else 0
+                except (ValueError, AttributeError):
+                    customer.total_companions = 0
+
+        except Exception as e:
+            logger.error(f"Error updating invoice data from view: {str(e)}")
+            raise

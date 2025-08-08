@@ -1,12 +1,12 @@
 from typing import List, Optional, Dict, Any
 from sqlalchemy import create_engine, func
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
 from features.InvoiceTable.invoice_table_models import (
-    InvoiceData, InvoiceSummary, DocumentCount
+    InvoiceData, InvoiceSummary
 )
-from shared.entities.common_sqlalchemy_bases import (Base, IssuedInvoiceModel, InvoiceItemModel, UsersModel,
-                                                     UserProfileModel)
+from shared.models.sqlalchemy_models import (Base, IssuedInvoiceModel, InvoiceItemModel, UsersModel,
+                                             UserProfileModel)
 import logging
 from shared import return_resource
 

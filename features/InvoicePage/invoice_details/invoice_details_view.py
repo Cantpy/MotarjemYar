@@ -34,6 +34,7 @@ class InvoiceDetailsView(QWidget):
         """Initialize all widgets."""
         # Invoice group widgets (labels instead of line edits)
         self.receipt_number_label = QLabel("نامشخص")
+        self.total_documents = QLabel("۰")
         self.receive_date_label = QLabel()
         self.username_label = QLabel("نامشخص")
         self.delivery_date = DatePickerLineEdit()
@@ -76,6 +77,7 @@ class InvoiceDetailsView(QWidget):
         self.customer_national_id = QLabel("نامشخص")
         self.customer_email = QLabel("نامشخص")
         self.customer_address = QLabel("نامشخص")
+        self.companions_num = QLabel("۰")
 
         # Remarks
         self.remarks_text = QTextEdit()
@@ -142,6 +144,7 @@ class InvoiceDetailsView(QWidget):
 
         # Style the labels
         self._style_info_label(self.receipt_number_label)
+        self._style_info_label(self.total_documents)
         self._style_info_label(self.receive_date_label)
         self._style_info_label(self.username_label)
 
@@ -149,6 +152,7 @@ class InvoiceDetailsView(QWidget):
         self._update_translation_direction()
 
         form.addRow("شماره رسید:", self.receipt_number_label)
+        form.addRow("تعداد اسناد:", self.total_documents)
         form.addRow("تاریخ صدور:", self.receive_date_label)
         form.addRow("تاریخ تحویل:", self.delivery_date)
         form.addRow("کاربر:", self.username_label)
@@ -170,6 +174,7 @@ class InvoiceDetailsView(QWidget):
         self._style_info_label(self.customer_national_id)
         self._style_info_label(self.customer_email)
         self._style_info_label(self.customer_address)
+        self._style_info_label(self.companions_num)
 
         # CustomerModel information section
         form.addRow("نام مشتری:", self.customer_name)
@@ -177,6 +182,7 @@ class InvoiceDetailsView(QWidget):
         form.addRow("کد ملی:", self.customer_national_id)
         form.addRow("ایمیل مشتری:", self.customer_email)
         form.addRow("آدرس مشتری:", self.customer_address)
+        form.addRow("تعداد همراهان:", self.companions_num)
 
         return group
 
@@ -254,6 +260,7 @@ class InvoiceDetailsView(QWidget):
         """Setup widget properties and initial values."""
         # Set object names for styling
         self.receipt_number_label.setObjectName("receipt_number_label")
+        self.total_documents.setObjectName("total_documents")
         self.receive_date_label.setObjectName("receive_date_label")
         self.username_label.setObjectName("username_label")
         self.delivery_date.setObjectName("delivery_date")
@@ -487,6 +494,7 @@ class InvoiceDetailsView(QWidget):
         """Get current form data."""
         return {
             'receipt_number': self.receipt_number_label.text(),
+            'total_documents': self.total_documents.text(),
             'receive_date': self.receive_date_label.text(),
             'delivery_date': self.delivery_date.text(),
             'username': self.username_label.text(),
@@ -507,7 +515,8 @@ class InvoiceDetailsView(QWidget):
                 'phone': self.customer_phone.text(),
                 'national_id': self.customer_national_id.text(),
                 'email': self.customer_email.text(),
-                'address': self.customer_address.text()
+                'address': self.customer_address.text(),
+                'total_companions': self.companions_num.text()
             },
             'office_info': {
                 'name': self.office_name.text(),
@@ -527,6 +536,7 @@ class InvoiceDetailsView(QWidget):
         try:
             # Set basic info
             self.receipt_number_label.setText(invoice_data.receipt_number)
+            self.total_documents.setText(str(invoice_data.total_documents))
             self.username_label.setText(invoice_data.username)
 
             # Set receive date with current format
@@ -573,6 +583,7 @@ class InvoiceDetailsView(QWidget):
                 self.customer_national_id.setText(getattr(customer, 'national_id', 'نامشخص'))
                 self.customer_email.setText(getattr(customer, 'email', 'نامشخص'))
                 self.customer_address.setText(getattr(customer, 'address', 'نامشخص'))
+                self.companions_num.setText(getattr(customer, 'total_companions', '۰'))
 
             # Set remarks
             self.remarks_text.setPlainText(invoice_data.remarks)
@@ -620,6 +631,7 @@ class InvoiceDetailsView(QWidget):
         self.customer_national_id.setText("نامشخص")
         self.customer_email.setText("نامشخص")
         self.customer_address.setText("نامشخص")
+        self.companions_num.setText("۰")
 
         # Clear remarks
         self.remarks_text.clear()
@@ -663,7 +675,7 @@ class InvoiceDetailsView(QWidget):
         return errors
 
     def set_customer_info(self, name: str = None, phone: str = None, national_id: str = None,
-                          email: str = None, address: str = None):
+                          email: str = None, address: str = None, companion_num: int = None):
         """Set customer information (called by controller)."""
         if name is not None:
             self.customer_name.setText(name or "نامشخص")
@@ -675,6 +687,8 @@ class InvoiceDetailsView(QWidget):
             self.customer_email.setText(email or "نامشخص")
         if address is not None:
             self.customer_address.setText(address or "نامشخص")
+        if companion_num is not None:
+            self.companions_num.setText(companion_num or "۰")
 
     def set_office_info(self, name: str = None, registration_number: int = None, translator: str = None,
                         address: str = None, phone: str = None, email: str = None):

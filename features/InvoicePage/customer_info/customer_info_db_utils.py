@@ -4,12 +4,9 @@ Database Utilities - Diagnose and manage database table creation issues
 """
 import os
 from sqlalchemy import create_engine, MetaData, inspect, text
-from sqlalchemy.orm import sessionmaker
-import io
-import re
 
 try:
-    from shared.entities.common_sqlalchemy_bases import *
+    from shared.models.sqlalchemy_models import *
     print("Successfully imported Base, CustomerModel, CompanionModel")
 except ImportError as e:
     print(f"Import error: {e}")

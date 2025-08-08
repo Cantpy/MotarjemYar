@@ -835,8 +835,19 @@ class CustomerInfoView(QWidget):
 
     def _on_customer_affairs_clicked(self):
         """Handle customer affairs button click."""
-        dialog = CustomerManagementDialog(self.customer_repository, self)
-        dialog.exec()
+        from features.InvoicePage.customer_management.customer_management_entry_point import (setup_databases,
+                                                                                              CustomerLogic,
+                                                                                              CustomerRepository,
+                                                                                              CustomerManagementController)
+        customer_session, invoices_session = setup_databases()
+
+        # Create repository, logic, and controller
+        repository = CustomerRepository(invoices_session, customer_session)
+        logic = CustomerLogic(repository)
+        controller = CustomerManagementController(logic, self)
+
+        # Show the customer management dialog
+        controller.show()
 
     def _on_clear_form_clicked(self):
         """Handle clear form button click."""
@@ -1024,88 +1035,3 @@ class CustomerInfoView(QWidget):
                             if item and item.layout():
                                 # This would require more complex responsive logic
                                 pass
-
-
-class CustomerManagementDialog(QDialog):
-    """Dialog for customer management operations."""
-
-    def __init__(self, customer_repository: ICustomerRepository, parent=None):
-        """Initialize dialog with repository."""
-        super().__init__(parent)
-        self.customer_repository = customer_repository
-        self.controller = CustomerManagementController(customer_repository, self)
-
-        self._setup_ui()
-        self._connect_signals()
-
-        # Load initial data
-        self.controller.load_all_customers()
-
-    def _setup_ui(self):
-        """Setup dialog UI."""
-        self.setWindowTitle("مدیریت مشتریان")
-        self.setModal(True)
-        self.resize(1000, 700)
-
-        layout = QVBoxLayout(self)
-
-        # Toolbar
-        toolbar_layout = QHBoxLayout()
-
-        self.new_btn = QPushButton("مشتری جدید")
-        self.edit_btn = QPushButton("ویرایش")
-        self.delete_btn = QPushButton("حذف")
-        self.refresh_btn = QPushButton("بروزرسانی")
-
-        # Search
-        self.search_le = QLineEdit()
-        self.search_le.setPlaceholderText("جستجو...")
-
-        toolbar_layout.addWidget(self.new_btn)
-        toolbar_layout.addWidget(self.edit_btn)
-        toolbar_layout.addWidget(self.delete_btn)
-        toolbar_layout.addWidget(self.refresh_btn)
-        toolbar_layout.addStretch()
-        toolbar_layout.addWidget(QLabel("جستجو:"))
-        toolbar_layout.addWidget(self.search_le)
-
-        # Customers table
-        self.customers_table = QTableWidget()
-        self.customers_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.customers_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
-
-        # Set columns
-        self.customers_table.setColumnCount(5)
-        self.customers_table.setHorizontalHeaderLabels([
-            "نام", "کد ملی", "شماره تماس", "ایمیل", "آدرس"
-        ])
-
-        # Close button
-        close_btn = QPushButton("بستن")
-        close_btn.clicked.connect(self.close)
-
-        layout.addLayout(toolbar_layout)
-        layout.addWidget(self.customers_table)
-        layout.addWidget(close_btn)
-
-    def _connect_signals(self):
-        """Connect dialog signals."""
-        self.search_le.textChanged.connect(self.controller.search_customers)
-        self.controller.customers_loaded.connect(self._update_customers_table)
-        self.controller.search_completed.connect(self._update_customers_table)
-        self.controller.error_occurred.connect(self.show_error)
-
-    def _update_customers_table(self, customers: List[Dict[str, Any]]):
-        """Update customers table."""
-        self.customers_table.setRowCount(len(customers))
-
-        for row, customer in enumerate(customers):
-            self.customers_table.setItem(row, 0, QTableWidgetItem(customer.get('name', '')))
-            self.customers_table.setItem(row, 1, QTableWidgetItem(customer.get('national_id', '')))
-            self.customers_table.setItem(row, 2, QTableWidgetItem(customer.get('phone', '')))
-            self.customers_table.setItem(row, 3, QTableWidgetItem(customer.get('email', '')))
-            self.customers_table.setItem(row, 4, QTableWidgetItem(customer.get('address', '')))
-
-    def show_error(self, error_message: str):
-        """Show error message."""
-        QMessageBox.warning(self, "خطا", error_message)

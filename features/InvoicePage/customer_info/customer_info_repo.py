@@ -2,15 +2,15 @@
 """
 Repository Layer - Data Access with SQLAlchemy ORM
 """
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import and_, or_
+from sqlalchemy import or_
 
 from features.InvoicePage.customer_info.customer_info_models import (
     CustomerData, CompanionData, CustomerInfoData, CustomerSearchCriteria
 )
-from shared.entities.common_sqlalchemy_bases import CustomerModel, CompanionModel
+from shared.models.sqlalchemy_models import CustomerModel, CompanionModel
 
 
 class ICustomerRepository:

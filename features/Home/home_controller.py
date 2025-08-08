@@ -2,17 +2,16 @@
 Controller layer for home page.
 Handles coordination between the view and business logic.
 """
-from typing import Optional, Callable
 from PySide6.QtCore import QObject, QTimer, Signal
-from PySide6.QtWidgets import QMessageBox, QWidget
+from PySide6.QtWidgets import QWidget
 from typing import List, Tuple
 
 from features.Home.home_logic import HomePageLogic
 from features.Home.home_models import DashboardStats, DeliveryStatus, StatusChangeRequest
 from features.Home.home_settings_models import Settings
-from shared.entities.common_sqlalchemy_bases import IssuedInvoiceModel
+from shared.models.sqlalchemy_models import IssuedInvoiceModel
 from shared import (show_question_message_box, show_information_message_box, NotificationDialog, return_resource,
-                    show_error_message_box, show_warning_message_box)
+                    show_error_message_box)
 
 customers_database = return_resource("databases", "customers.db")
 invoices_database = return_resource("databases", "invoices.db")

@@ -7,14 +7,13 @@ from PySide6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from features.InvoicePage.customer_info.customer_info_models import (CustomerData, CustomerInfoData, CompanionData)
+from features.InvoicePage.customer_info.customer_info_models import (CustomerData)
 from features.InvoicePage.customer_info.customer_info_repo import CustomerRepository
-from features.InvoicePage.customer_info.customer_info_logic import CustomerInfoLogic, CustomerManagementLogic
-from features.InvoicePage.customer_info.customer_info_controller import ControllerFactory
+from features.InvoicePage.customer_info.customer_info_logic import CustomerInfoLogic
 from features.InvoicePage.customer_info.customer_info_view import CustomerInfoView
 
 # Import only the specific models we need to avoid creating unnecessary tables
-from shared.entities.common_sqlalchemy_bases import CustomerModel, CompanionModel, Base
+from shared.models.sqlalchemy_models import CustomerModel, CompanionModel
 from shared import return_resource
 
 customers_database = return_resource('databases', 'customers.db')
