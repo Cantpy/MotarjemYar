@@ -17,6 +17,10 @@ from invoice_details_view import InvoiceDetailsView
 # Import the MVC components
 from features.InvoicePage.invoice_details.invoice_details_models import CustomerInfo, TranslationOfficeInfo
 from features.InvoicePage.invoice_page.invoice_page_controller import InvoiceDetailsController
+from shared import return_resource
+
+invoices_database = return_resource('databases', 'invoices.db')
+users_database = return_resource('databases', 'users.db')
 
 # Configure logging
 logging.basicConfig(
@@ -29,18 +33,24 @@ logger = logging.getLogger(__name__)
 class DatabaseManager:
     """Database manager for the application."""
 
-    def __init__(self, database_url: str = "sqlite:///invoice_system.db"):
+    def __init__(self,
+                 invoices_database_url: str = f"sqlite:///{invoices_database}",
+                 users_database_url: str = f"sqlite:///{users_database}"):
         """Initialize database connection."""
-        self.engine = create_engine(database_url, echo=False)
-        self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
+        self.invoices_engine = create_engine(invoices_database_url, echo=False)
+        self.invoices_SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.invoices_engine)
+
+        self.users_engine = create_engine(users_database_url, echo=False)
+        self.users_SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.users_engine)
 
     def get_session(self):
         """Get database session."""
-        return self.SessionLocal()
+        return self.invoices_SessionLocal(), self.users_SessionLocal()
 
     def close(self):
         """Close database connection."""
-        self.engine.dispose()
+        self.invoices_engine.dispose()
+        self.users_engine.dispose()
 
 
 class InvoiceDetailsMainWindow(QMainWindow):
@@ -54,7 +64,7 @@ class InvoiceDetailsMainWindow(QMainWindow):
 
         # Initialize database
         self.db_manager = DatabaseManager()
-        self.db_session = self.db_manager.get_session()
+        self.invoices_db_session, self.users_session = self.db_manager.get_session()
 
         # Current user (in real app, this would come from authentication)
         self.current_user = "admin"
@@ -137,7 +147,8 @@ class InvoiceDetailsMainWindow(QMainWindow):
         """Initialize the controller and connect signals."""
         # Create controller
         self.controller = InvoiceDetailsController(
-            db_session=self.db_session,
+            invoices_db_session=self.invoices_db_session,
+            users_db_session=self.users_session,
             current_user=self.current_user,
             parent=self
         )

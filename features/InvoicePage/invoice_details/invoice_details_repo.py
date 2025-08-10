@@ -14,15 +14,18 @@ from shared.models.sqlalchemy_models import IssuedInvoiceModel, UsersModel, Tran
 class InvoiceDetailsRepository:
     """Repository for invoice details operations."""
 
-    def __init__(self, db_session: Session):
+    def __init__(self,
+                 invoices_db_session: Session,
+                 users_db_session: Session):
         """Initialize repository with database session."""
-        self.db_session = db_session
+        self.invoices_db_session = invoices_db_session
+        self.users_db_session = users_db_session
 
     def get_next_invoice_number(self) -> str:
         """Get the next invoice number by incrementing the last issued invoice number."""
         try:
             last_invoice = (
-                self.db_session.query(IssuedInvoiceModel)
+                self.invoices_db_session.query(IssuedInvoiceModel)
                 .order_by(desc(IssuedInvoiceModel.invoice_number))
                 .first()
             )
@@ -39,7 +42,7 @@ class InvoiceDetailsRepository:
         """Get user information by username."""
         try:
             user = (
-                self.db_session.query(UsersModel)
+                self.users_db_session.query(UsersModel)
                 .filter(UsersModel.username == username)
                 .filter(UsersModel.active == 1)
                 .first()
@@ -62,7 +65,7 @@ class InvoiceDetailsRepository:
         """Get translation office information."""
         try:
             office = (
-                self.db_session.query(TranslationOfficeDataModl)
+                self.users_db_session.query(TranslationOfficeDataModl)
                 .order_by(desc(TranslationOfficeDataModl.updated_at))
                 .first()
             )
@@ -82,8 +85,6 @@ class InvoiceDetailsRepository:
                     other_media=office.other_media,
                     open_hours=office.open_hours,
                     map_url=office.map_url,
-                    created_at=office.created_at,
-                    updated_at=office.updated_at
                 )
             return None
 
@@ -94,7 +95,7 @@ class InvoiceDetailsRepository:
         """Check if an invoice number already exists."""
         try:
             count = (
-                self.db_session.query(IssuedInvoiceModel)
+                self.invoices_db_session.query(IssuedInvoiceModel)
                 .filter(IssuedInvoiceModel.invoice_number == int(invoice_number))
                 .count()
             )
@@ -107,7 +108,7 @@ class InvoiceDetailsRepository:
         """Get the count of invoices created by a specific user."""
         try:
             count = (
-                self.db_session.query(IssuedInvoiceModel)
+                self.invoices_db_session.query(IssuedInvoiceModel)
                 .filter(IssuedInvoiceModel.username == username)
                 .count()
             )
@@ -119,7 +120,7 @@ class InvoiceDetailsRepository:
     def get_total_invoices_count(self) -> int:
         """Get the total count of all invoices."""
         try:
-            count = self.db_session.query(IssuedInvoiceModel).count()
+            count = self.invoices_db_session.query(IssuedInvoiceModel).count()
             return count
 
         except SQLAlchemyError as e:
@@ -129,7 +130,7 @@ class InvoiceDetailsRepository:
         """Get recent invoices."""
         try:
             invoices = (
-                self.db_session.query(IssuedInvoiceModel)
+                self.invoices_db_session.query(IssuedInvoiceModel)
                 .order_by(desc(IssuedInvoiceModel.issue_date))
                 .limit(limit)
                 .all()
@@ -139,23 +140,11 @@ class InvoiceDetailsRepository:
         except SQLAlchemyError as e:
             raise Exception(f"Database error while getting recent invoices: {str(e)}")
 
-    def create_invoice(self, invoice_data: dict) -> bool:
-        """Create a new invoice record."""
-        try:
-            new_invoice = IssuedInvoiceModel(**invoice_data)
-            self.db_session.add(new_invoice)
-            self.db_session.commit()
-            return True
-
-        except SQLAlchemyError as e:
-            self.db_session.rollback()
-            raise Exception(f"Database error while creating invoice: {str(e)}")
-
     def update_translation_office_info(self, office_info: TranslationOfficeInfo) -> bool:
         """Update translation office information."""
         try:
             # Get existing record or create new one
-            office = self.db_session.query(TranslationOfficeDataModl).first()
+            office = self.users_db_session.query(TranslationOfficeDataModl).first()
 
             if office:
                 # Update existing record
@@ -192,20 +181,20 @@ class InvoiceDetailsRepository:
                     created_at=datetime.now(),
                     updated_at=datetime.now()
                 )
-                self.db_session.add(office)
+                self.users_db_session.add(office)
 
-            self.db_session.commit()
+            self.users_db_session.commit()
             return True
 
         except SQLAlchemyError as e:
-            self.db_session.rollback()
+            self.users_db_session.rollback()
             raise Exception(f"Database error while updating translation office info: {str(e)}")
 
     def validate_user_permission(self, username: str, required_permissions: list = None) -> bool:
         """Validate if user has required permissions."""
         try:
             user = (
-                self.db_session.query(UsersModel)
+                self.users_db_session.query(UsersModel)
                 .filter(UsersModel.username == username)
                 .filter(UsersModel.active == 1)
                 .first()
@@ -229,12 +218,12 @@ class InvoiceDetailsRepository:
         """Get invoice statistics."""
         try:
             stats = {
-                'total_invoices': self.db_session.query(IssuedInvoiceModel).count(),
-                'paid_invoices': self.db_session.query(IssuedInvoiceModel)
+                'total_invoices': self.invoices_db_session.query(IssuedInvoiceModel).count(),
+                'paid_invoices': self.invoices_db_session.query(IssuedInvoiceModel)
                 .filter(IssuedInvoiceModel.payment_status == 1).count(),
-                'unpaid_invoices': self.db_session.query(IssuedInvoiceModel)
+                'unpaid_invoices': self.invoices_db_session.query(IssuedInvoiceModel)
                 .filter(IssuedInvoiceModel.payment_status == 0).count(),
-                'total_revenue': self.db_session.query(
+                'total_revenue': self.invoices_db_session.query(
                     func.sum(IssuedInvoiceModel.final_amount)
                 ).scalar() or 0
             }

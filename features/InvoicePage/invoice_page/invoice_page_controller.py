@@ -28,14 +28,19 @@ class InvoiceDetailsController(QObject):
     validation_failed = Signal(list)  # Emitted when validation fails
     office_info_updated = Signal(dict)  # Emitted when office info is updated
 
-    def __init__(self, db_session: Session, current_user: str, parent=None):
+    def __init__(self,
+                 invoices_db_session: Session,
+                 users_db_session: Session,
+                 current_user: str,
+                 parent=None):
         """Initialize controller with database session and current user."""
         super().__init__(parent)
-        self.db_session = db_session
+        self.invoices_db_session = invoices_db_session
+        self.users_db_session = users_db_session
         self.current_user = current_user
 
         # Initialize repository and logic layers
-        self.repository = InvoiceDetailsRepository(db_session)
+        self.repository = InvoiceDetailsRepository(invoices_db_session, users_db_session)
         self.logic = InvoiceDetailsLogic(self.repository)
 
         # Current invoice data

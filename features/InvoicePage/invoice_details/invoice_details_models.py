@@ -3,11 +3,6 @@ from datetime import datetime, date
 from typing import Optional, Dict, Any
 from enum import Enum
 
-from dataclasses import dataclass, field
-from datetime import datetime, date
-from typing import Optional, Dict, Any
-from enum import Enum
-
 
 class Language(Enum):
     """Supported languages for translation."""
@@ -52,6 +47,7 @@ class TranslationOfficeInfo:
     address: str = ""
     phone: str = ""
     website: str = ""
+    email: str = ""
     whatsapp: str = ""
     instagram: str = ""
     telegram: str = ""
@@ -106,9 +102,12 @@ class DocumentCounts:
 @dataclass
 class UserInfo:
     """Current user information."""
+    start_date: date
+    end_date: date
     username: str = ""
     role: str = ""
     full_name: str = ""
+    active: bool = True
 
 
 @dataclass

@@ -9,7 +9,7 @@ from features.InvoicePage.invoice_page.invoice_page_controller import InvoicePag
 from features.InvoicePage.invoice_page.invoice_page_models import WizardSteps
 from features.InvoicePage.invoice_details.invoice_details_view import InvoiceDetailsView
 from features.InvoicePage.invoice_preview.invoice_preview_view import InvoicePreviewView
-from features.InvoicePage.invoice_preview_resume.share_invoice.share_invoice_view import ShareInvoiceView
+from features.InvoicePage.share_invoice.share_invoice_view import ShareInvoiceView
 
 
 class InvoiceWizardView(QWidget):

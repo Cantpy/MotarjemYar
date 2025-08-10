@@ -235,6 +235,7 @@ class InvoiceDetailsView(QWidget):
         self._style_info_label(self.office_phone)
         self._style_info_label(self.office_email)
         self._style_info_label(self.office_license)
+        self._style_info_label(self.office_translator)
 
         form.addRow("نام:", self.office_name)
         form.addRow("شماره ثبت:", self.office_license)
@@ -451,7 +452,8 @@ class InvoiceDetailsView(QWidget):
         advance = self.advance_payment.value()
 
         final = max(0, int(subtotal - discount - advance))
-        self.final_amount.setText(self._format_currency(final))
+        final_english = self._format_currency(final)
+        self.final_amount.setText(to_persian_number(final_english))
 
         # Emit data changed signal
         self._schedule_data_changed()
@@ -567,10 +569,10 @@ class InvoiceDetailsView(QWidget):
             # final_amount will be calculated automatically
 
             # Set office info
-            office = invoice_data.office_info
+            office = translation_office_info
             self.office_name.setText(office.name)
             self.office_license.setText(to_persian_number(office.registration_number))
-            self.office_translator.setText(office.translator)
+            self.office_translator.setText(office.representative)
             self.office_address.setText(office.address)
             self.office_phone.setText(office.phone)
             self.office_email.setText(office.email)

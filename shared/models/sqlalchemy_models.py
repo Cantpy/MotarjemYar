@@ -268,6 +268,7 @@ class TranslationOfficeDataModl(Base):
     manager = Column(Text)
     address = Column(Text)
     phone = Column(Text)
+    email = Column(Text)
     website = Column(Text)
     whatsapp = Column(Text)
     instagram = Column(Text)
