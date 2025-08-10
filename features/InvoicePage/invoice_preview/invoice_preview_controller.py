@@ -6,10 +6,12 @@ from PySide6.QtPrintSupport import QPrinter, QPrintDialog
 from PySide6.QtCore import QPoint
 
 from typing import Callable
+from datetime import date
 
 from features.InvoicePage.invoice_preview.invoice_preview_view import MainInvoiceWindow
 from features.InvoicePage.invoice_preview.invoice_preview_logic import InvoiceService, create_mock_invoice
 from features.InvoicePage.invoice_preview.invoice_preview_repo import InvoiceRepository
+from features.InvoicePage.invoice_preview.invoice_preview_models import Invoice, Customer, InvoiceItem
 
 from shared import show_warning_message_box, show_information_message_box, show_error_message_box
 
@@ -37,6 +39,68 @@ class InvoiceController:
         self.view.action_panel.save_png_button.clicked.connect(self.save_as_png)
         self.view.pagination_panel.next_button.clicked.connect(self.next_page)
         self.view.pagination_panel.prev_button.clicked.connect(self.prev_page)
+
+    def load_new_invoice(self, builder_data: 'InvoiceBuilder'):
+        """
+        This is the new public method called by the main window to load final data.
+        It rebuilds the entire invoice model from the builder object.
+        """
+        # --- Step 1: Extract Customer and Office Info ---
+        customer_dict = builder_data.customer_data.get('customer', {})
+        new_customer = Customer(
+            name=customer_dict.get('name', 'نامشخص'),
+            national_id=customer_dict.get('national_id', 'نامشخص'),
+            phone=customer_dict.get('phone', 'نامشخص'),
+            address=customer_dict.get('address', '')
+        )
+
+        # NOTE: Office info is likely static. If it comes from the details page,
+        # you would extract it from builder_data.invoice_details['office_info']
+        office_info = self.invoice_data.office  # Keep the existing office info for now
+
+        # --- Step 2: Extract Document Items ---
+        new_items = []
+        for item_dict in builder_data.document_items:
+            new_items.append(
+                InvoiceItem(
+                    name=item_dict.get('name', ''),
+                    type=item_dict.get('type', ''),
+                    quantity=item_dict.get('count', 1),
+                    judiciary_seal=item_dict.get('judiciary_display', '-'),
+                    foreign_affairs_seal=item_dict.get('foreign_affairs_display', '-'),
+                    total_price=item_dict.get('total_price', 0.0)
+                )
+            )
+
+        # --- Step 3: Extract Invoice Details and Financials ---
+        details_dict = builder_data.invoice_details
+        subtotal = sum(item.total_price for item in new_items)
+
+        # --- Step 4: Rebuild the main Invoice object ---
+        self.invoice_data = Invoice(
+            invoice_number=details_dict.get('receipt_number', 'پیش‌نویس'),
+            issue_date=details_dict.get('issue_date', date.today()),  # You'll need to parse this
+            delivery_date=details_dict.get('delivery_date', date.today()),  # You'll need to parse this
+            username=details_dict.get('username', ''),
+            customer=new_customer,
+            office=office_info,
+            source_language=details_dict.get('source_language', ''),
+            target_language=details_dict.get('target_language', ''),
+            items=new_items,
+            total_amount=subtotal,
+            discount_amount=details_dict.get('discount_amount', 0.0),
+            advance_payment=details_dict.get('advance_payment', 0.0),
+            emergency_cost=details_dict.get('emergency_cost', 0.0),
+            remarks=details_dict.get('remarks', '')
+        )
+        # Note: You will need to parse the date strings from the details dictionary
+        # into actual date objects for the Invoice dataclass.
+
+        # --- Step 5: Update the service and refresh the view ---
+        self.service = InvoiceService(self.invoice_data)
+        self.current_page = 1
+        self.total_pages = self.service.get_total_pages()
+        self.update_view()  # This will refresh the UI with the complete invoice
 
     def update_view(self):
         """
