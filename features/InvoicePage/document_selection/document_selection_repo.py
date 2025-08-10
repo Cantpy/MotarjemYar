@@ -3,44 +3,14 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from typing import List, Optional
 from features.InvoicePage.document_selection.document_selection_models import Service, OtherService, FixedPrice
-
-Base = declarative_base()
-
-
-class ServiceEntity(Base):
-    __tablename__ = 'services'
-
-    id = Column(Integer, primary_key=True)
-    name = Column(Text, nullable=False)
-    base_price = Column(Integer)
-    dynamic_price_name_1 = Column(Text)
-    dynamic_price_1 = Column(Integer)
-    dynamic_price_name_2 = Column(Text)
-    dynamic_price_2 = Column(Integer)
-
-
-class OtherServiceEntity(Base):
-    __tablename__ = 'other_services'
-
-    id = Column(Integer, primary_key=True)
-    name = Column(Text, nullable=False, unique=True)
-    price = Column(Integer, nullable=False)
-
-
-class FixedPriceEntity(Base):
-    __tablename__ = 'fixed_prices'
-
-    id = Column(Integer, primary_key=True)
-    name = Column(Text, nullable=False, unique=True)
-    price = Column(Integer, nullable=False)
-    is_default = Column(Boolean, nullable=False)
-    label_name = Column(Text)
+from shared.models.sqlalchemy_models import Base, ServicesModel, OtherServicesModel, FixedPricesModel
+from features.InvoicePage.document_selection.document_selection_assets import SERVICES_DB_URL
 
 
 class DatabaseRepository:
     """Repository for database operations"""
 
-    def __init__(self, database_url: str = "sqlite:///services.db"):
+    def __init__(self, database_url: str = f"sqlite:///{SERVICES_DB_URL}"):
         self.engine = create_engine(database_url)
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
         Base.metadata.create_all(bind=self.engine)
@@ -52,7 +22,7 @@ class DatabaseRepository:
     def get_all_services(self) -> List[Service]:
         """Get all services from database"""
         with self.get_session() as session:
-            entities = session.query(ServiceEntity).all()
+            entities = session.query(ServicesModel).all()
             return [
                 Service(
                     id=entity.id,
@@ -69,7 +39,7 @@ class DatabaseRepository:
     def get_all_other_services(self) -> List[OtherService]:
         """Get all other services from database"""
         with self.get_session() as session:
-            entities = session.query(OtherServiceEntity).all()
+            entities = session.query(OtherServicesModel).all()
             return [
                 OtherService(
                     id=entity.id,
@@ -82,7 +52,7 @@ class DatabaseRepository:
     def get_service_by_name(self, name: str) -> Optional[Service]:
         """Get service by name"""
         with self.get_session() as session:
-            entity = session.query(ServiceEntity).filter(ServiceEntity.name == name).first()
+            entity = session.query(ServicesModel).filter(ServicesModel.name == name).first()
             if entity:
                 return Service(
                     id=entity.id,
@@ -98,7 +68,7 @@ class DatabaseRepository:
     def get_other_service_by_name(self, name: str) -> Optional[OtherService]:
         """Get other service by name"""
         with self.get_session() as session:
-            entity = session.query(OtherServiceEntity).filter(OtherServiceEntity.name == name).first()
+            entity = session.query(OtherServicesModel).filter(OtherServicesModel.name == name).first()
             if entity:
                 return OtherService(
                     id=entity.id,
@@ -110,7 +80,7 @@ class DatabaseRepository:
     def get_all_fixed_prices(self) -> List[FixedPrice]:
         """Get all fixed prices"""
         with self.get_session() as session:
-            entities = session.query(FixedPriceEntity).all()
+            entities = session.query(FixedPricesModel).all()
             return [
                 FixedPrice(
                     id=entity.id,
@@ -125,7 +95,7 @@ class DatabaseRepository:
     def get_fixed_price_by_name(self, name: str) -> Optional[FixedPrice]:
         """Get fixed price by name"""
         with self.get_session() as session:
-            entity = session.query(FixedPriceEntity).filter(FixedPriceEntity.name == name).first()
+            entity = session.query(FixedPricesModel).filter(FixedPricesModel.name == name).first()
             if entity:
                 return FixedPrice(
                     id=entity.id,

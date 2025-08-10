@@ -26,6 +26,7 @@ class CustomerInfoView(QWidget):
     validation_changed = Signal(bool)
     customer_selection_requested = Signal()
     customer_affairs_requested = Signal()
+    proceed_to_document_selection = Signal(dict)
 
     def __init__(self, customer_repository: ICustomerRepository, parent=None):
         """Initialize view with repository."""

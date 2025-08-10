@@ -46,7 +46,7 @@ class ICustomerRepository:
     def phone_exists(self, phone: str, exclude_national_id: str = None) -> bool:
         """Check if phone number exists (optionally excluding a specific customer)."""
         try:
-            query = self.db_session.query(CustomerModel).filter(CustomerModel.phone == phone)
+            query = CustomerRepository.db_session.query(CustomerModel).filter(CustomerModel.phone == phone)
             if exclude_national_id:
                 query = query.filter(CustomerModel.national_id != exclude_national_id)
             return query.first() is not None
@@ -58,7 +58,7 @@ class ICustomerRepository:
     def companion_national_id_exists(self, national_id: str, exclude_companion_id: int = None) -> bool:
         """Check if companion national ID exists (optionally excluding a specific companion)."""
         try:
-            query = self.db_session.query(CompanionModel).filter(CompanionModel.national_id == national_id)
+            query = CustomerRepository.db_session.query(CompanionModel).filter(CompanionModel.national_id == national_id)
             if exclude_companion_id:
                 query = query.filter(CompanionModel.id != exclude_companion_id)
             return query.first() is not None
@@ -70,7 +70,7 @@ class ICustomerRepository:
     def customer_national_id_exists_as_companion(self, national_id: str) -> bool:
         """Check if a national ID is already used as a companion."""
         try:
-            return self.db_session.query(CompanionModel).filter(
+            return CustomerRepository.db_session.query(CompanionModel).filter(
                 CompanionModel.national_id == national_id
             ).first() is not None
 
