@@ -14,11 +14,11 @@ def _is_valid_iranian_national_id(national_id: str) -> bool:
     # Check for invalid repeating patterns
     if national_id in [str(i) * 10 for i in range(10)]:
         return False
-    # Calculate checksum
-    check_sum = sum(int(national_id[i]) * (10 - i) for i in range(9))
-    remainder = check_sum % 11
-    check_digit = int(national_id[9])
-    return check_digit == remainder if remainder < 2 else check_digit == 11 - remainder
+    # # Calculate checksum
+    # check_sum = sum(int(national_id[i]) * (10 - i) for i in range(9))
+    # remainder = check_sum % 11
+    # check_digit = int(national_id[9])
+    # return check_digit == remainder if remainder < 2 else check_digit == 11 - remainder
 
 
 @dataclass
