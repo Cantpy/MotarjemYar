@@ -12,7 +12,8 @@ from features.InvoicePage.customer_info.customer_info_repo import CustomerReposi
 from features.InvoicePage.customer_info.customer_info_logic import CustomerInfoLogic
 from features.InvoicePage.customer_info.customer_info_view import CustomerInfoView
 
-# Import only the specific models we need to avoid creating unnecessary tables
+from features.InvoicePage.customer_management.customer_management_view import CustomerManagementView
+
 from shared.models.sqlalchemy_models import CustomerModel, CompanionModel
 from shared import return_resource
 
@@ -95,13 +96,18 @@ class MainWindow(QMainWindow):
 
         layout = QVBoxLayout(central_widget)
 
-        # Create customer info view with repository
         self.customer_info_view = CustomerInfoView(self.customer_repository, self)
         layout.addWidget(self.customer_info_view)
 
-        # Connect signals
-        self.customer_info_view.data_changed.connect(self.on_customer_data_changed)
-        self.customer_info_view.validation_changed.connect(self.on_validation_changed)
+        # Connect signals for navigation and actions
+        self.customer_info_view.customer_affairs_requested.connect(self.open_customer_affairs_dialog)
+
+    def open_customer_affairs_dialog(self):
+        """Handles the request from the view to open the management dialog."""
+        # Here you would instantiate and show the CustomerManagementDialog
+        print("LOG: Opening customer affairs dialog...")
+        dialog = CustomerManagementView(self)
+        dialog.exec()
 
     def on_customer_data_changed(self, data):
         """Handle customer data changes."""

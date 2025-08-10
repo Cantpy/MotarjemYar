@@ -14,9 +14,6 @@ from PySide6.QtWidgets import (
     QHeaderView, QTextEdit, QGridLayout
 )
 
-from features.InvoicePage.customer_info.customer_info_controller import (CustomerInfoController,
-                                                                         CustomerManagementController,
-                                                                         CustomerDialogController)
 from features.InvoicePage.customer_info.customer_info_repo import ICustomerRepository
 from features.InvoicePage.customer_info.customer_info_models import CustomerData, CompanionData
 
@@ -34,14 +31,9 @@ class CustomerInfoView(QWidget):
         """Initialize view with repository."""
         super().__init__(parent)
         self.setObjectName("CustomerInfoView")
-        self.customer_repository = customer_repository
-        self.companion_widgets = {}  # Store companion widgets by UI number
-
-        # Initialize controller
+        from features.InvoicePage.customer_info.customer_info_controller import CustomerInfoController
         self.controller = CustomerInfoController(customer_repository, self)
-
-        # Autocompletion setup
-        self._setup_autocompletion()
+        self.companion_widgets = {}  # Store companion widgets by UI number
 
         self._setup_ui()
         self._connect_signals()
@@ -52,48 +44,30 @@ class CustomerInfoView(QWidget):
 
     def _setup_autocompletion(self):
         """Setup autocompletion data structures."""
-        self.customer_completers = {}
-        self.companion_completers = {}
-        self._load_autocompletion_data()
+        pass
 
-    def _load_autocompletion_data(self):
-        """Load data for autocompletion from repository."""
-        try:
-            # Get all customers for autocompletion
-            customers = self.customer_repository.get_all_customers(limit=1000)
+    def setup_autocompleters(self, data: Dict[str, List[str]]):
+        """Receives data from the controller and sets up QCompleter widgets."""
+        # National ID completer
+        national_id_completer = QCompleter(data.get('national_ids', []), self)
+        self.national_id_le.setCompleter(national_id_completer)
+        national_id_completer.activated.connect(
+            lambda text: self.controller.find_and_load_customer(text, 'national_id')
+        )
 
-            # Create dictionaries for quick lookup
-            self.customers_by_national_id = {c.national_id: c for c in customers}
-            self.customers_by_phone = {c.phone: c for c in customers}
-            self.customers_by_name = {}
+        # Name completer
+        name_completer = QCompleter(data.get('names', []), self)
+        self.full_name_le.setCompleter(name_completer)
+        name_completer.activated.connect(
+            lambda text: self.controller.find_and_load_customer(text, 'name')
+        )
 
-            # Index customers by name parts for fuzzy matching
-            for customer in customers:
-                name_parts = customer.name.strip().split()
-                for part in name_parts:
-                    if part not in self.customers_by_name:
-                        self.customers_by_name[part] = []
-                    self.customers_by_name[part].append(customer)
-
-            # Get all companions for autocompletion
-            all_companions = []
-            for customer in customers:
-                companions = self.customer_repository.get_companions_by_customer(customer.national_id)
-                all_companions.extend(companions)
-
-            self.companions_by_national_id = {c.national_id: c for c in all_companions}
-            self.companions_by_name = {}
-
-            # Index companions by name parts
-            for companion in all_companions:
-                name_parts = companion.name.strip().split()
-                for part in name_parts:
-                    if part not in self.companions_by_name:
-                        self.companions_by_name[part] = []
-                    self.companions_by_name[part].append(companion)
-
-        except Exception as e:
-            print(f"Error loading autocompletion data: {e}")
+        # Phone ID completer
+        phone_completer = QCompleter(data.get('phones', []), self)
+        self.phone_le.setCompleter(phone_completer)
+        phone_completer.activated.connect(
+            lambda text: self.controller.find_and_load_customer(text, 'phone')
+        )
 
     def _setup_ui(self):
         """Setup the customer information UI - optimized for compactness with vertical stretch."""
@@ -334,65 +308,7 @@ class CustomerInfoView(QWidget):
         fields_layout.setColumnStretch(0, 1)
         fields_layout.setColumnStretch(1, 1)
 
-        # Setup autocompletion for customer fields
-        self._setup_customer_field_autocompletion()
-
         return fields_layout
-
-    def _setup_customer_field_autocompletion(self):
-        """Setup QCompleter for customer fields."""
-        # National ID completer
-        national_ids = list(self.customers_by_national_id.keys())
-        national_id_completer = QCompleter(national_ids, self)
-        national_id_completer.setCaseSensitivity(Qt.CaseInsensitive)
-        self.national_id_le.setCompleter(national_id_completer)
-
-        # Phone completer
-        phones = list(self.customers_by_phone.keys())
-        phone_completer = QCompleter(phones, self)
-        phone_completer.setCaseSensitivity(Qt.CaseInsensitive)
-        self.phone_le.setCompleter(phone_completer)
-
-        # Name completer (combine all name parts)
-        name_parts = list(self.customers_by_name.keys())
-        name_completer = QCompleter(name_parts, self)
-        name_completer.setCaseSensitivity(Qt.CaseInsensitive)
-        self.full_name_le.setCompleter(name_completer)
-
-        # Connect completer activated signal to autofill logic
-        self.national_id_le.completer().activated.connect(
-            lambda text: self._autofill_customer_data(self.customers_by_national_id[text])
-        )
-        self.phone_le.completer().activated.connect(
-            lambda text: self._autofill_customer_data(self.customers_by_phone[text])
-        )
-        self.full_name_le.completer().activated.connect(
-            lambda text: self._autofill_customer_data(self.customers_by_name[text][0])  # First match
-        )
-
-    def _autofill_customer_data(self, customer: CustomerData):
-        """Autofill customer data without triggering signals."""
-        # Temporarily disconnect signals to avoid recursive calls
-        self._disconnect_customer_signals()
-
-        # Fill the fields
-        self.national_id_le.setText(customer.national_id)
-        self.full_name_le.setText(customer.name)
-        self.phone_le.setText(customer.phone)
-        self.email_le.setText(customer.email or "")
-        self.address_le.setText(customer.address or "")
-
-        # Reconnect signals
-        self._reconnect_customer_signals()
-
-        # Load companions if any
-        companions = self.customer_repository.get_companions_by_customer(customer.national_id)
-        if companions:
-            self.has_companions_cb.setChecked(True)
-            self.controller.load_customer_by_national_id(customer.national_id)
-
-        # Notify controller of the change
-        self.controller.set_data(customer.to_dict())
 
     def _disconnect_customer_signals(self):
         """Temporarily disconnect customer field signals."""
@@ -502,64 +418,7 @@ class CustomerInfoView(QWidget):
         companion_layout.addLayout(header_layout)
         companion_layout.addLayout(fields_layout)
 
-        self._setup_companion_field_autocompletion(companion_num)
-
         return companion_frame
-
-    def _setup_companion_field_autocompletion(self, companion_num: int):
-        """Setup QCompleter for companion fields."""
-        companion_widget = self.companion_widgets.get(companion_num)
-        if not companion_widget:
-            return
-
-        name_field = companion_widget.findChild(QLineEdit, f"companion_full_name_{companion_num}")
-        national_id_field = companion_widget.findChild(QLineEdit, f"companion_national_id_{companion_num}")
-
-        if name_field:
-            name_parts = list(self.companions_by_name.keys())
-            name_completer = QCompleter(name_parts, self)
-            name_completer.setCaseSensitivity(Qt.CaseInsensitive)
-            name_field.setCompleter(name_completer)
-            name_completer.activated.connect(
-                lambda text: self._autofill_companion_data(companion_num, self.companions_by_name[text][0])
-            )
-
-        if national_id_field:
-            ids = list(self.companions_by_national_id.keys())
-            id_completer = QCompleter(ids, self)
-            id_completer.setCaseSensitivity(Qt.CaseInsensitive)
-            national_id_field.setCompleter(id_completer)
-            id_completer.activated.connect(
-                lambda text: self._autofill_companion_data(companion_num, self.companions_by_national_id[text])
-            )
-
-    def _autofill_companion_data(self, companion_num: int, companion: CompanionData):
-        """Autofill companion data without triggering signals."""
-        companion_widget = self.companion_widgets.get(companion_num)
-        if not companion_widget:
-            return
-
-        name_field = companion_widget.findChild(QLineEdit, f"companion_full_name_{companion_num}")
-        national_id_field = companion_widget.findChild(QLineEdit, f"companion_national_id_{companion_num}")
-
-        if name_field and national_id_field:
-            # Temporarily disconnect signals
-            name_field.textChanged.disconnect()
-            national_id_field.textChanged.disconnect()
-
-            # Fill the fields
-            name_field.setText(companion.name)
-            national_id_field.setText(companion.national_id)
-
-            # Reconnect signals
-            name_field.textChanged.connect(
-                lambda text: self.controller.on_companion_field_changed(companion_num, 'name', text))
-            national_id_field.textChanged.connect(
-                lambda text: self.controller.on_companion_field_changed(companion_num, 'national_id', text))
-
-            # Notify controller
-            self.controller.on_companion_field_changed(companion_num, 'name', companion.name)
-            self.controller.on_companion_field_changed(companion_num, 'national_id', companion.national_id)
 
     def _connect_signals(self):
         """Connect UI signals to controller methods."""
@@ -835,19 +694,7 @@ class CustomerInfoView(QWidget):
 
     def _on_customer_affairs_clicked(self):
         """Handle customer affairs button click."""
-        from features.InvoicePage.customer_management.customer_management_entry_point import (setup_databases,
-                                                                                              CustomerLogic,
-                                                                                              CustomerRepository,
-                                                                                              CustomerManagementController)
-        customer_session, invoices_session = setup_databases()
-
-        # Create repository, logic, and controller
-        repository = CustomerRepository(invoices_session, customer_session)
-        logic = CustomerLogic(repository)
-        controller = CustomerManagementController(logic, self)
-
-        # Show the customer management dialog
-        controller.show()
+        self.customer_affairs_requested.emit()
 
     def _on_clear_form_clicked(self):
         """Handle clear form button click."""
@@ -861,7 +708,6 @@ class CustomerInfoView(QWidget):
 
         if reply == QMessageBox.StandardButton.Yes:
             self.clear_form()
-            self._load_autocompletion_data()  # Refresh autocompletion data
 
     def _on_customer_loaded(self, customer_data: Dict[str, Any]):
         """Handle customer loaded signal from controller."""

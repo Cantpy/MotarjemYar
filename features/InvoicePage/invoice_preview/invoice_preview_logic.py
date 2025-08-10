@@ -1,7 +1,7 @@
 # logic.py
 
-from features.InvoicePage.invoice_preview_GAS.invoice_preview_models_GAS import (Invoice, Customer,
-                                                                                 TranslationOffice, InvoiceItem)
+from features.InvoicePage.invoice_preview.invoice_preview_models import (Invoice, Customer,
+                                                                         TranslationOffice, InvoiceItem)
 from datetime import date
 from typing import List
 import math
@@ -133,7 +133,7 @@ def create_mock_invoice() -> Invoice:
                "معتبر است.")
 
     invoice = Invoice(
-        invoice_number="۹۹-۱۴۰۳",
+        invoice_number="140399",
         issue_date=date.today(),
         delivery_date=date(2025, 9, 15),
         username="محمد کریمی",

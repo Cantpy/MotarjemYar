@@ -7,6 +7,20 @@ from typing import List, Optional, Dict, Any
 import re
 
 
+def _is_valid_iranian_national_id(national_id: str) -> bool:
+    """Validate Iranian national ID format."""
+    if not national_id or len(national_id) != 10 or not national_id.isdigit():
+        return False
+    # Check for invalid repeating patterns
+    if national_id in [str(i) * 10 for i in range(10)]:
+        return False
+    # Calculate checksum
+    check_sum = sum(int(national_id[i]) * (10 - i) for i in range(9))
+    remainder = check_sum % 11
+    check_digit = int(national_id[9])
+    return check_digit == remainder if remainder < 2 else check_digit == 11 - remainder
+
+
 @dataclass
 class CustomerData:
     """CustomerModel data model."""
@@ -49,7 +63,7 @@ class CustomerData:
                 bool(self.national_id.strip()) and
                 bool(self.name.strip()) and
                 bool(self.phone.strip()) and
-                self._is_valid_national_id(self.national_id.strip()) and
+                _is_valid_iranian_national_id(self.national_id.strip()) and  # Use shared function
                 self._is_valid_phone(self.phone.strip())
         )
 
@@ -59,7 +73,7 @@ class CustomerData:
 
         if not self.national_id.strip():
             errors.append("کد ملی الزامی است")
-        elif not self._is_valid_national_id(self.national_id.strip()):
+        elif not _is_valid_iranian_national_id(self.national_id.strip()):
             errors.append("کد ملی معتبر نمی‌باشد")
 
         if not self.name.strip():
@@ -71,33 +85,6 @@ class CustomerData:
             errors.append("شماره تماس معتبر نمی‌باشد")
 
         return errors
-
-    def _is_valid_national_id(self, national_id: str) -> bool:
-        """Validate Iranian national ID format."""
-        if not national_id or len(national_id) != 10:
-            return False
-
-        if not national_id.isdigit():
-            return False
-
-        # Check for invalid patterns
-        if national_id in ['0000000000', '1111111111', '2222222222', '3333333333',
-                           '4444444444', '5555555555', '6666666666', '7777777777',
-                           '8888888888', '9999999999']:
-            return False
-
-        # Calculate checksum
-        check_sum = 0
-        for i in range(9):
-            check_sum += int(national_id[i]) * (10 - i)
-
-        remainder = check_sum % 11
-        check_digit = int(national_id[9])
-
-        if remainder < 2:
-            return check_digit == remainder
-        else:
-            return check_digit == 11 - remainder
 
     def _is_valid_phone(self, phone: str) -> bool:
         """Validate phone number format."""
@@ -158,55 +145,24 @@ class CompanionData:
 
     def is_valid(self) -> bool:
         """Check if companion data is valid."""
-        # If any field is filled, both name and national_id should be filled and valid
         if self.name or self.national_id:
             return (
                     bool(self.name.strip()) and
                     bool(self.national_id.strip()) and
-                    self._is_valid_national_id(self.national_id.strip())
+                    _is_valid_iranian_national_id(self.national_id.strip())  # Use shared function
             )
         return True  # Empty companions are valid
 
     def get_validation_errors(self, companion_index: int = 0) -> List[str]:
-        """Get validation errors for companion data."""
         errors = []
-
         if self.name or self.national_id:
             if not self.name.strip():
                 errors.append(f"نام همراه {companion_index + 1} الزامی است")
             if not self.national_id.strip():
                 errors.append(f"کد ملی همراه {companion_index + 1} الزامی است")
-            elif not self._is_valid_national_id(self.national_id.strip()):
+            elif not _is_valid_iranian_national_id(self.national_id.strip()):  # Use shared function
                 errors.append(f"کد ملی همراه {companion_index + 1} معتبر نمی‌باشد")
-
         return errors
-
-    def _is_valid_national_id(self, national_id: str) -> bool:
-        """Validate Iranian national ID format."""
-        if not national_id or len(national_id) != 10:
-            return False
-
-        if not national_id.isdigit():
-            return False
-
-        # Check for invalid patterns
-        if national_id in ['0000000000', '1111111111', '2222222222', '3333333333',
-                           '4444444444', '5555555555', '6666666666', '7777777777',
-                           '8888888888', '9999999999']:
-            return False
-
-        # Calculate checksum
-        check_sum = 0
-        for i in range(9):
-            check_sum += int(national_id[i]) * (10 - i)
-
-        remainder = check_sum % 11
-        check_digit = int(national_id[9])
-
-        if remainder < 2:
-            return check_digit == remainder
-        else:
-            return check_digit == 11 - remainder
 
 
 @dataclass

@@ -492,39 +492,6 @@ class CustomerRepository(ICustomerRepository):
         )
 
 
-class CustomerRepositoryFactory:
-    """Factory for creating customer repositories."""
-
-    @staticmethod
-    def create(db_session: Session) -> CustomerRepository:
-        """Create a customer repository instance."""
-        return CustomerRepository(db_session)
-
-    def phone_exists(self, phone: str, exclude_national_id: str = None) -> bool:
-        raise NotImplementedError
-
-    def companion_national_id_exists(self, national_id: str, exclude_companion_id: int = None) -> bool:
-        raise NotImplementedError
-
-    def get_all_customers(self, limit: int = 100) -> List[CustomerData]:
-        raise NotImplementedError
-
-    def get_customer_count(self) -> int:
-        raise NotImplementedError
-
-    def get_companions_by_customer(self, customer_national_id: str) -> List[CompanionData]:
-        raise NotImplementedError
-
-    def get_all_companions(self, limit: int = 1000) -> List[CompanionData]:
-        raise NotImplementedError
-
-    def search_customers_by_partial_match(self, field: str, value: str, limit: int = 10) -> List[CustomerData]:
-        raise NotImplementedError
-
-    def search_companions_by_partial_match(self, field: str, value: str, limit: int = 10) -> List[CompanionData]:
-        raise NotImplementedError
-
-
 class InMemoryCustomerRepository(ICustomerRepository):
     """In-memory implementation for testing."""
 

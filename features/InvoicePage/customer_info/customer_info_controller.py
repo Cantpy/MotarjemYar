@@ -5,10 +5,10 @@ Controller Layer - PySide6 Controller for UI coordination and business logic int
 from PySide6.QtCore import QObject, Signal
 from typing import Dict, Any, Optional
 
-from features.InvoicePage.customer_info.customer_info_models import (CustomerData, CompanionData, CustomerInfoData,
-                                                                     CustomerSearchCriteria)
-from features.InvoicePage.customer_info.customer_info_logic import CustomerInfoLogic, CustomerManagementLogic
+from features.InvoicePage.customer_info.customer_info_models import CustomerData, CompanionData
+from features.InvoicePage.customer_info.customer_info_logic import CustomerInfoLogic
 from features.InvoicePage.customer_info.customer_info_repo import ICustomerRepository
+from features.InvoicePage.customer_info.customer_info_view import CustomerInfoView
 
 
 class CustomerInfoController(QObject):
@@ -18,54 +18,76 @@ class CustomerInfoController(QObject):
     data_changed = Signal(dict)
     validation_changed = Signal(bool)
     companions_visibility_changed = Signal(bool)
-    field_validation_changed = Signal(str, bool)  # field_name, is_valid
-    error_occurred = Signal(str)  # error_message
-    customer_loaded = Signal(dict)  # customer_data
+    field_validation_changed = Signal(str, bool)
+    error_occurred = Signal(str)
+    customer_loaded = Signal(dict)
     customer_saved = Signal()
     customer_deleted = Signal()
-    companions_refreshed = Signal(list)  # List of companion data
+    companions_refreshed = Signal(list)
 
-    def __init__(self, customer_repository: ICustomerRepository, parent=None):
-        """Initialize controller with repository and optional parent."""
-        super().__init__(parent)
-        self.customer_repository = customer_repository
+    def __init__(self, customer_repository: ICustomerRepository, view: 'CustomerInfoView'):
+        super().__init__(view)
+        self.view = view
         self.logic = CustomerInfoLogic(customer_repository)
-        self.management_logic = CustomerManagementLogic(customer_repository)
         self._last_validation_state = True
-        self._autocompletion_enabled = True
 
     def initialize(self):
-        """Initialize controller with default state."""
+        """Initialize controller and load necessary data for the view."""
+        self._load_and_set_autocompletion()
         self._emit_current_state()
 
-    def set_autocompletion_enabled(self, enabled: bool):
-        """Enable or disable autocompletion."""
-        self._autocompletion_enabled = enabled
+    def _load_and_set_autocompletion(self):
+        """Fetches data from the logic/repo and passes simple lists to the view."""
+        try:
+            # The controller is responsible for this data retrieval
+            customers = self.logic.customer_repository.get_all_customers()
+
+            # Prepare simple lists for the view
+            customer_names = [c.name for c in customers]
+            customer_phones = [c.phone for c in customers]
+            customer_ids = [c.national_id for c in customers]
+
+            # Pass the data to the view to set up completers
+            self.view.setup_autocompleters({
+                'names': customer_names,
+                'phones': customer_phones,
+                'national_ids': customer_ids
+            })
+        except Exception as e:
+            self.error_occurred.emit(f"خطا در بارگذاری اطلاعات تکمیلی: {str(e)}")
+
+    def find_and_load_customer(self, identifier: str, field: str):
+        """Finds a customer based on an identifier and loads their data."""
+        try:
+            if field == 'national_id':
+                customer = self.logic.customer_repository.get_by_national_id(identifier)
+            elif field == 'phone':
+                customer = self.logic.customer_repository.get_by_phone(identifier)
+            elif field == 'name':
+                customers = self.logic.customer_repository.search_customers_by_partial_match('name', identifier,
+                                                                                             limit=1)
+                customer = customers[0] if customers else None
+            else:
+                customer = None
+
+            if customer:
+                self.load_customer_by_national_id(customer.national_id)
+
+        except Exception as e:
+            self.error_occurred.emit(f"خطا در یافتن مشتری: {str(e)}")
 
     # CustomerModel field update methods (called by UI signals)
     def on_national_id_changed(self, value: str):
         """Handle national ID field change."""
         self.update_customer_field('national_id', value)
 
-        # Handle autocompletion if enabled
-        if self._autocompletion_enabled and len(value) >= 3:
-            self._try_autocomplete_customer_by_national_id(value)
-
     def on_full_name_changed(self, value: str):
         """Handle full name field change."""
         self.update_customer_field('name', value)
 
-        # Handle autocompletion if enabled
-        if self._autocompletion_enabled and len(value) >= 2:
-            self._try_autocomplete_customer_by_name(value)
-
     def on_phone_changed(self, value: str):
         """Handle phone field change."""
         self.update_customer_field('phone', value)
-
-        # Handle autocompletion if enabled
-        if self._autocompletion_enabled and len(value) >= 4:
-            self._try_autocomplete_customer_by_phone(value)
 
     def on_address_changed(self, value: str):
         """Handle address field change."""
@@ -93,144 +115,14 @@ class CustomerInfoController(QObject):
 
     def on_companion_field_changed(self, companion_num: int, field_name: str, value: str):
         """Handle companion field change."""
+        """Handle companion field change."""
         result = self.logic.update_companion_by_ui_number(companion_num, field_name, value)
 
         if not result.is_valid:
             self.error_occurred.emit("; ".join(result.errors))
 
-        # Handle companion autocompletion if enabled
-        if self._autocompletion_enabled and len(value) >= 2:
-            if field_name == 'national_id':
-                self._try_autocomplete_companion_by_national_id(companion_num, value)
-            elif field_name == 'name':
-                self._try_autocomplete_companion_by_name(companion_num, value)
-
         self._emit_current_state()
         self._emit_companion_validation(companion_num)
-
-    # Autocompletion methods
-    def _try_autocomplete_customer_by_national_id(self, partial_national_id: str):
-        """Try to autocomplete customer by partial national ID."""
-        try:
-            # Exact match first
-            customer = self.customer_repository.get_by_national_id(partial_national_id)
-            if customer:
-                self._autocomplete_customer(customer)
-                return
-
-            # Partial match
-            customers = self.customer_repository.search_customers_by_partial_match(
-                'national_id', partial_national_id, limit=1
-            )
-            if customers:
-                self._autocomplete_customer(customers[0])
-
-        except Exception as e:
-            print(f"Error in customer autocompletion by national ID: {e}")
-
-    def _try_autocomplete_customer_by_phone(self, partial_phone: str):
-        """Try to autocomplete customer by partial phone number."""
-        try:
-            # Exact match first
-            customer = self.customer_repository.get_by_phone(partial_phone)
-            if customer:
-                self._autocomplete_customer(customer)
-                return
-
-            # Partial match
-            customers = self.customer_repository.search_customers_by_partial_match(
-                'phone', partial_phone, limit=1
-            )
-            if customers:
-                self._autocomplete_customer(customers[0])
-
-        except Exception as e:
-            print(f"Error in customer autocompletion by phone: {e}")
-
-    def _try_autocomplete_customer_by_name(self, partial_name: str):
-        """Try to autocomplete customer by partial name."""
-        try:
-            customers = self.customer_repository.search_customers_by_partial_match(
-                'name', partial_name, limit=1
-            )
-            if customers:
-                self._autocomplete_customer(customers[0])
-
-        except Exception as e:
-            print(f"Error in customer autocompletion by name: {e}")
-
-    def _autocomplete_customer(self, customer: CustomerData):
-        """Autocomplete customer data and load companions if any."""
-        try:
-            # Check if this is actually new data (avoid infinite loops)
-            current_data = self.logic.get_current_data()
-            if current_data.customer.national_id == customer.national_id:
-                return
-
-            # Load complete customer data with companions
-            customer_info = self.customer_repository.get_customer_with_companions(customer.national_id)
-            if customer_info:
-                # Import the complete data
-                result = self.logic.import_data(customer_info.to_dict())
-                if result.is_valid:
-                    # Renumber companions for proper UI display
-                    self._renumber_companions()
-
-                    # Emit signals to update UI
-                    self.customer_loaded.emit(customer_info.to_dict())
-                    self.companions_visibility_changed.emit(customer_info.has_companions)
-                    self._emit_current_state()
-
-                    # Emit companions data for UI synchronization
-                    companion_dicts = [comp.to_dict() for comp in customer_info.companions]
-                    self.companions_refreshed.emit(companion_dicts)
-
-        except Exception as e:
-            print(f"Error in customer autocompletion: {e}")
-
-    def _try_autocomplete_companion_by_national_id(self, companion_num: int, partial_national_id: str):
-        """Try to autocomplete companion by partial national ID."""
-        try:
-            companions = self.customer_repository.search_companions_by_partial_match(
-                'national_id', partial_national_id, limit=1
-            )
-            if companions:
-                self._autocomplete_companion(companion_num, companions[0])
-
-        except Exception as e:
-            print(f"Error in companion autocompletion by national ID: {e}")
-
-    def _try_autocomplete_companion_by_name(self, companion_num: int, partial_name: str):
-        """Try to autocomplete companion by partial name."""
-        try:
-            companions = self.customer_repository.search_companions_by_partial_match(
-                'name', partial_name, limit=1
-            )
-            if companions:
-                self._autocomplete_companion(companion_num, companions[0])
-
-        except Exception as e:
-            print(f"Error in companion autocompletion by name: {e}")
-
-    def _autocomplete_companion(self, companion_num: int, companion: CompanionData):
-        """Autocomplete companion data."""
-        try:
-            # Check if this is actually new data (avoid infinite loops)
-            current_companion = self.logic.get_companion_by_ui_number(companion_num)
-            if current_companion and current_companion.national_id == companion.national_id:
-                return
-
-            # Update companion data through logic
-            result = self.logic.update_companion_by_ui_number(companion_num, 'name', companion.name)
-            if result.is_valid:
-                result = self.logic.update_companion_by_ui_number(companion_num, 'national_id', companion.national_id)
-
-            # Notify parent view for UI update if possible
-            if hasattr(self.parent(), '_autofill_companion_data'):
-                self.parent()._autofill_companion_data(companion_num, companion)
-
-        except Exception as e:
-            print(f"Error in companion autocompletion: {e}")
 
     # Action button handlers
     def on_add_customer_clicked(self):
@@ -535,12 +427,12 @@ class CustomerInfoController(QObject):
 
         if field_name == 'national_id':
             value = customer.national_id.strip()
-            return bool(value) and customer._is_valid_national_id(value)
+            return bool(value) and customer.is_valid()
         elif field_name == 'name':
             return bool(customer.name.strip())
         elif field_name == 'phone':
             value = customer.phone.strip()
-            return bool(value) and customer._is_valid_phone(value)
+            return bool(value) and customer.is_valid()
         elif field_name in ['address', 'email', 'telegram_id']:
             return True  # Optional fields
         else:
@@ -560,7 +452,7 @@ class CustomerInfoController(QObject):
             if field_name == 'name':
                 return bool(name)
             elif field_name == 'national_id':
-                return bool(national_id) and companion._is_valid_national_id(national_id)
+                return bool(national_id) and companion.is_valid()
 
         return True  # Empty companions are valid
 
@@ -610,7 +502,7 @@ class CustomerInfoController(QObject):
         # If any field is filled, both should be filled and valid
         if name or national_id:
             name_valid = bool(name)
-            national_id_valid = bool(national_id) and companion._is_valid_national_id(national_id)
+            national_id_valid = bool(national_id) and companion.is_valid()
 
             self.field_validation_changed.emit(f'companion_{ui_number}_name', name_valid)
             self.field_validation_changed.emit(f'companion_{ui_number}_national_id', national_id_valid)
@@ -625,336 +517,3 @@ class CustomerInfoController(QObject):
         if index < len(current_data.companions):
             companion = current_data.companions[index]
             self._emit_companion_validation(companion.ui_number)
-
-
-class CustomerManagementController(QObject):
-    """Controller for customer management operations with companion support."""
-
-    # Signals
-    customers_loaded = Signal(list)  # List of customer dictionaries
-    customer_created = Signal(dict)  # CustomerModel data
-    customer_updated = Signal(dict)  # CustomerModel data
-    customer_deleted = Signal(str)  # National ID
-    error_occurred = Signal(str)  # Error message
-    search_completed = Signal(list)  # Search results
-    customer_with_companions_loaded = Signal(dict)  # CustomerModel info with companions
-
-    def __init__(self, customer_repository: ICustomerRepository, parent=None):
-        """Initialize controller with repository."""
-        super().__init__(parent)
-        self.customer_repository = customer_repository
-        self.logic = CustomerManagementLogic(customer_repository)
-
-    def load_all_customers(self, limit: int = 100):
-        """Load all customers."""
-        try:
-            customers = self.logic.get_all_customers(limit)
-            customer_dicts = [customer.to_dict() for customer in customers]
-            self.customers_loaded.emit(customer_dicts)
-        except Exception as e:
-            self.error_occurred.emit(f"خطا در بارگذاری مشتریان: {str(e)}")
-
-    def load_customer_with_companions(self, national_id: str):
-        """Load customer with all companions."""
-        try:
-            customer_info = self.logic.get_customer_with_companions(national_id)
-            if customer_info:
-                self.customer_with_companions_loaded.emit(customer_info.to_dict())
-            else:
-                self.error_occurred.emit("مشتری یافت نشد")
-        except Exception as e:
-            self.error_occurred.emit(f"خطا در بارگذاری مشتری: {str(e)}")
-
-    def search_customers(self, search_term: str):
-        """Search customers by term."""
-        try:
-            if not search_term.strip():
-                self.search_completed.emit([])
-                return
-
-            customers = self.logic.search_customers(search_term.strip())
-            customer_dicts = [customer.to_dict() for customer in customers]
-            self.search_completed.emit(customer_dicts)
-        except Exception as e:
-            self.error_occurred.emit(f"خطا در جستجو: {str(e)}")
-
-    def create_customer(self, customer_data: Dict[str, Any]):
-        """Create new customer (without companions)."""
-        try:
-            customer = CustomerData.from_dict(customer_data)
-            result = self.logic.create_customer(customer)
-
-            if result.is_valid:
-                self.customer_created.emit(customer.to_dict())
-            else:
-                self.error_occurred.emit("; ".join(result.errors))
-        except Exception as e:
-            self.error_occurred.emit(f"خطا در ایجاد مشتری: {str(e)}")
-
-    def create_customer_with_companions(self, customer_info_data: Dict[str, Any]):
-        """Create new customer with companions."""
-        try:
-            customer_info = CustomerInfoData.from_dict(customer_info_data)
-            result = self.logic.create_customer_with_companions(customer_info)
-
-            if result.is_valid:
-                self.customer_created.emit(customer_info.to_dict())
-            else:
-                self.error_occurred.emit("; ".join(result.errors))
-        except Exception as e:
-            self.error_occurred.emit(f"خطا در ایجاد مشتری و همراهان: {str(e)}")
-
-    def update_customer(self, customer_data: Dict[str, Any]):
-        """Update existing customer (without companions)."""
-        try:
-            customer = CustomerData.from_dict(customer_data)
-            result = self.logic.update_customer(customer)
-
-            if result.is_valid:
-                self.customer_updated.emit(customer.to_dict())
-            else:
-                self.error_occurred.emit("; ".join(result.errors))
-        except Exception as e:
-            self.error_occurred.emit(f"خطا در به‌روزرسانی مشتری: {str(e)}")
-
-    def update_customer_with_companions(self, customer_info_data: Dict[str, Any]):
-        """Update existing customer with companions."""
-        try:
-            customer_info = CustomerInfoData.from_dict(customer_info_data)
-            result = self.logic.update_customer_with_companions(customer_info)
-
-            if result.is_valid:
-                self.customer_updated.emit(customer_info.to_dict())
-            else:
-                self.error_occurred.emit("; ".join(result.errors))
-        except Exception as e:
-            self.error_occurred.emit(f"خطا در به‌روزرسانی مشتری و همراهان: {str(e)}")
-
-    def delete_customer(self, national_id: str):
-        """Delete customer (companions will be deleted automatically)."""
-        try:
-            result = self.logic.delete_customer(national_id)
-
-            if result.is_valid:
-                self.customer_deleted.emit(national_id)
-            else:
-                self.error_occurred.emit("; ".join(result.errors))
-        except Exception as e:
-            self.error_occurred.emit(f"خطا در حذف مشتری: {str(e)}")
-
-    def get_customer_by_national_id(self, national_id: str) -> Optional[Dict[str, Any]]:
-        """Get customer by national ID (without companions)."""
-        try:
-            customer = self.customer_repository.get_by_national_id(national_id)
-            return customer.to_dict() if customer else None
-        except Exception as e:
-            self.error_occurred.emit(f"خطا در بارگذاری مشتری: {str(e)}")
-            return None
-
-    def get_customer_with_companions_by_national_id(self, national_id: str) -> Optional[Dict[str, Any]]:
-        """Get customer with companions by national ID."""
-        try:
-            customer_info = self.customer_repository.get_customer_with_companions(national_id)
-            return customer_info.to_dict() if customer_info else None
-        except Exception as e:
-            self.error_occurred.emit(f"خطا در بارگذاری مشتری و همراهان: {str(e)}")
-            return None
-
-    def get_customer_by_phone(self, phone: str) -> Optional[Dict[str, Any]]:
-        """Get customer by phone."""
-        try:
-            customer = self.customer_repository.get_by_phone(phone)
-            return customer.to_dict() if customer else None
-        except Exception as e:
-            self.error_occurred.emit(f"خطا در بارگذاری مشتری: {str(e)}")
-            return None
-
-    def validate_customer_data(self, customer_data: Dict[str, Any]) -> tuple:
-        """Validate customer data."""
-        try:
-            customer = CustomerData.from_dict(customer_data)
-            is_valid = customer.is_valid()
-            errors = customer.get_validation_errors() if not is_valid else []
-            return is_valid, errors
-        except Exception as e:
-            return False, [f"خطا در اعتبارسنجی داده‌ها: {str(e)}"]
-
-    def validate_customer_info_data(self, customer_info_data: Dict[str, Any]) -> tuple:
-        """Validate customer info data (including companions)."""
-        try:
-            customer_info = CustomerInfoData.from_dict(customer_info_data)
-            is_valid = customer_info.is_valid()
-            errors = customer_info.get_validation_errors() if not is_valid else []
-            return is_valid, errors
-        except Exception as e:
-            return False, [f"خطا در اعتبارسنجی داده‌ها: {str(e)}"]
-
-    def check_duplicate_national_id(self, national_id: str) -> bool:
-        """Check if national ID already exists as customer."""
-        try:
-            return self.customer_repository.customer_exists(national_id)
-        except Exception as e:
-            self.error_occurred.emit(f"خطا در بررسی کد ملی: {str(e)}")
-            return False
-
-    def check_duplicate_companion_national_id(self, national_id: str, exclude_companion_id: int = None) -> bool:
-        """Check if national ID already exists as companion."""
-        try:
-            return self.customer_repository.companion_national_id_exists(national_id, exclude_companion_id)
-        except Exception as e:
-            self.error_occurred.emit(f"خطا در بررسی کد ملی همراه: {str(e)}")
-            return False
-
-    def check_duplicate_phone(self, phone: str, exclude_national_id: str = None) -> bool:
-        """Check if phone number already exists."""
-        try:
-            return self.customer_repository.phone_exists(phone, exclude_national_id)
-        except Exception as e:
-            self.error_occurred.emit(f"خطا در بررسی شماره تماس: {str(e)}")
-            return False
-
-    def get_statistics(self) -> Dict[str, Any]:
-        """Get customer statistics."""
-        try:
-            return self.logic.get_customer_statistics()
-        except Exception as e:
-            self.error_occurred.emit(f"خطا در دریافت آمار: {str(e)}")
-            return {}
-
-
-class CustomerDialogController(QObject):
-    """Controller for customer selection/management dialogs with companion support."""
-
-    # Signals
-    customer_selected = Signal(dict)  # Selected customer data
-    dialog_closed = Signal()
-    search_results_changed = Signal(list)
-    customer_details_loaded = Signal(dict)  # CustomerModel with companions
-
-    def __init__(self, customer_repository: ICustomerRepository, parent=None):
-        """Initialize with customer repository."""
-        super().__init__(parent)
-        self.management_controller = CustomerManagementController(customer_repository, self)
-        self.selected_customer = None
-
-        # Connect management controller signals
-        self.management_controller.search_completed.connect(self.search_results_changed)
-        self.management_controller.customer_with_companions_loaded.connect(self.customer_details_loaded)
-        self.management_controller.error_occurred.connect(self._handle_error)
-
-    def search_customers(self, search_term: str):
-        """Search customers and emit results."""
-        self.management_controller.search_customers(search_term)
-
-    def load_customer_details(self, national_id: str):
-        """Load complete customer details including companions."""
-        self.management_controller.load_customer_with_companions(national_id)
-
-    def select_customer(self, customer_data: Dict[str, Any]):
-        """Select a customer."""
-        self.selected_customer = customer_data
-        self.customer_selected.emit(customer_data)
-
-    def get_selected_customer(self) -> Optional[Dict[str, Any]]:
-        """Get currently selected customer."""
-        return self.selected_customer
-
-    def clear_selection(self):
-        """Clear customer selection."""
-        self.selected_customer = None
-
-    def close_dialog(self):
-        """Close dialog and emit signal."""
-        self.dialog_closed.emit()
-
-    def _handle_error(self, error_message: str):
-        """Handle errors from management controller."""
-        # Re-emit error or handle as needed
-        if hasattr(self.parent(), 'show_error'):
-            self.parent().show_error(error_message)
-
-
-class ValidationController(QObject):
-    """Helper controller for validation operations with companion support."""
-
-    def __init__(self):
-        """Initialize validation controller."""
-        super().__init__()
-
-    @staticmethod
-    def validate_national_id(national_id: str) -> tuple:
-        """Validate Iranian national ID."""
-        customer_data = CustomerData(national_id=national_id)
-        is_valid = customer_data._is_valid_national_id(national_id)
-        error = "" if is_valid else "کد ملی معتبر نمی‌باشد"
-        return is_valid, error
-
-    @staticmethod
-    def validate_phone(phone: str) -> tuple:
-        """Validate phone number."""
-        customer_data = CustomerData(phone=phone)
-        is_valid = customer_data._is_valid_phone(phone)
-        error = "" if is_valid else "شماره تماس معتبر نمی‌باشد"
-        return is_valid, error
-
-    @staticmethod
-    def validate_required_field(value: str, field_name: str) -> tuple:
-        """Validate required field."""
-        is_valid = bool(value.strip())
-        error = f"{field_name} الزامی است" if not is_valid else ""
-        return is_valid, error
-
-    @staticmethod
-    def validate_email(email: str) -> tuple:
-        """Validate email format (basic validation)."""
-        if not email.strip():
-            return True, ""  # Email is optional
-
-        import re
-        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
-        is_valid = bool(re.match(email_pattern, email.strip()))
-        error = "فرمت ایمیل معتبر نمی‌باشد" if not is_valid else ""
-        return is_valid, error
-
-    @staticmethod
-    def validate_companion_data(companion_data: Dict[str, Any], index: int = 0) -> tuple:
-        """Validate companion data."""
-        companion = CompanionData.from_dict(companion_data)
-        is_valid = companion.is_valid()
-        errors = companion.get_validation_errors(index) if not is_valid else []
-        return is_valid, errors
-
-    @staticmethod
-    def validate_customer_info_data(customer_info_data: Dict[str, Any]) -> tuple:
-        """Validate complete customer info data including companions."""
-        customer_info = CustomerInfoData.from_dict(customer_info_data)
-        is_valid = customer_info.is_valid()
-        errors = customer_info.get_validation_errors() if not is_valid else []
-        return is_valid, errors
-
-
-class ControllerFactory:
-    """Factory for creating controllers with proper dependencies."""
-
-    @staticmethod
-    def create_customer_info_controller(customer_repository: ICustomerRepository,
-                                        parent=None) -> CustomerInfoController:
-        """Create customer info controller."""
-        return CustomerInfoController(customer_repository, parent)
-
-    @staticmethod
-    def create_customer_management_controller(customer_repository: ICustomerRepository,
-                                              parent=None) -> CustomerManagementController:
-        """Create customer management controller."""
-        return CustomerManagementController(customer_repository, parent)
-
-    @staticmethod
-    def create_customer_dialog_controller(customer_repository: ICustomerRepository,
-                                          parent=None) -> CustomerDialogController:
-        """Create customer dialog controller."""
-        return CustomerDialogController(customer_repository, parent)
-
-    @staticmethod
-    def create_validation_controller() -> ValidationController:
-        """Create validation controller."""
-        return ValidationController()

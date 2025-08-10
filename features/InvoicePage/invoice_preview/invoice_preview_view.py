@@ -5,10 +5,10 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame
                                QToolButton)
 from PySide6.QtGui import QFont, QPixmap, QIcon, QPainter
 from PySide6.QtCore import Qt, QSize, QByteArray
-from features.InvoicePage.invoice_preview_GAS.invoice_preview_models_GAS import Invoice, InvoiceItem
+from features.InvoicePage.invoice_preview.invoice_preview_models import Invoice, InvoiceItem
 from typing import List, Dict
-from features.InvoicePage.invoice_preview_GAS.invoice_preview_assets_GAS import (PRINT_ICON_PATH, PDF_ICON_PATH,
-                                                                                 PNG_ICON_PATH, SHARE_ICON_PATH)
+from features.InvoicePage.invoice_preview.invoice_preview_assets import (PRINT_ICON_PATH, PDF_ICON_PATH,
+                                                                         PNG_ICON_PATH, SHARE_ICON_PATH)
 
 from shared import to_persian_number
 

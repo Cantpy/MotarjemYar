@@ -1,8 +1,8 @@
 # tests/test_logic.py
 
 import pytest
-from features.InvoicePage.invoice_preview_GAS.invoice_preview_logic_GAS import InvoiceService, create_mock_invoice
-from features.InvoicePage.invoice_preview_GAS.invoice_preview_models_GAS import InvoiceItem
+from features.InvoicePage.invoice_preview.invoice_preview_logic import InvoiceService, create_mock_invoice
+from features.InvoicePage.invoice_preview.invoice_preview_models import InvoiceItem
 
 
 @pytest.fixture
@@ -66,8 +66,8 @@ import pytest
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from features.InvoicePage.invoice_preview_GAS.invoice_preview_repo_GAS import (Base, InvoiceRepository,
-                                                                               IssuedInvoiceModel)
+from features.InvoicePage.invoice_preview.invoice_preview_repo import (Base, InvoiceRepository,
+                                                                       IssuedInvoiceModel)
 
 # Use an in-memory SQLite database for testing
 TEST_DB_URL = "sqlite:///:memory:"
