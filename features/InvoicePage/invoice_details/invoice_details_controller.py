@@ -13,8 +13,8 @@ from features.InvoicePage.invoice_details.invoice_details_models import (
     InvoiceData, InvoiceDetailsRequest, InvoiceDetailsResponse,
     TranslationOfficeInfo, UserInfo, CustomerInfo, Language
 )
-from logic import InvoiceDetailsLogic
-from repo import InvoiceDetailsRepository
+from features.InvoicePage.invoice_details.invoice_details_logic import InvoiceDetailsLogic
+from features.InvoicePage.invoice_details.invoice_details_repo import InvoiceDetailsRepository
 
 logger = logging.getLogger(__name__)
 
