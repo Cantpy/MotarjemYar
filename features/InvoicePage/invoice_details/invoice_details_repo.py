@@ -8,7 +8,7 @@ from sqlalchemy import desc, func
 from sqlalchemy.exc import SQLAlchemyError
 
 from features.InvoicePage.invoice_details.invoice_details_models import TranslationOfficeInfo, UserInfo
-from shared.models.sqlalchemy_models import IssuedInvoiceModel, UsersModel, TranslationOfficeDataModl
+from shared.models.sqlalchemy_models import IssuedInvoiceModel, UsersModel, TranslationOfficeDataModel
 
 
 class InvoiceDetailsRepository:
@@ -33,7 +33,7 @@ class InvoiceDetailsRepository:
             if last_invoice:
                 return str(last_invoice.invoice_number + 1)
             else:
-                return "1"  # First invoice
+                return "نامشخص"  # invoice_number not found
 
         except SQLAlchemyError as e:
             raise Exception(f"Database error while getting next invoice number: {str(e)}")
@@ -65,8 +65,8 @@ class InvoiceDetailsRepository:
         """Get translation office information."""
         try:
             office = (
-                self.users_db_session.query(TranslationOfficeDataModl)
-                .order_by(desc(TranslationOfficeDataModl.updated_at))
+                self.users_db_session.query(TranslationOfficeDataModel)
+                .order_by(desc(TranslationOfficeDataModel.updated_at))
                 .first()
             )
 
@@ -144,7 +144,7 @@ class InvoiceDetailsRepository:
         """Update translation office information."""
         try:
             # Get existing record or create new one
-            office = self.users_db_session.query(TranslationOfficeDataModl).first()
+            office = self.users_db_session.query(TranslationOfficeDataModel).first()
 
             if office:
                 # Update existing record
@@ -164,7 +164,7 @@ class InvoiceDetailsRepository:
                 office.updated_at = datetime.now()
             else:
                 # Create new record
-                office = TranslationOfficeDataModl(
+                office = TranslationOfficeDataModel(
                     name=office_info.name,
                     reg_no=office_info.registration_number,
                     representative=office_info.representative,

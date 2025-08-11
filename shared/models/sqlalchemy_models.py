@@ -258,7 +258,7 @@ class LoginLogsModel(Base):
     )
 
 
-class TranslationOfficeDataModl(Base):
+class TranslationOfficeDataModel(Base):
     __tablename__ = 'translation_office'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -310,7 +310,7 @@ OtherServicesModel.metadata.create_all(services_engine)
 UsersModel.metadata.create_all(users_engine)
 UserProfileModel.metadata.create_all(users_engine)
 LoginLogsModel.metadata.create_all(users_engine)
-TranslationOfficeDataModl.metadata.create_all(users_engine)
+TranslationOfficeDataModel.metadata.create_all(users_engine)
 
 # Session makers
 CustomersSession = sessionmaker(bind=customers_engine)
