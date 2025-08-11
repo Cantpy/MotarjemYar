@@ -16,7 +16,7 @@ from invoice_details_view import InvoiceDetailsView
 
 # Import the MVC components
 from features.InvoicePage.invoice_details.invoice_details_models import CustomerInfo, TranslationOfficeInfo
-from features.InvoicePage.invoice_page.invoice_page_controller import InvoiceDetailsController
+from features.InvoicePage.invoice_details.invoice_details_controller import InvoiceDetailsController
 from shared import return_resource
 
 invoices_database = return_resource('databases', 'invoices.db')
@@ -147,8 +147,7 @@ class InvoiceDetailsMainWindow(QMainWindow):
         """Initialize the controller and connect signals."""
         # Create controller
         self.controller = InvoiceDetailsController(
-            invoices_db_session=self.invoices_db_session,
-            users_db_session=self.users_session,
+            db_session=self.invoices_db_session,
             current_user=self.current_user,
             parent=self
         )

@@ -115,7 +115,7 @@ def create_mock_invoice() -> Invoice:
                 InvoiceItem(f"ترجمه رسمی کارت ملی", "رسمی", 2, "دارد", "ندارد", 800000),
                 InvoiceItem(f"ترجمه مقاله ISI در زمینه مهندسی", "غیررسمی", 15, "ندارد", "ندارد", 2250000),
                 InvoiceItem(f"ترجمه رسمی دانشنامه و ریزنمرات", "رسمی", 1, "دارد", "دارد", 3500000),
-            ] * 12
+            ] * 3
 
     subtotal = sum(item.total_price for item in items)
     vat_rate = 0.09
