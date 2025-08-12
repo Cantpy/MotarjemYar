@@ -106,5 +106,5 @@ class PriceDialogState:
 class PriceDialogResult:
     """Result returned from price dialog"""
     accepted: bool
-    document_item: Optional[object] = None  # DocumentItem from models.py
+    document_item: Optional[object] = None
     error_message: Optional[str] = None

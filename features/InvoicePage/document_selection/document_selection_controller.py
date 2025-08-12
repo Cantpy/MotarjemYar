@@ -185,6 +185,7 @@ class DocumentSelectionController(QObject):
                     'remarks': item.remarks
                 }
                 for item in self.invoice_logic.items
+                for item in self.invoice_logic.items
             ],
             'total_amount': self.get_invoice_total(),
             'items_count': self.get_invoice_items_count()

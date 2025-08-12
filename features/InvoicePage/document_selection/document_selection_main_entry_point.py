@@ -10,90 +10,7 @@ from features.InvoicePage.document_selection.document_selection_repo import Data
 from features.InvoicePage.document_selection.document_selection_logic import DocumentLogic, PriceCalculationLogic
 from features.InvoicePage.document_selection.document_selection_controller import DocumentSelectionController
 
-
-def create_sample_database(db_path: str):
-    """Create sample database with test data"""
-    # Sample SQL data from your schema
-    sample_sql = """
-        BEGIN TRANSACTION;
-        CREATE TABLE IF NOT EXISTS "fixed_prices" (
-            "id"	INTEGER NOT NULL,
-            "name"	TEXT NOT NULL,
-            "price"	INTEGER NOT NULL,
-            "is_default"	BOOLEAN NOT NULL,
-            "label_name"	TEXT,
-            PRIMARY KEY("id"),
-            UNIQUE("name")
-        );
-        CREATE TABLE IF NOT EXISTS "other_services" (
-            "id"	INTEGER NOT NULL,
-            "name"	TEXT NOT NULL,
-            "price"	INTEGER NOT NULL,
-            PRIMARY KEY("id"),
-            UNIQUE("name")
-        );
-        CREATE TABLE IF NOT EXISTS "services" (
-            "id"	INTEGER NOT NULL,
-            "name"	TEXT NOT NULL,
-            "base_price"	INTEGER,
-            "dynamic_price_name_1"	TEXT,
-            "dynamic_price_1"	INTEGER,
-            "dynamic_price_name_2"	TEXT,
-            "dynamic_price_2"	INTEGER,
-            PRIMARY KEY("id")
-        );
-        INSERT INTO "fixed_prices" VALUES (1,'certified_copy',2250,1,'کپی برابر اصل (هر صفحه)');
-        INSERT INTO "fixed_prices" VALUES (2,'judiciary_seal',60000,1,'تاییدیه دادگستری');
-        INSERT INTO "fixed_prices" VALUES (3,'foreign_affairs_seal',15000,1,'تاییدیه امور خارجه (هر صفحه)');
-        INSERT INTO "fixed_prices" VALUES (4,'official_translation',30000,1,'ثبت در سامانه (امور دفتری)');
-        INSERT INTO "fixed_prices" VALUES (5,'additional_issues',12000,1,'نسخه اضافه (هر نسخه)');
-        INSERT INTO "other_services" VALUES (1,'پیک',0);
-        INSERT INTO "other_services" VALUES (2,'سایر خدمات',0);
-        INSERT INTO "other_services" VALUES (3,'امور خارجه',0);
-        INSERT INTO "services" VALUES (1,'کارت ملی',54000,NULL,NULL,NULL,NULL);
-        INSERT INTO "services" VALUES (2,'شناسنامه',63000,'هر وقایع',9000,NULL,NULL);
-        INSERT INTO "services" VALUES (3,'ریز نمرات دبیرستان، پیش دانشگاهی (هرترم)',0,'هر ترم',33000,'هر درس',1350);
-        INSERT INTO "services" VALUES (4,'ریزنمرات دانشگاه (هرترم)',0,'هر ترم',36000,'هر درس',1350);
-        INSERT INTO "services" VALUES (5,'کارت معافیت',54000,NULL,0,NULL,0);
-        INSERT INTO "services" VALUES (6,'ابلاغیه، اخطار قضایی',72000,'هر سطر متن',5400,NULL,0);
-        INSERT INTO "services" VALUES (7,'توصیه نامه تحصیلی (بعد از تحصیلات سوم راهنمایی)',66000,'هر سطر متن',2700,NULL,0);
-        INSERT INTO "services" VALUES (8,'جواز اشتغال به کار',54000,'هر سطر متن',2700,NULL,0);
-        INSERT INTO "services" VALUES (9,'حکم بازنشستگی',54000,'هر سطر توضیحات',2700,NULL,0);
-        INSERT INTO "services" VALUES (10,'دفترچه بیمه',75000,NULL,0,NULL,0);
-        INSERT INTO "services" VALUES (11,'دیپلم پایان تحصیلات متوسطه یا پیش دانشگاهی',75000,NULL,0,NULL,0);
-        INSERT INTO "services" VALUES (12,'ریزنمرات دبستان، راهنمایی (هر سال)',66000,'هر درس',1350,NULL,0);
-        INSERT INTO "services" VALUES (13,'سند تلفن همراه',72000,NULL,0,NULL,0);
-        INSERT INTO "services" VALUES (14,'فیش مستمری',66000,'هر آیتم ریالی',900,NULL,0);
-        INSERT INTO "services" VALUES (15,'کارت بازرگانی هوشمند',72000,NULL,0,NULL,0);
-        INSERT INTO "services" VALUES (16,'کارت عضویت نظام مهندسی',72000,NULL,0,NULL,0);
-        INSERT INTO "services" VALUES (17,'کارت نظام پزشکی',72000,NULL,0,NULL,0);
-        INSERT INTO "services" VALUES (18,'کارت واکسیناسیون',66000,'هر تزریق',900,NULL,0);
-        INSERT INTO "services" VALUES (19,'کارت پایان خدمت',72000,NULL,0,NULL,0);
-        INSERT INTO "services" VALUES (20,'گزارش ورود و خروج از کشور',66000,'هر تردد',1350,NULL,0);
-        INSERT INTO "services" VALUES (21,'گواهی اشتغال به تحصیل',66000,'هر سطر متن',2700,NULL,0);
-        INSERT INTO "services" VALUES (22,'گواهی تجرد، تولّد، فوت',72000,NULL,0,NULL,0);
-        INSERT INTO "services" VALUES (23,'گواهینامه رانندگی',72000,NULL,0,NULL,0);
-        INSERT INTO "services" VALUES (24,'گواهی ریزنمرات دانشگاهی',66000,'هر سطر توضیحات',4500,NULL,0);
-        INSERT INTO "services" VALUES (25,'گواهی عدم خسارت خودرو',66000,'هر سطر متن',4500,NULL,0);
-        INSERT INTO "services" VALUES (26,'گواهی عدم سوءپیشینه (غیرفرمی)',64800,'هر سطر متن',4500,NULL,0);
-        INSERT INTO "services" VALUES (27,'گواهی عدم سوءپیشینه (فرمی)',72000,NULL,0,NULL,0);
-        INSERT INTO "services" VALUES (28,'گذرنامه',84000,'هر پرفراژ',4500,NULL,0);
-        INSERT INTO "services" VALUES (29,'دانشنامه کاردانی، کارشناسی، کارشناسی ارشد، دکترا',108000,NULL,0,NULL,0);
-        INSERT INTO "services" VALUES (30,'گواهی فنی و حرفه ای',108000,NULL,0,NULL,0);
-        COMMIT;
-"""
-
-    # Create database file if it doesn't exist
-    if not Path(db_path).exists():
-        print(f"Creating sample database at: {db_path}")
-
-        conn = sqlite3.connect(db_path)
-        conn.executescript(sample_sql)
-        conn.close()
-
-        print("Sample database created successfully!")
-    else:
-        print(f"Database already exists at: {db_path}")
+from features.InvoicePage.document_selection.document_selection_assets import SERVICES_DB_URL
 
 
 class MainWindow(QMainWindow):
@@ -156,12 +73,9 @@ class MainWindow(QMainWindow):
     def setup_logic(self):
         """Setup business logic and controllers"""
         try:
-            # Create database
-            db_path = "services.db"
-            create_sample_database(db_path)
 
             # Initialize repository
-            repository = DatabaseRepository(f"sqlite:///{db_path}")
+            repository = DatabaseRepository(f"sqlite:///{SERVICES_DB_URL}")
 
             # Initialize logic components
             document_logic = DocumentLogic(repository)
@@ -224,7 +138,7 @@ def main():
     # Print startup message
     print("=== سیستم مدیریت اسناد و قیمت‌گذاری ===")
     print("Application started successfully!")
-    print("Database: services.db")
+    print(f"Database: {SERVICES_DB_URL}")
     print("UI Language: Persian (RTL)")
     print("=========================================")
 

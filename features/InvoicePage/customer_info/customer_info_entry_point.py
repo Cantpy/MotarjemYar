@@ -41,53 +41,17 @@ class MainWindow(QMainWindow):
             # Create engine
             engine = create_engine(f'sqlite:///{customers_database}', echo=False)
 
-            # Create only the tables we need - this should prevent extra tables
             # Only create CustomerModel and CompanionModel tables
             CustomerModel.__table__.create(engine, checkfirst=True)
             CompanionModel.__table__.create(engine, checkfirst=True)
-
-            # Alternative approach if you prefer:
-            # Base.metadata.create_all(engine, tables=[CustomerModel.__table__, CompanionModel.__table__])
 
             Session = sessionmaker(bind=engine)
             db_session = Session()
             self.customer_repository = CustomerRepository(db_session)
 
-            # Add some demo data if database is empty
-            self._add_demo_data()
-
         except Exception as e:
             print(f"Database setup error: {e}")
             raise
-
-    def _add_demo_data(self):
-        """Add demo customers for testing if database is empty."""
-        try:
-            # Check if database has data
-            if not self.customer_repository.get_all_customers():
-                demo_customers = [
-                    CustomerData(
-                        national_id="1234567890",
-                        name="علی احمدی",
-                        phone="09123456789",
-                        email="ali@example.com",
-                        address="تهران، خیابان آزادی"
-                    ),
-                    CustomerData(
-                        national_id="0987654321",
-                        name="فاطمه محمدی",
-                        phone="09987654321",
-                        email="fateme@example.com",
-                        address="اصفهان، خیابان چهارباغ"
-                    ),
-                ]
-
-                for customer in demo_customers:
-                    self.customer_repository.create_customer(customer)
-
-                print("Demo data added to database")
-        except Exception as e:
-            print(f"Error adding demo data: {e}")
 
     def setup_ui(self):
         """Setup main UI."""
@@ -161,39 +125,6 @@ def create_database_tables():
         raise
 
 
-def verify_database_structure():
-    """Verify that only the expected tables exist in the database."""
-    try:
-        from sqlalchemy import inspect
-
-        engine = create_engine(f'sqlite:///{customers_database}')
-        inspector = inspect(engine)
-
-        tables = inspector.get_table_names()
-        print(f"Tables in database: {tables}")
-
-        expected_tables = ['customers', 'companions']
-        unexpected_tables = [t for t in tables if t not in expected_tables]
-
-        if unexpected_tables:
-            print(f"WARNING: Unexpected tables found: {unexpected_tables}")
-        else:
-            print("Database structure is correct - only expected tables found")
-
-        # Show table details
-        for table_name in tables:
-            columns = inspector.get_columns(table_name)
-            indexes = inspector.get_indexes(table_name)
-            print(f"\nTable '{table_name}':")
-            print(f"  Columns: {[col['name'] for col in columns]}")
-            print(f"  Indexes: {len(indexes)} indexes")
-
-        return tables
-    except Exception as e:
-        print(f"Error verifying database structure: {e}")
-        return []
-
-
 def example_with_real_database():
     """Example of using the system with a real SQLAlchemy database."""
     try:
@@ -236,13 +167,6 @@ def example_with_real_database():
 
 
 if __name__ == "__main__":
-    print("Customer Management System - Production Mode")
-    print("=" * 50)
-
-    # Verify database structure first
-    print("Verifying database structure...")
-    verify_database_structure()
-    print("\n" + "=" * 50 + "\n")
 
     # Run database example
     print("Testing database operations...")

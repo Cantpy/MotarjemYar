@@ -17,7 +17,7 @@ Base = declarative_base()
 class CustomerModel(Base):
     __tablename__ = 'customers'
 
-    national_id = Column(Text, primary_key=True, unique=True, nullable=False)
+    national_id = Column(Integer, primary_key=True, unique=True, nullable=False)
     name = Column(Text, nullable=False)
     phone = Column(Text, nullable=False)
     telegram_id = Column(Text)
@@ -41,7 +41,7 @@ class CompanionModel(Base):
     __tablename__ = 'companions'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(Text, nullable=False)
+    name = Column(Integer, nullable=False)
     national_id = Column(Text, nullable=False, unique=True)
     customer_national_id = Column(Text, ForeignKey('customers.national_id', ondelete='CASCADE'), nullable=False)
 

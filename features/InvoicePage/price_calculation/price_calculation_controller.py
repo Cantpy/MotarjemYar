@@ -12,7 +12,7 @@ class PriceDialogController(QObject):
     """Controller for price dialog"""
 
     # Signals
-    dialog_accepted = Signal(object)  # DocumentItem
+    dialog_accepted = Signal(object)
     dialog_rejected = Signal()
 
     def __init__(self, document_logic: DocumentLogic, price_logic: PriceCalculationLogic, parent=None):

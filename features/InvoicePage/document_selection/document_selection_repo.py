@@ -1,5 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, Text
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from typing import List, Optional
 from features.InvoicePage.document_selection.document_selection_models import Service, OtherService, FixedPrice
