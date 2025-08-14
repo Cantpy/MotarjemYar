@@ -12,7 +12,7 @@ class CustomerController:
         """Constructs a Customer object and passes it to the logic layer."""
         # The view will handle the int conversion and exceptions
         customer = Customer(
-            national_id=customer_data.get('national_id', 0),
+            national_id=customer_data.get('national_id', ""),
             name=customer_data.get('name', ''),
             phone=customer_data.get('phone', ''),
             telegram_id=customer_data.get('telegram_id'),

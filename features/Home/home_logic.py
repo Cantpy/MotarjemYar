@@ -12,7 +12,7 @@ from features.Home.home_models import (
 from features.Home.home_repo import HomePageRepository
 from shared.utils.number_utils import to_persian_number
 from shared.entities.common_entities import InvoiceDetailsEntity
-from shared.models.sqlalchemy_models import IssuedInvoiceModel
+from shared.database_models.invoices_models import IssuedInvoiceModel
 
 
 class HomePageLogic:

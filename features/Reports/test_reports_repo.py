@@ -2,7 +2,8 @@
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from shared.models.sqlalchemy_models import Base, IssuedInvoiceModel, CustomerModel, CompanionModel
+from shared.database_models.invoices_models import BaseInvoices, IssuedInvoiceModel
+from shared.database_models.customer_models import BaseCustomers, CustomerModel, CompanionModel
 from features.Reports.reports_repo import ReportsRepo
 from datetime import date
 
@@ -11,7 +12,8 @@ from datetime import date
 def session():
     """Setup a test database session."""
     engine = create_engine('sqlite:///:memory:')
-    Base.metadata.create_all(engine)
+    BaseInvoices.metadata.create_all(engine)
+    BaseCustomers.metadata.creat_all(engine)
     Session = sessionmaker(bind=engine)
     db_session = Session()
     # Add Test Data

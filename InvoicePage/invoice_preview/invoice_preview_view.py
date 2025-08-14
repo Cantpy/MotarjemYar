@@ -3,8 +3,8 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QTableWidget, QTableWidgetItem,
                                QHeaderView, QSizePolicy, QScrollArea, QSpacerItem, QAbstractItemView, QGridLayout,
                                QToolButton)
-from PySide6.QtGui import QFont, QPixmap, QIcon, QPainter
-from PySide6.QtCore import Qt, QSize, QByteArray
+from PySide6.QtGui import QFont, QPixmap, QIcon
+from PySide6.QtCore import Qt, QSize
 from InvoicePage import Invoice, InvoiceItem
 from typing import List, Dict
 from InvoicePage import (PRINT_ICON_PATH, PDF_ICON_PATH,

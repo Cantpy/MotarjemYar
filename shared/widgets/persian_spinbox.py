@@ -1,47 +1,68 @@
 from PySide6.QtWidgets import QSpinBox, QVBoxLayout, QLabel, QWidget
-from PySide6.QtGui import QValidator
+from PySide6.QtGui import QValidator, QFont
 from PySide6.QtCore import Qt
 
 
 class PersianSpinBox(QSpinBox):
     eastern_to_western = str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789")
-    western_to_persian = str.maketrans("0123456789,", "۰۱۲۳۴۵۶۷۸۹،")
+    western_to_persian = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, suffix=""):
         super().__init__(parent)
-        self.setAlignment(Qt.AlignRight)
-        self.setLayoutDirection(Qt.RightToLeft)
-        self.setMaximum(999_999_999)
-        self.setMinimum(0)
-        self.setSingleStep(1000)
+        self.setFont(QFont("Tahoma", 10))
         self.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
-        self.setSuffix(" تومان")
-
-    def valueFromText(self, text: str) -> int:
-        # Normalize input: convert Persian to English digits, remove Persian/English commas
-        cleaned = text.translate(self.eastern_to_western).replace("،", "").replace(",", "")
-        try:
-            return int(cleaned)
-        except ValueError:
-            return 0  # This value will be ignored unless validate() returns Acceptable
+        self.setRange(0, 999_999_999)
+        self.setGroupSeparatorShown(True)
+        # Suffix is now passed in constructor for flexibility
+        if suffix:
+            self.setSuffix(f" {suffix}")
 
     def textFromValue(self, value: int) -> str:
-        # Add commas and convert to Persian numerals and comma
-        formatted = f"{value:,}"
-        return formatted.translate(self.western_to_persian)
+        return str(value).translate(self.western_to_persian)
+
+    def valueFromText(self, text: str) -> int:
+        # Remove suffix before processing
+        suffix = self.suffix()
+        if suffix:
+            text = text.removesuffix(suffix)
+
+        cleaned = text.strip().translate(self.eastern_to_western)
+        try:
+            return int(cleaned)
+        except (ValueError, TypeError):
+            return 0
 
     def validate(self, text: str, pos: int):
-        # Normalize to English digits
-        cleaned = text.translate(self.eastern_to_western).replace("،", "").replace(",", "")
-        if cleaned.isdigit():
+        # Allow only Persian digits
+        suffix = self.suffix()
+        if suffix:
+            text = text.removesuffix(suffix)
+
+        if all(c in "۰۱۲۳۴۵۶۷۸۹" for c in text.strip()):
             return QValidator.Acceptable, text, pos
-        elif cleaned == "" or all(c in "۰۱۲۳۴۵۶۷۸۹،" for c in text):
+        if text == "":
             return QValidator.Intermediate, text, pos
         return QValidator.Invalid, text, pos
 
-    def focusOutEvent(self, event):
-        self.lineEdit().setText(self.textFromValue(self.value()))
-        super().focusOutEvent(event)
+    def show_error(self, message):
+        """Highlight input field with red border and display error message below it."""
+        self.setStyleSheet("border: 2px solid red; border-radius: 4px;")
+
+        # Check if the error label already exists, if not, create it
+        if not hasattr(self, "error_label"):
+            self.error_label = QLabel(self.parent())
+            self.error_label.setStyleSheet("color: red; font-size: 11px;")
+            self.error_label.setWordWrap(True)
+
+        self.error_label.setText(message)
+        self.error_label.setGeometry(self.x(), self.y() + self.height() + 2, self.width(), 20)
+        self.error_label.show()
+
+    def clear_error(self):
+        """Clear error styling and message from a line edit field."""
+        self.setStyleSheet("")  # Clear red border
+        if hasattr(self, "error_label"):
+            self.error_label.hide()
 
 
 class NormalSpinBox(QSpinBox):

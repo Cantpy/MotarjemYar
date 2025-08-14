@@ -1,4 +1,4 @@
-"""services_management_models.py - Database models for services management"""
+"""services_management_models.py - Database database_models for services management"""
 
 from sqlalchemy import Column, Integer, String, Boolean, create_engine
 from sqlalchemy.ext.declarative import declarative_base

@@ -1,7 +1,7 @@
 # view.py
 from PySide6.QtWidgets import (
     QLabel, QWidget, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout, QCheckBox, QCompleter,
-    QScrollArea, QGroupBox, QMessageBox, QSpacerItem
+    QScrollArea, QGroupBox, QSpacerItem
 )
 from PySide6.QtGui import QIntValidator, QFont
 from PySide6.QtCore import QStringListModel, Qt, QTimer
@@ -11,7 +11,7 @@ from features.Invoice_Page_GAS.customer_info_GAS.customer_info_qss_styles import
                                                                                   VALID_LINEEDIT_STYLE,
                                                                                   INVALID_LINEEDIT_STYLE)
 from shared.utils.validation_utils import (validate_national_id, validate_email, validate_phone_number)
-from shared import to_persian_number
+from shared import to_persian_number, show_error_message_box, show_warning_message_box, show_information_message_box
 
 
 class CustomerInfoWidget(QWidget):
@@ -50,7 +50,7 @@ class CustomerInfoWidget(QWidget):
         self.clear_form()
 
     def _setup_customer_fields(self):
-        customer_group = QGroupBox("اطلاعات اصلی مشتری")
+        customer_group = QGroupBox("اطلاعات مشتری اصلی")
         grid_layout = QGridLayout(customer_group)
         grid_layout.setSpacing(15)
         grid_layout.setContentsMargins(15, 15, 15, 15)
@@ -394,7 +394,7 @@ class CustomerInfoWidget(QWidget):
         try:
             customer_nid_text = self.national_id_edit.text()
             if not customer_nid_text:
-                raise ValueError("Customer National ID cannot be empty.")
+                raise ValueError("کد ملی مشتری نمی‌تواند خالی باشد.")
 
             customer_nid_int = int(customer_nid_text)
 
@@ -421,14 +421,14 @@ class CustomerInfoWidget(QWidget):
             # This call will now go through the new validation in the logic layer
             self.controller.save_customer(customer_data)
 
-            QMessageBox.information(self, "Success", "Customer data saved successfully!")
+            show_information_message_box(self, "موفقیت", "مشتری با موفقیت ذخیره شد.")
             self.load_completer_data()
             self.clear_form()
 
         except ValueError as e:
-            QMessageBox.warning(self, "Input Error", str(e))
+            show_warning_message_box(self, "خطای ورودی:\n", str(e))
         except Exception as e:
-            QMessageBox.critical(self, "Application Error", f"An unexpected error occurred: {e}")
+            show_error_message_box(self, "خطای اپلیکیشن", f"خطای غیرمنتظره:\n {e}")
 
     def _clear_companion_widgets(self):
         while self.companions_layout.count():

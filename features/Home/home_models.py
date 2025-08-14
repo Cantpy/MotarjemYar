@@ -1,5 +1,5 @@
 """
-Domain models for the home page functionality.
+Domain database_models for the home page functionality.
 These represent the business entities and data structures.
 """
 from dataclasses import dataclass

@@ -1,4 +1,4 @@
-# models.py
+# database_models.py
 from dataclasses import dataclass, field
 from typing import List, Optional
 
@@ -8,13 +8,13 @@ class Companion:
     """Data class for a companion."""
     id: Optional[int] = None
     name: str = ""
-    national_id: int = 0
+    national_id: str = ""
 
 
 @dataclass
 class Customer:
     """Data class for a customer."""
-    national_id: int = 0
+    national_id: str = ""
     name: str = ""
     phone: str = ""
     telegram_id: Optional[str] = None

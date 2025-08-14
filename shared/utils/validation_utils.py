@@ -17,8 +17,8 @@ def validate_email(email):
     if not email or not isinstance(email, str):
         return False
 
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return re.match(pattern, email.strip()) is not None
+    pattern = re.compile(r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)")
+    return pattern.match(email) is not None
 
 
 def validate_phone_number(phone):

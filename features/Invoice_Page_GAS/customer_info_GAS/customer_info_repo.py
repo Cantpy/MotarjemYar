@@ -6,14 +6,14 @@ from typing import List, Optional
 from features.Invoice_Page_GAS.customer_info_GAS.customer_info_models import Customer, Companion
 from features.Invoice_Page_GAS.customer_info_GAS.customer_info_assets import CUSTOMERS_DB_URL
 
-from shared.models.sqlalchemy_models import CustomerModel, CompanionModel, Base
+from shared.database_models.customer_models import CustomerModel, CompanionModel, BaseCustomers
 
 
 # --- Repository Class for Data Operations ---
 class CustomerRepository:
     def __init__(self, db_file=CUSTOMERS_DB_URL):
         self.engine = create_engine(f"sqlite:///{db_file}")
-        Base.metadata.create_all(self.engine)
+        BaseCustomers.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
 
     def add_customer(self, customer: Customer) -> None:
@@ -27,7 +27,7 @@ class CustomerRepository:
 
             customer_model = CustomerModel(**customer_model_data)
 
-            # Create new companion models from the DTO
+            # Create new companion database_models from the DTO
             companion_models = [
                 CompanionModel(name=c.name, national_id=c.national_id, customer_national_id=customer.national_id) for c
                 in customer.companions]

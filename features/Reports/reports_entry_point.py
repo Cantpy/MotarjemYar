@@ -11,9 +11,15 @@ DATABASE_URL = "sqlite:///:memory:"
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 # --- This is for demonstration ---
-from shared.models.sqlalchemy_models import Base
+from shared.database_models.invoices_models import BaseInvoices
+from shared.database_models.customer_models import BaseCustomers
+from shared.database_models.services_models import BaseServices
+from shared.database_models.user_models import BaseUsers
 
-Base.metadata.create_all(bind=engine)
+BaseInvoices.metadata.create_all(bind=engine)
+BaseUsers.metadata.create_all(bind=engine)
+BaseServices.metadata.create_all(bind=engine)
+BaseCustomers.metadata.create_all(bind=engine)
 # (You should add some dummy data here to see reports on launch)
 # --- End of placeholder ---
 

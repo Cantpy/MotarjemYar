@@ -5,8 +5,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from features.InvoiceTable.invoice_table_models import (
     InvoiceData, InvoiceSummary
 )
-from shared.models.sqlalchemy_models import (Base, IssuedInvoiceModel, InvoiceItemModel, UsersModel,
-                                             UserProfileModel)
+from shared.database_models.invoices_models import BaseInvoices, IssuedInvoiceModel, InvoiceItemModel
+from shared.database_models.user_models import BaseUsers, UsersModel, UserProfileModel
 import logging
 from shared import return_resource
 
@@ -30,8 +30,8 @@ class DatabaseRepository:
         self.UsersSession = sessionmaker(bind=self.users_engine)
 
         # Create tables if they don't exist
-        Base.metadata.create_all(self.invoices_engine)
-        Base.metadata.create_all(self.users_engine)
+        BaseInvoices.metadata.create_all(self.invoices_engine)
+        BaseUsers.metadata.create_all(self.users_engine)
 
 
 class InvoiceRepository(DatabaseRepository):

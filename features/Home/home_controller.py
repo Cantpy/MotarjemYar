@@ -9,7 +9,7 @@ from typing import List, Tuple
 from features.Home.home_logic import HomePageLogic
 from features.Home.home_models import DashboardStats, DeliveryStatus, StatusChangeRequest
 from features.Home.home_settings_models import Settings
-from shared.models.sqlalchemy_models import IssuedInvoiceModel
+from shared.database_models.invoices_models import InvoiceItemModel
 from shared import (show_question_message_box, show_information_message_box, NotificationDialog, return_resource,
                     show_error_message_box)
 
@@ -95,7 +95,7 @@ class HomePageController(QObject):
             self.error_occurred.emit("خطای داشبورد", f"خطا در بروزرسانی داشبورد: {str(e)}")
             return None
 
-    def get_recent_invoices(self) -> List[Tuple[IssuedInvoiceModel, str]]:
+    def get_recent_invoices(self) -> List[Tuple[InvoiceItemModel, str]]:
         """
         Get recent invoices with priority information.
 

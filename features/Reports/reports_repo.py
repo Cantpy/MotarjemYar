@@ -2,8 +2,9 @@
 from sqlalchemy import func, case
 from sqlalchemy.orm import Session
 from datetime import date, timedelta
-from shared.models.sqlalchemy_models import (IssuedInvoiceModel, CustomerModel, UsersModel, LoginLogsModel,
-                                             UserProfileModel)
+from shared.database_models.invoices_models import BaseInvoices, IssuedInvoiceModel
+from shared.database_models.customer_models import BaseCustomers, CustomerModel
+from shared.database_models.user_models import BaseUsers, UsersModel, LoginLogsModel, UserProfileModel
 from typing import List
 
 

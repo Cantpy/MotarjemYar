@@ -8,7 +8,7 @@ from PySide6.QtCore import QPoint
 from typing import Callable
 from datetime import date
 
-from InvoicePage import MainInvoiceWindow
+from InvoicePage.invoice_preview.invoice_preview_view import MainInvoiceWindow
 from InvoicePage import InvoiceService, create_mock_invoice
 from InvoicePage import InvoiceRepository
 from InvoicePage import Invoice, Customer, InvoiceItem

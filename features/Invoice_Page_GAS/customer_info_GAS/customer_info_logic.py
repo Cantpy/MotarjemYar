@@ -17,14 +17,15 @@ class CustomerLogic:
         if not all([customer.national_id, customer.name, customer.phone]):
             raise ValueError("فیلدهای کدملی، نام و نام و خانوادگی، و شماره تماس باید پر شوند.")
 
-        if not validate_email(str(customer.national_id)):
+        if not validate_national_id(str(customer.national_id)):
             raise ValueError(f"کد ملی مشتری نامعتبر است.\n{customer.national_id}")
 
         if not validate_phone_number(customer.phone):
             raise ValueError(f"شماره تماس مشتری نامعتیر است.\n {customer.phone}")
 
-        if not validate_email(customer.email):
-            raise ValueError(f"ایمیل مشتری نامعتیر است.\n {customer.phone}")
+        if customer.email:
+            if not validate_email(customer.email):
+                raise ValueError(f"ایمیل مشتری نامعتیر است.\n {customer.email}")
 
         # --- Companion Validation ---
         for companion in customer.companions:

@@ -1,12 +1,11 @@
 # repo.py
 
-import os
 from sqlalchemy import create_engine, update
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
 from typing import Optional
 from datetime import date
-from shared.database_models.invoices_models import (IssuedInvoiceModel, BaseInvoices )
+from shared.database_models.invoices_models import (IssuedInvoiceModel, BaseInvoices)
 from InvoicePage import INVOICES_DB_URL
 
 

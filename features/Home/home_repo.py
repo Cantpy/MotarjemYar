@@ -9,8 +9,10 @@ from datetime import date
 import jdatetime
 from shared.utils.number_utils import to_persian_number
 from shared.entities.common_entities import CustomerEntity, ServicesEntity, InvoiceDetailsEntity, InvoiceDocumentsEntity
-from shared.models.sqlalchemy_models import (IssuedInvoiceModel, InvoiceItemModel, CustomerModel,
-                                             FixedPricesModel, ServicesModel, OtherServicesModel)
+from shared.database_models.invoices_models import IssuedInvoiceModel, InvoiceItemModel, BaseInvoices
+from shared.database_models.customer_models import CustomerModel, CompanionModel, BaseCustomers
+from shared.database_models.services_models import FixedPricesModel, ServicesModel, OtherServicesModel, BaseServices
+
 from features.Home.home_models import DashboardStats, DocumentStatistics
 
 

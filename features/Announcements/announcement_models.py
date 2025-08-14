@@ -1,5 +1,5 @@
 """
-Data models for SMS and Email notifications.
+Data database_models for SMS and Email notifications.
 """
 from dataclasses import dataclass, field
 from datetime import datetime
