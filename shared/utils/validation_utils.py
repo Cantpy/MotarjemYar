@@ -58,37 +58,65 @@ def validate_national_id(national_id):
     Returns:
         bool: True if national ID is valid, False otherwise
     """
-    if not national_id or not isinstance(national_id, str):
+    # 1. Prerequisite check: Must be 10 digits and numeric.
+    if not national_id.isdigit() or len(national_id) != 10:
         return False
 
-    # Remove spaces and convert to string
-    clean_id = national_id.replace(" ", "").strip()
-
-    # Must be exactly 10 digits
-    if not clean_id.isdigit() or len(clean_id) != 10:
+    # 2. Check for invalid repeating characters.
+    if len(set(national_id)) == 1:
         return False
 
-    # Invalid patterns
-    invalid_patterns = [
-        '0000000000', '1111111111', '2222222222', '3333333333', '4444444444',
-        '5555555555', '6666666666', '7777777777', '8888888888', '9999999999'
-    ]
+    # 3. Calculate the checksum.
+    check_digit = int(national_id[9])
+    weighted_sum = sum(int(national_id[i]) * (10 - i) for i in range(9))
+    remainder = weighted_sum % 11
 
-    if clean_id in invalid_patterns:
-        return False
-
-    # Checksum validation
-    check_sum = 0
-    for i in range(9):
-        check_sum += int(clean_id[i]) * (10 - i)
-
-    remainder = check_sum % 11
-    check_digit = int(clean_id[9])
-
+    # 4. Compare with the check digit based on the official rules.
     if remainder < 2:
         return check_digit == remainder
     else:
-        return check_digit == 11 - remainder
+        return check_digit == (11 - remainder)
+
+
+def validate_legal_national_id(nid: str) -> bool:
+    """
+    Validates an 11-digit Iranian Legal Entity National ID (شناسه ملی).
+
+    Args:
+        nid: The 11-digit national ID as a string.
+
+    Returns:
+        True if the ID is valid, False otherwise.
+    """
+    # 1. Prerequisite check: Must be 11 digits and numeric.
+    if not nid.isdigit() or len(nid) != 11:
+        return False
+
+    # 2. Get the check digit (the last digit).
+    check_digit = int(nid[10])
+
+    # 3. Define the constant weights for the checksum calculation.
+    weights = [29, 27, 23, 19, 17, 13, 11, 7, 5, 3]
+
+    # 4. The digit before the check digit (at index 9) is a special coefficient.
+    coefficient = int(nid[9]) + 2
+
+    # 5. Calculate the weighted sum.
+    weighted_sum = 0
+    # Iterate through the first 10 digits and their corresponding weights.
+    for i in range(10):
+        term = (int(nid[i]) + coefficient) % 10
+        weighted_sum += term * weights[i]
+
+    # 6. Calculate the remainder.
+    remainder = weighted_sum % 11
+
+    # 7. Determine the expected check digit and compare.
+    if remainder == 0:
+        return check_digit == 0
+    else:
+        expected_check_digit = 11 - remainder
+        return check_digit == expected_check_digit
 
 
 def validate_required_field(value, field_name="Field"):

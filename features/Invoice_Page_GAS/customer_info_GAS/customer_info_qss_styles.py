@@ -51,6 +51,8 @@ CUSTOMER_INFO_STYLES = """
         #RemoveButton:hover { background-color: #c82333; }
         QCheckBox { spacing: 10px; font-weight: bold; }
         QScrollArea { border: none; background-color: transparent; }
+        #container_fields {background-color: transparent;}
+        #error_label {background-color: transparent;}
         """
 
 BASE_LINEEDIT_STYLE = """background-color: #ffffff;

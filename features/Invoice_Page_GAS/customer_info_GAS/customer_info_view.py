@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QLabel, QWidget, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout, QCheckBox, QCompleter,
     QScrollArea, QGroupBox, QSpacerItem
 )
-from PySide6.QtGui import QIntValidator, QFont
+from PySide6.QtGui import QIntValidator, QFont, QValidator
 from PySide6.QtCore import QStringListModel, Qt, QTimer, Signal
 
 from features.Invoice_Page_GAS.customer_info_GAS.customer_info_models import Customer
@@ -13,6 +13,8 @@ from features.Invoice_Page_GAS.customer_info_GAS.customer_info_qss_styles import
                                                                                   INVALID_LINEEDIT_STYLE)
 from shared.utils.validation_utils import (validate_national_id, validate_email, validate_phone_number)
 from shared import to_persian_number, show_error_message_box, show_information_message_box, show_question_message_box
+from shared.widgets.validators import PersianNIDEdit
+from shared.widgets.persian_tools import PhoneLineEdit, EmailLineEdit
 
 
 class CustomerInfoWidget(QWidget):
@@ -58,21 +60,21 @@ class CustomerInfoWidget(QWidget):
 
         # --- Create Widgets ---
         self.name_edit = QLineEdit()
-        self.national_id_edit = QLineEdit()
-        self.national_id_edit.setValidator(QIntValidator())
-        self.phone_edit = QLineEdit()
-        self.email_edit = QLineEdit()
+        self.national_id_edit = PersianNIDEdit()
+        self.phone_edit = PhoneLineEdit()
+        self.email_edit = EmailLineEdit()
         self.address_edit = QLineEdit()
 
         # --- Create validated field containers using the new helper method ---
         name_container, self.name_error_label = self._create_validated_field_widget(self.name_edit)
-        nid_container, self.nid_error_label = self._create_validated_field_widget(self.national_id_edit)
+        nid_container, self.nid_error_label, self.nid_feedback_label = self._create_validated_field_widget(
+            self.national_id_edit, include_feedback=True)
         phone_container, self.phone_error_label = self._create_validated_field_widget(self.phone_edit)
         email_container, self.email_error_label = self._create_validated_field_widget(self.email_edit)
 
         # --- Connect signals for real-time validation ---
         self.name_edit.textChanged.connect(self._validate_name)
-        self.national_id_edit.textChanged.connect(self._validate_nid)
+        self.national_id_edit.validation_changed.connect(self._on_nid_validation_changed)
         self.phone_edit.textChanged.connect(self._validate_phone)
         self.email_edit.textChanged.connect(self._validate_email)
 
@@ -101,18 +103,27 @@ class CustomerInfoWidget(QWidget):
 
         self.main_layout.addWidget(customer_group)
 
-    def _create_validated_field_widget(self, line_edit: QLineEdit) -> (QWidget, QLabel):
+    def _create_validated_field_widget(self, line_edit: QLineEdit, include_feedback=False) -> tuple:
+        """Updated to optionally include a green feedback label."""
         container = QWidget()
-
+        container.setObjectName('container_fields')
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
         layout.addWidget(line_edit)
 
         error_label = QLabel()
-        error_label.setStyleSheet("color: #dc3545; font-family: IranSANS; font-size: 9pt;")
+        error_label.setObjectName('error_label')
         error_label.setVisible(False)
+        error_label.setStyleSheet("color: #dc3545; font-size: 9pt;")
         layout.addWidget(error_label)
+
+        if include_feedback:
+            feedback_label = QLabel()
+            feedback_label.setVisible(False)
+            feedback_label.setStyleSheet("color: #28a745; font-size: 9pt; font-weight: bold;")
+            layout.addWidget(feedback_label)
+            return container, error_label, feedback_label
 
         return container, error_label
 
@@ -124,8 +135,7 @@ class CustomerInfoWidget(QWidget):
 
         layout = QGridLayout(companion_group)
         name_edit = QLineEdit(name)
-        nid_edit = QLineEdit(str(national_id) if national_id else "")
-        nid_edit.setValidator(QIntValidator())
+        nid_edit = PersianNIDEdit(national_id if national_id else "")
         remove_button = QPushButton("×")
         remove_button.setObjectName("RemoveButton")
 
@@ -187,16 +197,25 @@ class CustomerInfoWidget(QWidget):
             self._set_field_state(self.name_edit, self.name_error_label, "invalid", "نام باید حداقل ۳ حرف باشد")
             return False
 
-    def _validate_nid(self, text):
-        if validate_national_id(text):
+    def _on_nid_validation_changed(self, state: QValidator.State, entity_type: str):
+        """
+        Slot that handles feedback from the PersianNIDEdit widget.
+        This replaces the old _validate_nid method.
+        """
+        self.nid_feedback_label.hide()  # Hide feedback by default
+
+        if state == QValidator.Acceptable:
             self._set_field_state(self.national_id_edit, self.nid_error_label, "valid")
-            return True
-        elif not text:
+            if entity_type == 'real':
+                self.nid_feedback_label.setText("✔ شخص حقیقی")
+                self.nid_feedback_label.show()
+            elif entity_type == 'legal':
+                self.nid_feedback_label.setText("✔ شخص حقوقی")
+                self.nid_feedback_label.show()
+        elif state == QValidator.Invalid:
+            self._set_field_state(self.national_id_edit, self.nid_error_label, "invalid", "کد/شناسه ملی معتبر نیست")
+        else:  # Intermediate state
             self._clear_field_state(self.national_id_edit, self.nid_error_label)
-            return False
-        else:
-            self._set_field_state(self.national_id_edit, self.nid_error_label, "invalid", "کد ملی معتبر نیست")
-            return False
 
     def _validate_phone(self, text):
         if validate_phone_number(text):
@@ -245,6 +264,7 @@ class CustomerInfoWidget(QWidget):
         # Clear main fields' visual state
         self._clear_field_state(self.name_edit, self.name_error_label)
         self._clear_field_state(self.national_id_edit, self.nid_error_label)
+        self.nid_feedback_label.hide()
         self._clear_field_state(self.phone_edit, self.phone_error_label)
         self._clear_field_state(self.email_edit, self.email_error_label)
 
@@ -309,57 +329,6 @@ class CustomerInfoWidget(QWidget):
             self.companions_checkbox.setChecked(True)
 
         self._is_autofilling = False
-
-    # def load_completer_data(self):
-    #     """Fetches customer names and IDs to populate the autofill completer."""
-    #     self.completer_map = {info['name']: info['national_id'] for info in customer_info}
-    #
-    #     model = QStringListModel(list(self.completer_map.keys()))
-    #
-    #     completer = QCompleter(model, self)
-    #     completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
-    #     self.name_edit.setCompleter(completer)
-    #
-    #     # Connect the completer's 'activated' signal to the autofill slot
-    #     completer.activated.connect(self.autofill_customer_data)
-    #
-    # def display_customer_details(self, customer: Customer):
-    #     """Public slot to pre-fill the form with data."""
-    #     self.name_edit.setText(customer.name)
-    #     self.national_id_edit.setText(customer.national_id)
-    #     # ... (fill all other fields)
-    #
-    # def autofill_customer_data(self, selected_name: str):
-    #     """Fills the form with data of the customer selected from the completer."""
-    #     national_id = self.completer_map.get(selected_name)
-    #     if not national_id:
-    #         return
-    #
-    #     customer = self.controller.get_customer_details(national_id)
-    #     if customer:
-    #         # Clear all fields first to ensure a clean slate
-    #         self.clear_form()
-    #
-    #         # Fill the main customer fields
-    #         self.national_id_edit.setText(str(customer.national_id))
-    #         self.name_edit.setText(customer.name)
-    #         self.phone_edit.setText(customer.phone)
-    #         self.email_edit.setText(customer.email or "")
-    #         self.address_edit.setText(customer.address or "")
-    #
-    #         # --- REVISED LOGIC FOR ROBUSTNESS ---
-    #         if customer.companions:
-    #             # 1. Add all the companion data fields FIRST.
-    #             for comp in customer.companions:
-    #                 self.add_companion_fields(comp.name, comp.national_id)
-    #
-    #             # 2. THEN, check the box. This will trigger toggle_companions_ui,
-    #             # but the check to add a default field will fail because the
-    #             # layout is no longer empty, which is the correct behavior.
-    #             self.companions_checkbox.setChecked(True)
-    #         else:
-    #             # Ensure the box is unchecked if there are no companions.
-    #             self.companions_checkbox.setChecked(False)
 
     def toggle_companions_ui(self, state):
         """

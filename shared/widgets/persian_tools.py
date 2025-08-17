@@ -1,7 +1,116 @@
-from PySide6.QtWidgets import (QSpinBox, QVBoxLayout, QLabel, QWidget, QHeaderView, QStyleOptionHeader, QStyle,
+from PySide6.QtWidgets import (QSpinBox, QVBoxLayout, QLabel, QWidget, QHeaderView, QLineEdit,
                                QStyledItemDelegate)
 from PySide6.QtGui import QValidator, QFont, QPainter, QColor
-from PySide6.QtCore import Qt, QRect
+from PySide6.QtCore import Qt
+import re
+from shared.utils.validation_utils import validate_national_id
+
+PERSIAN_TO_ENGLISH = str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789")
+
+
+class PersianNIDValidator(QValidator):
+    def validate(self, input_text: str, pos: int):
+        normalized = input_text.translate(PERSIAN_TO_ENGLISH)
+
+        if normalized == "":
+            return QValidator.Intermediate, input_text, pos
+
+        if not normalized.isdigit():
+            return QValidator.Invalid, input_text, pos
+
+        # Limit length to 10 digits
+        if len(normalized) > 10:
+            return QValidator.Invalid, input_text, pos
+
+        # If 10 digits are complete, check validity
+        if len(normalized) == 10:
+            if validate_national_id(normalized):
+                return QValidator.Acceptable, input_text, pos
+            else:
+                return QValidator.Invalid, input_text, pos
+
+        # Otherwise still typing → Intermediate
+        return QValidator.Intermediate, input_text, pos
+
+    def fixup(self, input_text: str) -> str:
+        return "".join(ch for ch in input_text.translate(PERSIAN_TO_ENGLISH) if ch.isdigit())[:10]
+
+
+class PersianNIDEdit(QLineEdit):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setValidator(PersianNIDValidator(self))
+        self.setAlignment(Qt.AlignRight)
+        self.setPlaceholderText("کد ملی ۱۰ رقمی")
+
+    def text(self) -> str:
+        return super().text().translate(PERSIAN_TO_ENGLISH)
+
+    def strip(self) -> str:
+        return super().text().strip().translate(PERSIAN_TO_ENGLISH)
+
+
+class PhoneValidator(QValidator):
+    def validate(self, input_text: str, pos: int):
+        # Normalize Persian digits to English before checking
+        normalized = input_text.translate(PERSIAN_TO_ENGLISH)
+
+        if normalized == "":
+            return QValidator.Intermediate, input_text, pos
+
+        # Allow: optional + at start, then digits only
+        if re.fullmatch(r"\+?\d*", normalized):
+            return QValidator.Acceptable, input_text, pos
+
+        return QValidator.Invalid, input_text, pos
+
+    def fixup(self, input_text: str) -> str:
+        text = input_text.translate(PERSIAN_TO_ENGLISH)
+        if text.startswith("+"):
+            return "+" + "".join(ch for ch in text[1:] if ch.isdigit())
+        return "".join(ch for ch in text if ch.isdigit())
+
+
+class PhoneLineEdit(QLineEdit):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setValidator(PhoneValidator(self))
+        self.setPlaceholderText("Phone (e.g., +989123456789 or ۰۹۱۲۳۴۵۶۷۸۹)")
+        self.setAlignment(Qt.AlignRight)
+
+    def text(self) -> str:
+        # Always return normalized English digits
+        return super().text().translate(PERSIAN_TO_ENGLISH)
+
+    def strip(self) -> str:
+        return super().text().strip().translate(PERSIAN_TO_ENGLISH)
+
+
+# ---------------- Email Validator ---------------- #
+class EmailValidator(QValidator):
+    # Only allow English letters, digits, ., -, _, and @
+    EMAIL_ALLOWED = re.compile(r"^[A-Za-z0-9._\-@]*$")
+
+    def validate(self, input_text: str, pos: int):
+        if input_text == "":
+            return QValidator.Intermediate, input_text, pos
+        if self.EMAIL_ALLOWED.fullmatch(input_text):
+            return QValidator.Acceptable, input_text, pos
+        return QValidator.Invalid, input_text, pos
+
+    def fixup(self, input_text: str) -> str:
+        return "".join(ch for ch in input_text if self.EMAIL_ALLOWED.match(ch))
+
+
+class EmailLineEdit(QLineEdit):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setValidator(EmailValidator(self))
+        self.setPlaceholderText("example@email.com")
+
+    def text(self) -> str:
+        # Return as-is (only English allowed)
+        return super().text().strip()
 
 
 class PersianHeaderDelegate(QStyledItemDelegate):
@@ -20,7 +129,6 @@ class PersianHeaderDelegate(QStyledItemDelegate):
         painter.setPen(self.color)
         painter.drawText(option.rect, Qt.AlignCenter, persian_text)
         painter.restore()
-
 
 
 class PersianVerticalHeader(QHeaderView):
