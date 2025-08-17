@@ -4,21 +4,23 @@ from PySide6.QtWidgets import (
     QScrollArea, QGroupBox, QSpacerItem
 )
 from PySide6.QtGui import QIntValidator, QFont
-from PySide6.QtCore import QStringListModel, Qt, QTimer
+from PySide6.QtCore import QStringListModel, Qt, QTimer, Signal
 
+from features.Invoice_Page_GAS.customer_info_GAS.customer_info_models import Customer
 from features.Invoice_Page_GAS.customer_info_GAS.customer_info_qss_styles import (CUSTOMER_INFO_STYLES,
                                                                                   BASE_LINEEDIT_STYLE,
                                                                                   VALID_LINEEDIT_STYLE,
                                                                                   INVALID_LINEEDIT_STYLE)
 from shared.utils.validation_utils import (validate_national_id, validate_email, validate_phone_number)
-from shared import to_persian_number, show_error_message_box, show_warning_message_box, show_information_message_box
+from shared import to_persian_number, show_error_message_box, show_information_message_box, show_question_message_box
 
 
 class CustomerInfoWidget(QWidget):
-    def __init__(self, controller):
-        super().__init__()
-        self.controller = controller
+    save_requested = Signal(dict)
+    fetch_customer_details_requested = Signal(str)
 
+    def __init__(self):
+        super().__init__()
         self.setObjectName("CustomerInfoWidget")
         self.setWindowTitle("فرم اطلاعات مشتریان")
         self.setGeometry(100, 100, 1200, 800)
@@ -46,7 +48,6 @@ class CustomerInfoWidget(QWidget):
         self._setup_action_buttons()
 
         # --- Initial Setup ---
-        self.load_completer_data()
         self.clear_form()
 
     def _setup_customer_fields(self):
@@ -273,51 +274,92 @@ class CustomerInfoWidget(QWidget):
         self.main_layout.addWidget(self.add_companion_button)
         self.add_companion_button.setVisible(False)
 
-    def load_completer_data(self):
-        """Fetches customer names and IDs to populate the autofill completer."""
-        customer_info = self.controller.get_all_customer_info_for_completer()
+    def populate_completer(self, customer_info: list[dict]):
+        """Public slot to receive completer data and set up the completer."""
         self.completer_map = {info['name']: info['national_id'] for info in customer_info}
-
         model = QStringListModel(list(self.completer_map.keys()))
-
         completer = QCompleter(model, self)
         completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
         self.name_edit.setCompleter(completer)
+        # When a name is activated, find its ID and emit a signal asking for details
+        completer.activated.connect(self._on_completer_activated)
 
-        # Connect the completer's 'activated' signal to the autofill slot
-        completer.activated.connect(self.autofill_customer_data)
-
-    def autofill_customer_data(self, selected_name: str):
-        """Fills the form with data of the customer selected from the completer."""
+    def _on_completer_activated(self, selected_name: str):
+        """Internal handler to emit the fetch request signal."""
         national_id = self.completer_map.get(selected_name)
-        if not national_id:
-            return
+        if national_id:
+            self.fetch_customer_details_requested.emit(national_id)
 
-        customer = self.controller.get_customer_details(national_id)
-        if customer:
-            # Clear all fields first to ensure a clean slate
-            self.clear_form()
+    # This method will be called by the controller after it fetches the data
+    def display_customer_details(self, customer: Customer):
+        """Public slot to pre-fill the form with a Customer object's data."""
+        # This flag prevents validation signals from firing while we programmatically set text
+        self._is_autofilling = True
 
-            # Fill the main customer fields
-            self.national_id_edit.setText(str(customer.national_id))
-            self.name_edit.setText(customer.name)
-            self.phone_edit.setText(customer.phone)
-            self.email_edit.setText(customer.email or "")
-            self.address_edit.setText(customer.address or "")
+        self.clear_form()  # Start with a clean slate
+        self.name_edit.setText(customer.name)
+        self.national_id_edit.setText(customer.national_id)
+        self.phone_edit.setText(customer.phone)
+        self.email_edit.setText(customer.email or "")
+        self.address_edit.setText(customer.address or "")
 
-            # --- REVISED LOGIC FOR ROBUSTNESS ---
-            if customer.companions:
-                # 1. Add all the companion data fields FIRST.
-                for comp in customer.companions:
-                    self.add_companion_fields(comp.name, comp.national_id)
+        if customer.companions:
+            for comp in customer.companions:
+                self.add_companion_fields(comp.name, comp.national_id)
+            self.companions_checkbox.setChecked(True)
 
-                # 2. THEN, check the box. This will trigger toggle_companions_ui,
-                # but the check to add a default field will fail because the
-                # layout is no longer empty, which is the correct behavior.
-                self.companions_checkbox.setChecked(True)
-            else:
-                # Ensure the box is unchecked if there are no companions.
-                self.companions_checkbox.setChecked(False)
+        self._is_autofilling = False
+
+    # def load_completer_data(self):
+    #     """Fetches customer names and IDs to populate the autofill completer."""
+    #     self.completer_map = {info['name']: info['national_id'] for info in customer_info}
+    #
+    #     model = QStringListModel(list(self.completer_map.keys()))
+    #
+    #     completer = QCompleter(model, self)
+    #     completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+    #     self.name_edit.setCompleter(completer)
+    #
+    #     # Connect the completer's 'activated' signal to the autofill slot
+    #     completer.activated.connect(self.autofill_customer_data)
+    #
+    # def display_customer_details(self, customer: Customer):
+    #     """Public slot to pre-fill the form with data."""
+    #     self.name_edit.setText(customer.name)
+    #     self.national_id_edit.setText(customer.national_id)
+    #     # ... (fill all other fields)
+    #
+    # def autofill_customer_data(self, selected_name: str):
+    #     """Fills the form with data of the customer selected from the completer."""
+    #     national_id = self.completer_map.get(selected_name)
+    #     if not national_id:
+    #         return
+    #
+    #     customer = self.controller.get_customer_details(national_id)
+    #     if customer:
+    #         # Clear all fields first to ensure a clean slate
+    #         self.clear_form()
+    #
+    #         # Fill the main customer fields
+    #         self.national_id_edit.setText(str(customer.national_id))
+    #         self.name_edit.setText(customer.name)
+    #         self.phone_edit.setText(customer.phone)
+    #         self.email_edit.setText(customer.email or "")
+    #         self.address_edit.setText(customer.address or "")
+    #
+    #         # --- REVISED LOGIC FOR ROBUSTNESS ---
+    #         if customer.companions:
+    #             # 1. Add all the companion data fields FIRST.
+    #             for comp in customer.companions:
+    #                 self.add_companion_fields(comp.name, comp.national_id)
+    #
+    #             # 2. THEN, check the box. This will trigger toggle_companions_ui,
+    #             # but the check to add a default field will fail because the
+    #             # layout is no longer empty, which is the correct behavior.
+    #             self.companions_checkbox.setChecked(True)
+    #         else:
+    #             # Ensure the box is unchecked if there are no companions.
+    #             self.companions_checkbox.setChecked(False)
 
     def toggle_companions_ui(self, state):
         """
@@ -377,7 +419,7 @@ class CustomerInfoWidget(QWidget):
 
         self.save_button = QPushButton("ذخیره مشتری")
         self.save_button.setObjectName("PrimaryButton")
-        self.save_button.clicked.connect(self.save_customer)
+        self.save_button.clicked.connect(self._on_save_clicked)
 
         self.clear_button = QPushButton("پاک کردن فرم")
         self.clear_button.clicked.connect(self.clear_form)
@@ -389,49 +431,51 @@ class CustomerInfoWidget(QWidget):
         # Add the button layout to the main layout
         self.main_layout.addLayout(self.buttons_layout)
 
-    def save_customer(self):
-        """Gathers data, performs UI-level validation, and calls the controller."""
-        try:
-            customer_nid_text = self.national_id_edit.text()
-            if not customer_nid_text:
-                raise ValueError("کد ملی مشتری نمی‌تواند خالی باشد.")
+    def _on_save_clicked(self):
+        """Gathers raw text from all fields and emits the save_requested signal."""
+        companions = []
+        # Find all companion groups and get their raw text
+        for group_box in self.companions_widget.findChildren(QGroupBox, "CompanionGroup"):
+            line_edits = group_box.findChildren(QLineEdit)
+            if len(line_edits) == 2:
+                companions.append({
+                    "name": line_edits[0].text(),
+                    "national_id": line_edits[1].text()
+                })
 
-            customer_nid_int = int(customer_nid_text)
+        # Package all raw data into a single dictionary
+        raw_data = {
+            "name": self.name_edit.text(),
+            "national_id": self.national_id_edit.text(),
+            "phone": self.phone_edit.text(),
+            "email": self.email_edit.text(),
+            "address": self.address_edit.text(),
+            "companions": companions
+        }
 
-            companions_data = []
-            if self.companions_checkbox.isChecked():
-                for group_box in self.companions_widget.findChildren(QGroupBox):
-                    if group_box.objectName() == "CompanionGroup":
-                        line_edits = group_box.findChildren(QLineEdit)
-                        if len(line_edits) == 2:
-                            name = line_edits[0].text()
-                            nid_text = line_edits[1].text()
-                            if name and nid_text:
-                                companions_data.append({"name": name, "national_id": int(nid_text)})
-
-            customer_data = {
-                "name": self.name_edit.text(),
-                "national_id": customer_nid_int,
-                "phone": self.phone_edit.text(),
-                "email": self.email_edit.text(),
-                "address": self.address_edit.text(),
-                "companions": companions_data,
-            }
-
-            # This call will now go through the new validation in the logic layer
-            self.controller.save_customer(customer_data)
-
-            show_information_message_box(self, "موفقیت", "مشتری با موفقیت ذخیره شد.")
-            self.load_completer_data()
-            self.clear_form()
-
-        except ValueError as e:
-            show_warning_message_box(self, "خطای ورودی:\n", str(e))
-        except Exception as e:
-            show_error_message_box(self, "خطای اپلیکیشن", f"خطای غیرمنتظره:\n {e}")
+        # Emit the signal with the raw data for the logic layer to process
+        self.save_requested.emit(raw_data)
 
     def _clear_companion_widgets(self):
         while self.companions_layout.count():
             child = self.companions_layout.takeAt(0)
             if child.widget():
                 child.widget().deleteLater()
+
+    def show_save_success(self, message):
+        """Public slot to show a success message."""
+        show_information_message_box(self, "موفقیت", message)
+
+    def show_error(self, message: str):
+        """Public slot to show an error message."""
+        show_error_message_box(self, "خطا", message)
+
+    def show_edit_question(self, message, func):
+        """Public slot to show question message box."""
+        show_question_message_box(parent=self,
+                                  title="ویراش مشتری",
+                                  message=message,
+                                  button_1="بله",
+                                  yes_func=func,
+                                  button_2="خیر"
+                                  )

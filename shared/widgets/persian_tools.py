@@ -1,6 +1,38 @@
-from PySide6.QtWidgets import QSpinBox, QVBoxLayout, QLabel, QWidget
-from PySide6.QtGui import QValidator, QFont
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (QSpinBox, QVBoxLayout, QLabel, QWidget, QHeaderView, QStyleOptionHeader, QStyle,
+                               QStyledItemDelegate)
+from PySide6.QtGui import QValidator, QFont, QPainter, QColor
+from PySide6.QtCore import Qt, QRect
+
+
+class PersianHeaderDelegate(QStyledItemDelegate):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.western_to_persian = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
+        self.font = QFont("Tahoma", 10, QFont.Bold)
+        self.color = QColor(64, 64, 64)  # Dark gray
+
+    def paint(self, painter: QPainter, option, index):
+        # Persian numeral for the row index
+        persian_text = str(index.row() + 1).translate(self.western_to_persian)
+
+        painter.save()
+        painter.setFont(self.font)
+        painter.setPen(self.color)
+        painter.drawText(option.rect, Qt.AlignCenter, persian_text)
+        painter.restore()
+
+
+
+class PersianVerticalHeader(QHeaderView):
+    def __init__(self, parent=None):
+        super().__init__(Qt.Vertical, parent)
+        self.setFont(QFont("Tahoma", 10, QFont.Bold))
+        self.western_to_persian = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
+
+    def headerData(self, section, orientation, role):
+        if role == Qt.DisplayRole and orientation == Qt.Vertical:
+            return str(section + 1).translate(str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹"))
+        return super().headerData(section, orientation, role)
 
 
 class PersianSpinBox(QSpinBox):

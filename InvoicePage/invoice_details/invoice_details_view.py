@@ -5,7 +5,7 @@ from PySide6.QtGui import QFont
 from datetime import datetime
 from typing import Dict, Any
 from InvoicePage.invoice_details import InvoiceData, Language, TranslationOfficeInfo
-from shared.widgets.persian_spinbox import NormalSpinBox
+from shared.widgets.persian_tools import NormalSpinBox
 from shared import to_persian_number, get_persian_date, DatePickerLineEdit
 
 

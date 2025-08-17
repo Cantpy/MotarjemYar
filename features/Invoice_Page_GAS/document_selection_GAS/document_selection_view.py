@@ -1,189 +1,282 @@
 # document_selection/view.py
 from PySide6.QtWidgets import (
-    QWidget, QLineEdit, QPushButton, QLabel, QTableWidget, QTableWidgetItem, QAbstractItemView, QDialog,
-    QVBoxLayout, QHBoxLayout, QGroupBox, QHeaderView, QCompleter, QSpinBox, QCheckBox
+    QWidget, QLineEdit, QPushButton, QLabel, QTableWidget, QTableWidgetItem, QAbstractItemView,
+    QVBoxLayout, QHBoxLayout, QGroupBox, QHeaderView, QCompleter, QGridLayout, QGraphicsDropShadowEffect, QMenu
 )
-from PySide6.QtCore import Signal, QStringListModel, Qt, QSize
-from features.Invoice_Page_GAS.document_selection_GAS.document_selection_controller import DocumentSelectionController
-from features.Invoice_Page_GAS.document_selection_GAS.document_selection_models import (Service, InvoiceItem,
-                                                                                        DynamicPrice, FixedPrice)
-from features.Invoice_Page_GAS.document_selection_GAS.price_calculation_dialog import CalculationDialog
+from PySide6.QtCore import Signal, Qt
+from PySide6.QtGui import QColor, QAction, QFont
+from features.Invoice_Page_GAS.document_selection_GAS.document_selection_models import InvoiceItem
+from features.Invoice_Page_GAS.document_selection_GAS.document_selection_qss_styles import (DOC_SELECTION_STYLES,
+                                                                                            COMPLETER_POPUP)
+from features.Invoice_Page_GAS.workflow_manager.invoice_page_state_manager import WorkflowStateManager
+from typing import List
+from shared import to_persian_number
 
 
 class DocumentSelectionWidget(QWidget):
     # --- The communication signal ---
-    invoice_items_changed = Signal(list)
+    add_button_clicked = Signal(str)
+    edit_button_clicked = Signal(int)
+    delete_button_clicked = Signal(int)
+    clear_button_clicked = Signal()
+    manual_item_updated = Signal(object, int, str)
 
-    def __init__(self):
+    def __init__(self, state_manager: WorkflowStateManager):
         super().__init__()
+        self.state_manager = state_manager
+
         self.resize(1200, 800)
-        self._controller = DocumentSelectionController()
-        self._services_map = {s.name: s for s in self._controller.get_all_services()}
-        self._calculation_fees = self._controller.get_calculation_fees()
-        self._current_invoice_items = []
+        self.setObjectName("DocumentSelectionWidget")
+        self.setStyleSheet(DOC_SELECTION_STYLES)
+        self._is_updating_table = False
 
         main_layout = QVBoxLayout(self)
         self._setup_ui(main_layout)
-        self._populate_completer()
+        self._setup_connections()
 
     def _setup_ui(self, main_layout):
-        service_input_group = QGroupBox("افزودن خدمات به فاکتور")
-        input_layout = QHBoxLayout(service_input_group)
-        self.service_edit = QLineEdit()
-        self.service_edit.setPlaceholderText("نام سند یا خدمات را جستجو کنید...")
-        add_button = QPushButton("افزودن به لیست")
-        add_button.setObjectName("PrimaryButton")
-        input_layout.addWidget(QLabel("انتخاب سند:"))
-        input_layout.addWidget(self.service_edit)
-        input_layout.addWidget(add_button)
+        self._setup_service_input(main_layout)
+        self._setup_invoice_table(main_layout)
+        self._setup_action_buttons(main_layout)
 
-        invoice_table_group = QGroupBox("لیست خدمات انتخاب شده")
-        table_layout = QVBoxLayout(invoice_table_group)
+    def _apply_shadow_effect(self, widget: QGroupBox):
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(20)
+        shadow.setXOffset(0)
+        shadow.setYOffset(2)
+        shadow.setColor(QColor(0, 0, 0, 25))
+        widget.setGraphicsEffect(shadow)
+
+    def _setup_service_input(self, parent_layout):
+        service_input_group = QGroupBox("افزودن خدمات به فاکتور")
+        # Use a grid layout for better alignment and control
+        layout = QGridLayout(service_input_group)
+        layout.setSpacing(15)
+
+        self.service_edit = QLineEdit(placeholderText="نام سند یا خدمات را جستجو کنید...")
+        self.add_button = QPushButton("➕ افزودن خدمت")
+        self.add_button.setObjectName("PrimaryButton")
+        self.add_button.setEnabled(False)
+        self.add_button.setToolTip("ابتدا یک خدمت معتبر از لیست انتخاب کنید")
+
+        layout.addWidget(QLabel("انتخاب سند:"), 0, 0)
+        layout.addWidget(self.service_edit, 0, 1)
+        layout.addWidget(self.add_button, 0, 2)
+        layout.setColumnStretch(1, 1)
+
+        self._apply_shadow_effect(service_input_group)
+        parent_layout.addWidget(service_input_group)
+
+    def _setup_invoice_table(self, parent_layout):
+        invoice_table_group = QGroupBox("لیست خدمات")
+        layout = QVBoxLayout(invoice_table_group)
+
         self.table = QTableWidget()
-        # NEW: Read-only table with updated columns
+        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.table.setColumnCount(8)
+        self.table.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+        self.table.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
+
+        self.table.verticalHeader().setVisible(True)
+        self.table.verticalHeader().setFixedWidth(40)
+        self.table.verticalHeader().setFont(QFont("IRANSans", 10))
+
+        self.table.setStyleSheet("""QHeaderView::section:vertical {border-right: 1px solid #edf2f7;}""")
+
+        self.table.setAlternatingRowColors(True)
+
+        self.table.setColumnCount(7)
         self.table.setHorizontalHeaderLabels([
-            "شرح خدمات", "تعداد", "تعداد صفحات", "مهر دادگستری", "مهر امورخارجه",
-            "قیمت کل", "توضیحات", ""
+            "شرح خدمات", "تعداد کل", "تعداد صفحات", "مهر دادگستری", "مهر امورخارجه",
+            "قیمت کل", "توضیحات"
         ])
+
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.Stretch)
         header.setSectionResizeMode(6, QHeaderView.Stretch)
-        table_layout.addWidget(self.table)
 
+        layout.addWidget(self.table)
+        self._apply_shadow_effect(invoice_table_group)
+        parent_layout.addWidget(invoice_table_group)
+
+        self.table.setContextMenuPolicy(Qt.CustomContextMenu)
+
+    def _setup_action_buttons(self, parent_layout):
         buttons_layout = QHBoxLayout()
-        clear_button = QPushButton("پاک کردن کل لیست")
-        delete_button = QPushButton("حذف آیتم انتخاب شده")
-        delete_button.setObjectName("RemoveButton")
+        self.clear_button = QPushButton("پاک کردن کل لیست")
+        self.delete_button = QPushButton("حذف ردیف انتخاب شده")
+        self.delete_button.setObjectName("RemoveButton")
+        self.delete_button.setEnabled(False)  # Initially disabled
+
+        # --- NEW: Edit Button ---
+        self.edit_button = QPushButton("ویرایش ردیف انتخاب شده")
+        self.edit_button.setEnabled(False)  # Initially disabled
+
         buttons_layout.addStretch()
-        buttons_layout.addWidget(delete_button)
-        buttons_layout.addWidget(clear_button)
+        buttons_layout.addWidget(self.delete_button)
+        buttons_layout.addWidget(self.edit_button)
+        buttons_layout.addWidget(self.clear_button)
+        parent_layout.addLayout(buttons_layout)
 
-        main_layout.addWidget(service_input_group)
-        main_layout.addWidget(invoice_table_group)
-        main_layout.addLayout(buttons_layout)
+    def _setup_connections(self):
+        self.table.itemSelectionChanged.connect(self._on_selection_changed)
+        self.table.itemChanged.connect(self._on_table_item_changed)
+        self.table.customContextMenuRequested.connect(self._show_table_context_menu)
 
-        add_button.clicked.connect(self._add_service_item)
-        clear_button.clicked.connect(self._clear_all)
-        delete_button.clicked.connect(self._delete_table_row)
+        self.delete_button.clicked.connect(self._delete_selected_row)
+        self.delete_button.clicked.connect(lambda: self.delete_button_clicked.emit(self.table.currentRow()))
 
-    def _populate_completer(self):
-        completer = QCompleter(list(self._services_map.keys()), self)
-        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
-        completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        self.edit_button.clicked.connect(lambda: self.edit_button_clicked.emit(self.table.currentRow()))
+        self.add_button.clicked.connect(lambda: self.add_button_clicked.emit(self.service_edit.text()))
+
+        self.clear_button.clicked.connect(self.clear_button_clicked.emit)
+        self.service_edit.returnPressed.connect(self.add_button.click)
+
+    def populate_completer(self, service_names: list):
+        completer = QCompleter(service_names, self)
+        completer.setCaseSensitivity(Qt.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchContains)
+
+        completer.popup().setStyleSheet(COMPLETER_POPUP)
+
         self.service_edit.setCompleter(completer)
 
-    def _create_option_widget(self, service: Service, option_name: str) -> QWidget:
-        container = QWidget()
-        layout = QHBoxLayout(container)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        completer.activated.connect(lambda text: self.add_button.setEnabled(True))
+        self.service_edit.textChanged.connect(lambda text: self.add_button.setEnabled(text in service_names))
 
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        checkbox = QCheckBox()
-
-        option_found = False
-        for dyn_price in service.dynamic_prices:
-            if dyn_price.name == option_name:
-                checkbox.setProperty("option_price", dyn_price.price)
-                option_found = True
-                break
-
-        checkbox.setEnabled(option_found)
-        layout.addWidget(checkbox)
-        return container
-
-    # def _on_item_changed(self):
-    #     invoice_items = []
-    #     total_invoice_price = 0
-    #     for row in range(self.table.rowCount()):
-    #         service: Service = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
-    #         quantity = self.table.cellWidget(row, 2).value()
-    #
-    #         row_total = service.base_price
-    #         selected_options = []
-    #
-    #         for col in [3, 4]:  # Judiciary and Foreign Affairs columns
-    #             checkbox = self.table.cellWidget(row, col).findChild(QCheckBox)
-    #             if checkbox.isChecked():
-    #                 price = checkbox.property("option_price")
-    #                 option_name = self.table.horizontalHeaderItem(col).text()
-    #                 row_total += price
-    #                 selected_options.append(DynamicPrice(name=option_name, price=price))
-    #
-    #         row_total *= quantity
-    #         self.table.item(row, 5).setText(f"{row_total:,}")
-    #
-    #         notes_item = self.table.item(row, 6)
-    #         item = InvoiceItem(
-    #             service_name=service.name,
-    #             service_type=service.type,
-    #             quantity=quantity,
-    #             base_price=service.base_price,
-    #             selected_options=selected_options,
-    #             notes=notes_item.text() if notes_item else "",
-    #             total_price=row_total
-    #         )
-    #         invoice_items.append(item)
-    #         total_invoice_price += row_total
-    #
-    #     self.invoice_items_changed.emit(invoice_items)
-
-    def _add_service_item(self):
-        service = self._services_map.get(self.service_edit.text())
-        if not service: return
-
-        # --- OPEN THE DIALOG ---
-        dialog = CalculationDialog(service, self._calculation_fees, self)
-        if dialog.exec() == QDialog.Accepted:
-            new_item = dialog.result_item
-            self._current_invoice_items.append(new_item)
-            self._display_item_in_table(new_item)
-            self.invoice_items_changed.emit(self._current_invoice_items)
-            self.service_edit.clear()
-
-    def _display_item_in_table(self, item: InvoiceItem):
-        row = self.table.rowCount()
-        self.table.insertRow(row)
-
-        self.table.setItem(row, 0, QTableWidgetItem(item.service.name))
-        self.table.setItem(row, 1, QTableWidgetItem(str(item.quantity)))
-        self.table.setItem(row, 2, QTableWidgetItem(str(item.page_count)))
-
-        # Display checkmarks or dashes for seals
-        jud_seal_item = QTableWidgetItem("✔" if item.has_judiciary_seal else "-")
-        jud_seal_item.setTextAlignment(Qt.AlignCenter)
-        self.table.setItem(row, 3, jud_seal_item)
-
-        fa_seal_item = QTableWidgetItem("✔" if item.has_foreign_affairs_seal else "-")
-        fa_seal_item.setTextAlignment(Qt.AlignCenter)
-        self.table.setItem(row, 4, fa_seal_item)
-
-        self.table.setItem(row, 5, QTableWidgetItem(f"{item.total_price:,}"))
-        self.table.setItem(row, 6, QTableWidgetItem(item.remarks))
-
-        # We store the full object on the delete button for easy removal
-        delete_button = QPushButton("حذف")
-        delete_button.setObjectName("RemoveButton")
-        delete_button.setProperty("invoice_item", item)
-        delete_button.clicked.connect(self._delete_table_row)
-        self.table.setCellWidget(row, 7, delete_button)
-
-    def _delete_table_row(self):
-        button = self.sender()
-        item_to_remove = button.property("invoice_item")
-
-        # Find the row corresponding to this button
-        for row in range(self.table.rowCount()):
-            cell_widget = self.table.cellWidget(row, 7)
-            if cell_widget == button:
-                self.table.removeRow(row)
-                self._current_invoice_items.remove(item_to_remove)
-                self.invoice_items_changed.emit(self._current_invoice_items)
-                break
-
-    def _clear_all(self):
+    def update_table_display(self, items: List[InvoiceItem]):
+        self._is_updating_table = True
         self.table.setRowCount(0)
-        self._current_invoice_items.clear()
-        self.invoice_items_changed.emit(self._current_invoice_items)
+
+        for item in items:
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+
+            # --- CRITICAL FIX: Differentiate between editable and non-editable rows ---
+            if item.service.type == "خدمات دیگر":
+                # This is a manual entry, cells should be editable
+                self.table.setItem(row, 0, self._create_cell(item.service.name, data=item, editable=False))
+                self.table.setItem(row, 1, self._create_cell("۱", centered=True))
+                self.table.setItem(row, 2, self._create_cell("-", centered=True))
+                self.table.setItem(row, 3, self._create_cell("-", centered=True))
+                self.table.setItem(row, 4, self._create_cell("-", centered=True))
+                # Price and Remarks are editable by default
+                self.table.setItem(row, 5, self._create_cell(to_persian_number(f"{item.total_price:,} تومان"),
+                                                             centered=True, data=item, editable=True))
+                self.table.setItem(row, 6, self._create_cell(item.remarks, data=item, editable=True))
+            else:
+                # This is a calculated item, all cells are read-only
+                self.table.setItem(row, 0, self._create_cell(item.service.name, data=item))
+                self.table.setItem(row, 1, self._create_cell(to_persian_number(item.quantity), centered=True))
+                self.table.setItem(row, 2, self._create_cell(to_persian_number(item.page_count), centered=True))
+                self.table.setItem(row, 3, self._create_cell("✔" if item.has_judiciary_seal else "-",
+                                                             centered=True))
+                self.table.setItem(row, 4, self._create_cell("✔" if item.has_foreign_affairs_seal else "-",
+                                                             centered=True))
+                self.table.setItem(row, 5, self._create_cell(to_persian_number(f"{item.total_price:,} تومان"),
+                                                             centered=True))
+                self.table.setItem(row, 6, self._create_cell(item.remarks, tooltip=item.remarks))
+
+        vertical_headers = [to_persian_number(i + 1) for i in range(self.table.rowCount())]
+        self.table.setVerticalHeaderLabels(vertical_headers)
+
+        self.table.resizeRowsToContents()
+        self._is_updating_table = False
+
+    def _on_table_item_changed(self, item: QTableWidgetItem):
+        """
+        Handles user edits for manual items, now with a check to prevent recursion.
+        """
+        # If the table is being programmatically redrawn, do nothing.
+        if self._is_updating_table:
+            return
+
+        row = item.row()
+        col = item.column()
+
+        # Get the backend data object for this row
+        data_item = self.table.item(row, 0)
+        if not data_item: return
+        invoice_item = data_item.data(Qt.UserRole)
+
+        # This handler should only work for manual "Other Service" items
+        if not isinstance(invoice_item, InvoiceItem) or invoice_item.service.type != "خدمات دیگر":
+            return
+
+        # Handle Price changes
+        if col == 5:
+            try:
+                price_text = item.text().replace(" تومان", "").replace(",", "").strip()
+                new_price = int(price_text)
+
+                # Only send an update if the price has actually changed.
+                if new_price != invoice_item.total_price:
+                    self.manual_item_updated.emit(invoice_item, new_price, invoice_item.remarks)
+                # If the user types invalid text, the logic layer won't be called,
+                # and the next full redraw will fix the cell's text automatically.
+
+            except (ValueError, TypeError):
+                # If user types garbage, revert the cell text immediately without a signal loop.
+                self._is_updating_table = True
+                item.setText(f"{invoice_item.total_price:,} تومان")
+                self._is_updating_table = False
+
+        # Handle Remarks changes
+        elif col == 6:
+            new_remarks = item.text()
+
+            # Only send an update if the remarks have actually changed.
+            if new_remarks != invoice_item.remarks:
+                self.manual_item_updated.emit(invoice_item, invoice_item.total_price, new_remarks)
+
+    def _create_cell(self, text, editable=False, centered=False, right_aligned=False, data=None,
+                     tooltip=None) -> QTableWidgetItem:
+        item = QTableWidgetItem(text)
+        if not editable:
+            item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+        if centered:
+            item.setTextAlignment(Qt.AlignCenter)
+        if right_aligned:
+            item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        if data:
+            item.setData(Qt.UserRole, data)
+        if tooltip:
+            item.setToolTip(tooltip)
+        return item
+
+    def _on_selection_changed(self):
+        """Enables/disables edit and delete buttons based on row selection."""
+        is_row_selected = len(self.table.selectedIndexes()) > 0
+        self.delete_button.setEnabled(is_row_selected)
+        self.edit_button.setEnabled(is_row_selected)
+
+    def _show_table_context_menu(self, position):
+        """Creates and shows the right-click context menu."""
+        selected_items = self.table.selectedItems()
+        if not selected_items:
+            return
+
+        row = selected_items[0].row()
+
+        menu = QMenu()
+        edit_action = QAction("ویرایش آیتم", self)
+        delete_action = QAction("حذف آیتم", self)
+
+        edit_action.triggered.connect(lambda: self.edit_button_clicked.emit(row))
+        delete_action.triggered.connect(lambda: self.delete_button_clicked.emit(row))
+
+        menu.addAction(edit_action)
+        menu.addAction(delete_action)
+
+        menu.exec(self.table.viewport().mapToGlobal(position))
+
+    def _delete_selected_row(self):
+        """Deletes the currently selected row. More robust now."""
+        current_row = self.table.currentRow()
+        if current_row >= 0:
+            self.delete_button_clicked.emit(current_row)
+
+    def clear_service_input(self):
+        """A public slot to clear the line edit and reset button state."""
+        self.service_edit.clear()
+        self.add_button.setEnabled(False)

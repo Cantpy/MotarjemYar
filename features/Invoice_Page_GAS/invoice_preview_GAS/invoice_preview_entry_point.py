@@ -2,8 +2,8 @@
 
 import sys
 from PySide6.QtWidgets import QApplication
-from InvoicePage import MainInvoiceWindow
-from InvoicePage import InvoiceController
+from features.Invoice_Page_GAS.invoice_preview_GAS.invoice_preview_view import MainInvoiceWindow
+from features.Invoice_Page_GAS.invoice_preview_GAS.invoice_preview_controller import InvoiceController
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

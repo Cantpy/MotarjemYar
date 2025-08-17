@@ -1,15 +1,15 @@
 # document_selection/price_calculation_dialog.py
 from PySide6.QtWidgets import (
-    QDialog, QDialogButtonBox, QVBoxLayout, QGroupBox, QGridLayout, QLabel, QGraphicsDropShadowEffect,
-    QLineEdit, QHBoxLayout, QCheckBox, QTextEdit, QFrame
+    QDialog, QDialogButtonBox, QVBoxLayout, QGroupBox, QGridLayout, QLabel, QGraphicsDropShadowEffect, QHBoxLayout,
+    QCheckBox, QTextEdit, QFrame
 )
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtCore import Qt
 from features.Invoice_Page_GAS.document_selection_GAS.document_selection_models import Service, InvoiceItem, FixedPrice
-from features.Invoice_Page_GAS.document_selection_GAS.documents_selection_qss_styles import DIALOG_STYLESHEET
+from features.Invoice_Page_GAS.document_selection_GAS.document_selection_qss_styles import DIALOG_STYLESHEET
 from typing import Dict, List
 from shared import to_persian_number
-from shared.widgets.persian_spinbox import PersianSpinBox
+from shared.widgets.persian_tools import PersianSpinBox
 
 CERTIFIED_COPY_KEY = "certified_copy"
 OFFICIAL_TRANSLATION_KEY = "official_translation"
@@ -20,8 +20,9 @@ SEALS_TOTAL_KEY = "seals_total_price"
 
 
 class CalculationDialog(QDialog):
-    def __init__(self, service: Service, fees: List[FixedPrice], parent=None):
+    def __init__(self, service: Service, fees: List[FixedPrice], item_to_edit: InvoiceItem = None, parent=None):
         super().__init__(parent)
+        self.setObjectName("CalculationDialog")
         self.setWindowTitle(f"محاسبه قیمت: {service.name}")
         self.setMinimumWidth(700)
         self.setStyleSheet(DIALOG_STYLESHEET)
@@ -54,7 +55,7 @@ class CalculationDialog(QDialog):
         ok_button = button_box.button(QDialogButtonBox.Ok)
         ok_button.setText("تایید")
         ok_button.setObjectName("PrimaryButton")
-        cancel_button = button_box.button(QDialogButtonBox.ButtonRole.Cancel)
+        cancel_button = button_box.button(QDialogButtonBox.Cancel)
         cancel_button.setText("انصراف")
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
@@ -62,6 +63,8 @@ class CalculationDialog(QDialog):
 
         self._connect_signals()
         self._update_totals()
+        if item_to_edit:
+            self._prepopulate_fields(item_to_edit)
 
     def _apply_shadow_effect(self, widget: QGroupBox):
         shadow = QGraphicsDropShadowEffect()
@@ -125,6 +128,7 @@ class CalculationDialog(QDialog):
         self.extra_copies_spin = PersianSpinBox(suffix="نسخه")
 
         self.is_official_check = QCheckBox("ترجمه رسمی است")
+        self.is_official_check.setChecked(True)
         self.jud_seal_check = QCheckBox("مهر دادگستری")
         self.fa_seal_check = QCheckBox("مهر امور خارجه")
 
@@ -330,6 +334,34 @@ class CalculationDialog(QDialog):
             self.quantity_spin.clear_error()
 
         return True
+
+    def _prepopulate_fields(self, item: InvoiceItem):
+        """Sets the initial values of all widgets based on an existing item."""
+        # Pre-fill dynamic price spinboxes
+        for name, spinbox in self.dynamic_spinboxes.items():
+            if name in item.dynamic_quantities:
+                spinbox.setValue(item.dynamic_quantities[name])
+
+        # Pre-fill option widgets
+        self.quantity_spin.setValue(item.quantity - item.extra_copies)  # Show base quantity
+        self.page_count_spin.setValue(item.page_count)
+        self.extra_copies_spin.setValue(item.extra_copies)
+        self.is_official_check.setChecked(item.is_official)
+        self.jud_seal_check.setChecked(item.has_judiciary_seal)
+        self.fa_seal_check.setChecked(item.has_foreign_affairs_seal)
+
+        # Pre-fill remarks
+        # We need to parse the user's manual remarks out of the full string
+        auto_remarks = self._generate_auto_remarks()  # Generate based on pre-filled values
+        full_remarks = item.remarks
+        user_part = full_remarks
+        if full_remarks.startswith(auto_remarks):
+            user_part = full_remarks[len(auto_remarks):].strip()
+            if user_part.startswith('(') and user_part.endswith(')'):
+                user_part = user_part[1:-1]
+
+        self.remarks_edit.setText(user_part)
+        self._user_manual_remarks = user_part
 
     def accept(self):
         """

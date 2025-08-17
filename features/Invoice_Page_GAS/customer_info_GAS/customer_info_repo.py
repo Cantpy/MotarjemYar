@@ -36,7 +36,7 @@ class CustomerRepository:
             session.merge(customer_model)
             session.commit()
 
-    def get_customer(self, national_id: int) -> Optional[Customer]:
+    def get_customer(self, national_id: str) -> Optional[Customer]:
         """
         Retrieves a single customer by their national ID.
         Refactored to have a single, clear return point.

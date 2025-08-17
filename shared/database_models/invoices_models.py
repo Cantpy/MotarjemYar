@@ -1,7 +1,9 @@
-from __future__ import annotations
-from sqlalchemy import Column, Integer, Text, Date, CheckConstraint, Index
-from sqlalchemy.orm import relationship, Mapped, mapped_column
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import (
+    Integer, Text, Date, ForeignKey, CheckConstraint, Index, VARCHAR, Boolean
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship, declarative_base
+from typing import Optional
+
 
 BaseInvoices = declarative_base()
 
@@ -12,12 +14,12 @@ class IssuedInvoiceModel(BaseInvoices):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     invoice_number: Mapped[int] = mapped_column(Integer, nullable=False, unique=True)
     name: Mapped[str] = mapped_column(Text, nullable=False)
-    national_id: Mapped[int] = mapped_column(Integer, nullable=False)  # No FK to customers
+    national_id: Mapped[int] = mapped_column(Integer, nullable=False)
     phone: Mapped[str] = mapped_column(Text, nullable=False)
     issue_date: Mapped[Date] = mapped_column(Date, nullable=False)
     delivery_date: Mapped[Date] = mapped_column(Date, nullable=False)
     translator: Mapped[str] = mapped_column(Text, nullable=False)
-    total_items: Mapped[int | None] = mapped_column(Integer)
+    total_items: Mapped[Optional[int]] = mapped_column(Integer)
     total_amount: Mapped[int] = mapped_column(Integer, nullable=False)
     total_translation_price: Mapped[int] = mapped_column(Integer, nullable=False)
     advance_payment: Mapped[int] = mapped_column(Integer, default=0)
@@ -32,15 +34,19 @@ class IssuedInvoiceModel(BaseInvoices):
     total_judiciary_count: Mapped[int] = mapped_column(Integer, default=0)
     total_foreign_affairs_count: Mapped[int] = mapped_column(Integer, default=0)
     total_additional_doc_count: Mapped[int] = mapped_column(Integer, default=0)
-    source_language: Mapped[str | None] = mapped_column(Text)
-    target_language: Mapped[str | None] = mapped_column(Text)
-    username: Mapped[str | None] = mapped_column(Text)  # No FK to users
-    pdf_file_path: Mapped[str | None] = mapped_column(Text)
+    source_language: Mapped[Optional[str]] = mapped_column(Text)
+    target_language: Mapped[Optional[str]] = mapped_column(Text)
+    username: Mapped[Optional[str]] = mapped_column(
+        Text, ForeignKey("users.username", ondelete="SET NULL")
+    )
+    pdf_file_path: Mapped[Optional[str]] = mapped_column(Text)
 
-    invoice_items: Mapped[list[InvoiceItemModel]] = relationship(
+    # One-to-many: IssuedInvoice → InvoiceItems
+    invoice_items: Mapped[list["InvoiceItemModel"]] = relationship(
         "InvoiceItemModel",
         back_populates="issued_invoice",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
+        passive_deletes=True
     )
 
     __table_args__ = (
@@ -55,24 +61,27 @@ class IssuedInvoiceModel(BaseInvoices):
         Index('idx_issued_invoices_user', 'username'),
     )
 
-    def __repr__(self) -> str:
-        return f"<IssuedInvoiceModel(invoice_number={self.invoice_number}, name={self.name!r}, final_amount={self.final_amount})>"
-
-
 class InvoiceItemModel(BaseInvoices):
     __tablename__ = 'invoice_items'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    invoice_number: Mapped[int] = mapped_column(Integer, nullable=False)  # No FK across DB
+    invoice_number: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("issued_invoices.invoice_number", ondelete="CASCADE"),
+        nullable=False
+    )
     item_name: Mapped[str] = mapped_column(Text, nullable=False)
     item_qty: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     item_price: Mapped[int] = mapped_column(Integer, nullable=False)
     officiality: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     judiciary_seal: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     foreign_affairs_seal: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    remarks: Mapped[str | None] = mapped_column(Text)
+    remarks: Mapped[Optional[str]] = mapped_column(Text)
 
-    issued_invoice: Mapped[IssuedInvoiceModel] = relationship("IssuedInvoiceModel", back_populates="invoice_items")
+    # Many-to-one: InvoiceItem → IssuedInvoice
+    issued_invoice: Mapped["IssuedInvoiceModel"] = relationship(
+        "IssuedInvoiceModel", back_populates="invoice_items"
+    )
 
     __table_args__ = (
         CheckConstraint('officiality IN (0, 1)', name='check_officiality'),
@@ -83,6 +92,3 @@ class InvoiceItemModel(BaseInvoices):
         Index('idx_invoice_items_judiciary', 'judiciary_seal'),
         Index('idx_invoice_items_official', 'officiality'),
     )
-
-    def __repr__(self) -> str:
-        return f"<InvoiceItemModel(id={self.id}, name={self.item_name!r}, qty={self.item_qty}, price={self.item_price})>"

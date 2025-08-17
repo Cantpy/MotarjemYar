@@ -1,5 +1,6 @@
 # document_selection/models.py
 from dataclasses import dataclass, field
+import copy
 from typing import List, Dict
 
 
@@ -52,3 +53,7 @@ class InvoiceItem:
 
     # The final, grand total for this item row
     total_price: int = 0
+
+    def clone(self) -> 'InvoiceItem':
+        """Creates a deep copy of this InvoiceItem."""
+        return copy.deepcopy(self)
