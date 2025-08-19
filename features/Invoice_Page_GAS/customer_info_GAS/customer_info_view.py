@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QLabel, QWidget, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout, QCheckBox, QCompleter,
     QScrollArea, QGroupBox, QSpacerItem
 )
-from PySide6.QtGui import QIntValidator, QFont, QValidator
+from PySide6.QtGui import QFont, QValidator
 from PySide6.QtCore import QStringListModel, Qt, QTimer, Signal
 
 from features.Invoice_Page_GAS.customer_info_GAS.customer_info_models import Customer
@@ -50,7 +50,7 @@ class CustomerInfoWidget(QWidget):
         self._setup_action_buttons()
 
         # --- Initial Setup ---
-        self.clear_form()
+        self._is_autofilling = False
 
     def _setup_customer_fields(self):
         customer_group = QGroupBox("اطلاعات مشتری اصلی")
@@ -135,7 +135,9 @@ class CustomerInfoWidget(QWidget):
 
         layout = QGridLayout(companion_group)
         name_edit = QLineEdit(name)
-        nid_edit = PersianNIDEdit(national_id if national_id else "")
+        nid_edit = PersianNIDEdit()
+        if national_id:
+            nid_edit.setText(str(national_id))
         remove_button = QPushButton("×")
         remove_button.setObjectName("RemoveButton")
 
@@ -153,16 +155,14 @@ class CustomerInfoWidget(QWidget):
         layout.setColumnStretch(1, 1)
         layout.setColumnStretch(3, 1)
 
-        # --- NEW: Add vertical stretch INSIDE the group box ---
         # This forces the content in row 0 to the top, preventing vertical stretching.
         layout.setRowStretch(1, 1)
 
         # Connect signals for validation
-        name_edit.textChanged.connect(
-            lambda text, le=name_edit, el=name_error_label: self._set_field_state(
-                le, el, "valid") if text else self._clear_field_state(le, el))
-        nid_edit.textChanged.connect(
-            lambda text, le=nid_edit, el=nid_error_label: self._validate_companion_nid(le, el, text))
+        nid_edit.validation_changed.connect(
+            lambda state, entity_type, le=nid_edit, el=nid_error_label:
+            self._on_companion_nid_validation_changed(state, le, el)
+        )
 
         # Connect the remove button
         remove_button.clicked.connect(lambda: self._remove_companion(companion_group))
@@ -170,6 +170,15 @@ class CustomerInfoWidget(QWidget):
         self.companions_layout.addWidget(companion_group)
 
     # --- VISUAL VALIDATION SYSTEM (REVISED) ---
+    def _on_companion_nid_validation_changed(self, state, line_edit, error_label):
+        """Handles visual feedback for a companion's NID field."""
+        if state == QValidator.Acceptable:
+            self._set_field_state(line_edit, error_label, "valid")
+        elif state == QValidator.Invalid:
+            self._set_field_state(line_edit, error_label, "invalid", "کد ملی معتبر نیست")
+        else:  # Intermediate
+            self._clear_field_state(line_edit, error_label)
+
     def _set_field_state(self, line_edit: QLineEdit, error_label: QLabel, state: str, message: str = None):
         """A generic function to set the visual state of a field."""
         if state == "valid":
@@ -294,21 +303,30 @@ class CustomerInfoWidget(QWidget):
         self.main_layout.addWidget(self.add_companion_button)
         self.add_companion_button.setVisible(False)
 
-    def populate_completer(self, customer_info: list[dict]):
+    def populate_completer(self, all_people_info: list[dict]):
         """Public slot to receive completer data and set up the completer."""
-        self.completer_map = {info['name']: info['national_id'] for info in customer_info}
+        # The key for the map is the displayed name, the value is the NID to FETCH.
+        # For companions, the logic layer has already mapped this to the main customer's NID.
+        self.completer_map = {person['name']: person['national_id'] for person in all_people_info}
+
         model = QStringListModel(list(self.completer_map.keys()))
         completer = QCompleter(model, self)
-        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        completer.setCaseSensitivity(Qt.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchContains)  # This is good for searching
         self.name_edit.setCompleter(completer)
-        # When a name is activated, find its ID and emit a signal asking for details
+
+        # --- This connection is CRITICAL and must be present ---
         completer.activated.connect(self._on_completer_activated)
 
-    def _on_completer_activated(self, selected_name: str):
-        """Internal handler to emit the fetch request signal."""
-        national_id = self.completer_map.get(selected_name)
-        if national_id:
-            self.fetch_customer_details_requested.emit(national_id)
+    def _on_completer_activated(self, selected_text: str):
+        """
+        Internal handler to find the correct NID from the selected text and
+        emit the fetch request signal.
+        """
+        # Look up the selected name in our map to get the NID to fetch.
+        national_id_to_fetch = self.completer_map.get(selected_text)
+        if national_id_to_fetch:
+            self.fetch_customer_details_requested.emit(national_id_to_fetch)
 
     # This method will be called by the controller after it fetches the data
     def display_customer_details(self, customer: Customer):
@@ -400,8 +418,9 @@ class CustomerInfoWidget(QWidget):
         # Add the button layout to the main layout
         self.main_layout.addLayout(self.buttons_layout)
 
-    def _on_save_clicked(self):
-        """Gathers raw text from all fields and emits the save_requested signal."""
+    def get_current_data(self) -> dict:
+        """A new public method to get the raw data from the form fields."""
+        # This is the same logic that was in your old _on_save_clicked method
         companions = []
         # Find all companion groups and get their raw text
         for group_box in self.companions_widget.findChildren(QGroupBox, "CompanionGroup"):
@@ -422,7 +441,11 @@ class CustomerInfoWidget(QWidget):
             "companions": companions
         }
 
-        # Emit the signal with the raw data for the logic layer to process
+        return raw_data
+
+    def _on_save_clicked(self):
+        """Gathers raw data and emits the save_requested signal."""
+        raw_data = self.get_current_data()
         self.save_requested.emit(raw_data)
 
     def _clear_companion_widgets(self):

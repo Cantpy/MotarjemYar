@@ -15,6 +15,9 @@ from features.Invoice_Page_GAS.document_selection_GAS.document_selection_control
 from features.Invoice_Page_GAS.document_selection_GAS.document_selection_models import InvoiceItem
 from features.Invoice_Page_GAS.workflow_manager.invoice_page_state_manager import WorkflowStateManager
 from features.Invoice_Page_GAS.invoice_details_GAS.invoice_details_controller import InvoiceDetailsController
+from features.Invoice_Page_GAS.customer_info_GAS.customer_info_logic import CustomerStatus
+
+from shared import show_question_message_box
 
 
 class InvoiceMainWidget(QWidget):
@@ -163,6 +166,43 @@ class InvoiceMainWidget(QWidget):
         if current_index >= self.stacked_widget.count() - 1:
             return
 
+            # --- NEW "Smart" Logic when leaving Customer Info (Step 1) ---
+        if current_widget is self.customer_widget:
+            # 1. Get the raw data from the view
+            raw_data = self.customer_widget.get_current_data()
+
+            # 2. Ask the controller to check its status
+            status, customer_obj = self.customer_controller.check_status(raw_data)
+
+            if status == CustomerStatus.NEW:
+                # 3. Customer is new, ask user if they want to save
+                def save_customer():
+                    self.customer_controller.save_current_customer(raw_data)
+                    # The state manager will be updated automatically by the controller
+                    self._navigate_to_next_page()
+
+                def skip_saving_customer():
+                    temp_customer = self.customer_controller._logic._build_customer_from_data(raw_data)
+                    self.state_manager.set_customer(temp_customer)
+                    self._navigate_to_next_page()
+
+                show_question_message_box(self,
+                                          title="ذخیره مشتری",
+                                          message="این مشتری در پایگاه داده وجود ندارد. آیا مایل به ذخیره آن هستید؟",
+                                          button_1="بله",
+                                          yes_func=save_customer,
+                                          button_2="انصراف",
+                                          button_3="خیر",
+                                          action_func=skip_saving_customer
+                                          )
+
+            else:  # Customer is EXISTING_UNMODIFIED or EXISTING_MODIFIED
+                # Silently update the state manager and proceed
+                # (You could add a check for MODIFIED here if you want another warning)
+                self.state_manager.set_customer(customer_obj)
+                self._navigate_to_next_page()
+        # --- End of Customer Info Logic ---
+
         # --- Logic Path 1: Leaving Document Selection (Step 2) ---
         if current_widget is self.document_selection_widget:
             if not self.state_manager.get_customer():
@@ -226,6 +266,13 @@ class InvoiceMainWidget(QWidget):
             next_index = current_index + 1
             self.stacked_widget.setCurrentIndex(next_index)
             self._update_step_ui(next_index)
+
+    def _navigate_to_next_page(self):
+        """Helper method to handle the actual page switch."""
+        current_index = self.stacked_widget.currentIndex()
+        if current_index < self.stacked_widget.count() - 1:
+            self.stacked_widget.setCurrentIndex(current_index + 1)
+            self._update_step_ui(current_index + 1)
 
     def _go_to_previous_step(self):
         """

@@ -78,3 +78,20 @@ class CustomerRepository:
                 ) for cm in customers_models
             ]
         return customer_list
+
+    def get_all_customers_for_completer(self) -> list[dict]:
+        """Fetches just the name and NID of all main customers."""
+        with self.Session() as session:
+            results = session.query(CustomerModel.name, CustomerModel.national_id).all()
+            return [{"name": name, "national_id": nid} for name, nid in results]
+
+    def get_all_companions_for_completer(self) -> list[dict]:
+        """
+        NEW: Fetches the name and NID of all companions, along with their
+        main customer's NID for lookup purposes.
+        """
+        with self.Session() as session:
+            results = session.query(CompanionModel.name, CompanionModel.national_id,
+                                    CompanionModel.customer_national_id).all()
+            return [{"name": name, "national_id": nid, "main_customer_nid": main_nid} for name, nid, main_nid in
+                    results]
