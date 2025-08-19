@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Integer, Text, Date, ForeignKey, CheckConstraint, Index, VARCHAR, Boolean
+    Integer, Text, Date, ForeignKey, CheckConstraint, Index
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship, declarative_base
 from typing import Optional
@@ -60,6 +60,7 @@ class IssuedInvoiceModel(BaseInvoices):
         Index('idx_issued_invoices_translator', 'translator'),
         Index('idx_issued_invoices_user', 'username'),
     )
+
 
 class InvoiceItemModel(BaseInvoices):
     __tablename__ = 'invoice_items'

@@ -2,6 +2,7 @@
 from dataclasses import dataclass, field
 import copy
 from typing import List, Dict
+import uuid
 
 
 @dataclass
@@ -54,6 +55,10 @@ class InvoiceItem:
     # The final, grand total for this item row
     total_price: int = 0
 
+    unique_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+
     def clone(self) -> 'InvoiceItem':
         """Creates a deep copy of this InvoiceItem."""
-        return copy.deepcopy(self)
+        new_item = copy.deepcopy(self)
+        new_item.unique_id = str(uuid.uuid4())  # Ensure the clone is unique
+        return new_item

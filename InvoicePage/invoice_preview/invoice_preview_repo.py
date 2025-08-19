@@ -6,7 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from typing import Optional
 from datetime import date
 from shared.database_models.invoices_models import (IssuedInvoiceModel, BaseInvoices)
-from InvoicePage import INVOICES_DB_URL
+from InvoicePage.invoice_preview.invoice_preview_assets import INVOICES_DB_URL
 
 
 # Create engines for each database

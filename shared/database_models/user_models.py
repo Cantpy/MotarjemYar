@@ -1,5 +1,5 @@
 from __future__ import annotations
-from sqlalchemy import Column, Integer, Text, Index, CheckConstraint, LargeBinary, Date, DateTime, func
+from sqlalchemy import ForeignKey, Integer, Text, Index, CheckConstraint, LargeBinary, Date, DateTime, func
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -21,21 +21,19 @@ class UsersModel(BaseUsers):
     created_at: Mapped[str | None] = mapped_column(Text)
     updated_at: Mapped[str | None] = mapped_column(Text)
 
-    user_profile: Mapped[UserProfileModel | None] = relationship(
+    # 🔑 One-to-One relationship
+    user_profile: Mapped["UserProfileModel"] = relationship(
         "UserProfileModel",
         back_populates="user",
         uselist=False,
         cascade="all, delete-orphan"
     )
-    login_logs: Mapped[list[LoginLogsModel]] = relationship(
+
+    # 🔑 One-to-Many relationship
+    login_logs: Mapped[list["LoginLogsModel"]] = relationship(
         "LoginLogsModel",
         back_populates="user",
         cascade="all, delete-orphan"
-    )
-    issued_invoices: Mapped[list["IssuedInvoiceModel"]] = relationship(
-        "IssuedInvoiceModel",
-        back_populates="user",
-        viewonly=True,  # invoices live in another DB; keep as logical relationship only
     )
 
     __table_args__ = (
@@ -54,7 +52,8 @@ class UserProfileModel(BaseUsers):
     __tablename__ = 'user_profiles'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    username: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True)
+
     full_name: Mapped[str] = mapped_column(Text, nullable=False)
     role_fa: Mapped[str] = mapped_column(Text, nullable=False)
     date_of_birth: Mapped[Date | None] = mapped_column(Date)
@@ -67,21 +66,19 @@ class UserProfileModel(BaseUsers):
     created_at: Mapped[str | None] = mapped_column(Text)
     updated_at: Mapped[str | None] = mapped_column(Text)
 
+    # 🔑 backref to UsersModel
     user: Mapped[UsersModel] = relationship("UsersModel", back_populates="user_profile")
 
-    __table_args__ = (
-        Index('idx_profiles_username', 'username'),
-    )
-
     def __repr__(self) -> str:
-        return f"<UserProfileModel(id={self.id}, username={self.username!r}, full_name={self.full_name!r})>"
+        return f"<UserProfileModel(id={self.id}, user_id={self.user_id}, full_name={self.full_name!r})>"
 
 
 class LoginLogsModel(BaseUsers):
     __tablename__ = 'login_logs'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    username: Mapped[str] = mapped_column(Text, nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+
     login_time: Mapped[str | None] = mapped_column(Text)
     logout_time: Mapped[str | None] = mapped_column(Text)
     time_on_app: Mapped[int | None] = mapped_column(Integer)
@@ -89,17 +86,17 @@ class LoginLogsModel(BaseUsers):
     ip_address: Mapped[str | None] = mapped_column(Text)
     user_agent: Mapped[str | None] = mapped_column(Text)
 
+    # 🔑 backref to UsersModel
     user: Mapped[UsersModel] = relationship("UsersModel", back_populates="login_logs")
 
     __table_args__ = (
         CheckConstraint("status IN ('success', 'failed', 'auto_login_success')", name='check_status'),
         Index('idx_login_logs_status', 'status'),
         Index('idx_login_logs_time', 'login_time'),
-        Index('idx_login_logs_username', 'username'),
     )
 
     def __repr__(self) -> str:
-        return f"<LoginLogsModel(id={self.id}, username={self.username!r}, login_time={self.login_time!r})>"
+        return f"<LoginLogsModel(id={self.id}, user_id={self.user_id}, login_time={self.login_time!r})>"
 
 
 class TranslationOfficeDataModel(BaseUsers):

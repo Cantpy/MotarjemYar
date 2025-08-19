@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import (QSpinBox, QVBoxLayout, QLabel, QWidget, QHeaderView, QLineEdit,
+from PySide6.QtWidgets import (QSpinBox, QVBoxLayout, QLabel, QWidget, QHeaderView, QLineEdit, QDoubleSpinBox,
                                QStyledItemDelegate)
 from PySide6.QtGui import QValidator, QFont, QPainter, QColor
 from PySide6.QtCore import Qt
@@ -205,16 +205,33 @@ class PersianSpinBox(QSpinBox):
             self.error_label.hide()
 
 
+class PersianDoubleSpinBox(QDoubleSpinBox):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self.setSingleStep(0.5)
+        self.setDecimals(2)
+        self.setButtonSymbols(QDoubleSpinBox.ButtonSymbols.NoButtons)
+        self.setSuffix("%")
+        self.setGroupSeparatorShown(True)
+
+    def textFromValue(self, value: float) -> str:
+        formatted = f"{value}"
+        return formatted.translate(str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹"))
+
+
 class NormalSpinBox(QSpinBox):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setAlignment(Qt.AlignRight)
-        self.setLayoutDirection(Qt.RightToLeft)
+        self.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         self.setMaximum(999_999_999)
         self.setMinimum(0)
         self.setSingleStep(1000)
         self.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
         self.setSuffix(" تومان")
+        self.setGroupSeparatorShown(True)
 
     def textFromValue(self, value: int) -> str:
         # Just override the display, not parsing or validation

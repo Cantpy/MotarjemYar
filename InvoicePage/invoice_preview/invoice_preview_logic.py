@@ -1,7 +1,6 @@
 # logic.py
 
-from InvoicePage import (Invoice, Customer,
-                         TranslationOffice, InvoiceItem)
+from InvoicePage.invoice_preview.invoice_preview_models import (Invoice, Customer, TranslationOffice, InvoiceItem)
 from datetime import date
 from typing import List
 import math

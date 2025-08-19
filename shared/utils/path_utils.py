@@ -7,6 +7,39 @@ import json
 import subprocess
 
 
+def return_folder(folder1, folder2=None, folder3=None):
+    """
+        Return the path to a folder based on the application's execution context.
+
+        Args:
+            folder1 (str): First folder level
+            folder2 (str): Second folder level
+            folder3 (str, optional): Third folder level
+
+        Returns:
+            str: Full path to the folder
+        """
+    if getattr(sys, 'frozen', False):
+        # App is frozen (PyInstaller)
+        base_path = sys._MEIPASS
+    else:
+        # Running from source
+        base_path = os.path.dirname(os.path.abspath(__file__))
+
+    # Go two levels up to get to a deeper root
+    project_root = os.path.abspath(os.path.join(base_path, "..", ".."))
+
+    # Build the path components conditionally
+    if folder2:
+        path = os.path.join(project_root, folder1, folder2)
+    elif folder3:
+        path = os.path.join(project_root, folder1, folder2, folder3)
+    else:
+        path = os.path.join(project_root, folder1)
+
+    return path
+
+
 def return_resource(folder1, resource, folder2=None):
     """
     Return the path to a resource file based on the application's execution context.

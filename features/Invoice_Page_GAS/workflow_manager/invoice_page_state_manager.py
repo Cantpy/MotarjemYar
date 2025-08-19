@@ -2,6 +2,7 @@
 from PySide6.QtCore import QObject, Signal
 from features.Invoice_Page_GAS.customer_info_GAS.customer_info_models import Customer
 from features.Invoice_Page_GAS.document_selection_GAS.document_selection_models import InvoiceItem
+from features.Invoice_Page_GAS.invoice_details_GAS.invoice_details_models import InvoiceDetails
 
 
 class WorkflowStateManager(QObject):
@@ -12,12 +13,14 @@ class WorkflowStateManager(QObject):
     customer_updated = Signal(Customer)
     invoice_items_updated = Signal(list)
     assignments_updated = Signal(dict)
+    invoice_details_updated = Signal(InvoiceDetails)
 
     def __init__(self):
         super().__init__()
         self._customer: Customer = None
         self._invoice_items: list[InvoiceItem] = []
         self._assignments: dict = {}
+        self._invoice_details: InvoiceDetails = None
 
     # --- Public methods to get the current state ---
     def get_customer(self) -> Customer:
@@ -34,6 +37,9 @@ class WorkflowStateManager(QObject):
         if not self._customer:
             return 0
         return 1 + len(self._customer.companions)
+
+    def get_invoice_details(self) -> InvoiceDetails:
+        return self._invoice_details
 
     # --- Public slots to update the state ---
     def set_customer(self, customer: Customer):
@@ -62,3 +68,8 @@ class WorkflowStateManager(QObject):
                 "__unassigned__": []
             }
             self.set_assignments(assignments)
+
+    def set_invoice_details(self, details: InvoiceDetails):
+        self._invoice_details = details
+        print("STATE UPDATE: Invoice details set.")
+        self.invoice_details_updated.emit(self._invoice_details)

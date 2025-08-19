@@ -14,6 +14,7 @@ from features.Invoice_Page_GAS.document_assignment.document_assignment_view impo
 from features.Invoice_Page_GAS.document_selection_GAS.document_selection_controller import DocumentSelectionController
 from features.Invoice_Page_GAS.document_selection_GAS.document_selection_models import InvoiceItem
 from features.Invoice_Page_GAS.workflow_manager.invoice_page_state_manager import WorkflowStateManager
+from features.Invoice_Page_GAS.invoice_details_GAS.invoice_details_controller import InvoiceDetailsController
 
 
 class InvoiceMainWidget(QWidget):
@@ -29,6 +30,7 @@ class InvoiceMainWidget(QWidget):
         super().__init__()
 
         # --- 1. Window and State Initialization ---
+        self.setObjectName("InvoiceWizard")
         self.setWindowTitle("ایجاد فاکتور جدید")
         self.setGeometry(100, 100, 1200, 900)
         self.state_manager = WorkflowStateManager()
@@ -68,6 +70,7 @@ class InvoiceMainWidget(QWidget):
     def _create_top_bar(self):
         """Creates the top progress bar with step labels."""
         self.top_bar_layout = QHBoxLayout()
+        self.top_bar_layout.setObjectName('top_bar_layout')
         self.top_bar_layout.setContentsMargins(20, 10, 20, 10)
 
         self.step_labels = []
@@ -104,7 +107,8 @@ class InvoiceMainWidget(QWidget):
         self.stacked_widget.addWidget(self.assignment_widget)
 
         # Step 4 & 5 (Placeholders with references)
-        self.invoice_details_widget = QLabel("صفحه جزئیات نهایی فاکتور", alignment=Qt.AlignCenter)
+        self.invoice_details_controller = InvoiceDetailsController(self.state_manager)
+        self.invoice_details_widget = self.invoice_details_controller.get_widget()
         self.stacked_widget.addWidget(self.invoice_details_widget)
 
         self.preview_widget = QLabel("صفحه پیش‌نمایش و چاپ", alignment=Qt.AlignCenter)
@@ -150,48 +154,78 @@ class InvoiceMainWidget(QWidget):
 
     def _go_to_next_step(self):
         """
-        Handles forward navigation using object comparison and indexOf, not hardcoded indexes.
+        Handles forward navigation using object comparison and a proper if/elif/else structure.
         """
         current_widget = self.stacked_widget.currentWidget()
+        current_index = self.stacked_widget.currentIndex()
 
-        # --- Special Logic when leaving Document Selection (Step 2) ---
+        # --- Check if we are at the last page ---
+        if current_index >= self.stacked_widget.count() - 1:
+            return
+
+        # --- Logic Path 1: Leaving Document Selection (Step 2) ---
         if current_widget is self.document_selection_widget:
             if not self.state_manager.get_customer():
                 QMessageBox.warning(self, "خطا", "لطفا ابتدا اطلاعات مشتری در مرحله ۱ را ذخیره کنید.")
                 return
 
             num_people = self.state_manager.get_num_people()
+            next_widget = None
 
             if num_people > 1:
-                # Path A: More than one person, go to Assignment step
+                # --- This block now correctly prepares the data ---
+                # 1. Unpack the items from the state manager.
                 print("INFO: More than one person detected. Proceeding to Assignment step.")
                 unpacked_items = self._unpack_invoice_items(self.state_manager.get_invoice_items())
+
+                # 2. Get the previously saved assignments to restore state.
                 saved_assignments = self.state_manager.get_assignments()
 
+                # 3. Pass all necessary data to the assignment widget.
                 self.assignment_widget.set_data(
-                    self.state_manager.get_customer(), unpacked_items, saved_assignments
+                    self.state_manager.get_customer(),
+                    unpacked_items,
+                    saved_assignments
                 )
 
-                # Navigate dynamically by finding the widget's index
                 next_index = self.stacked_widget.indexOf(self.assignment_widget)
                 self.stacked_widget.setCurrentIndex(next_index)
                 self._update_step_ui(next_index)
+
             else:
-                # Path B: Only one person, SKIP Assignment step to Invoice Details
+                # Skip to Invoice Details step
                 print("INFO: Only one person detected. Skipping Assignment step.")
                 self.state_manager.auto_assign_for_single_person()
 
-                # Navigate dynamically by finding the widget's index
-                next_index = self.stacked_widget.indexOf(self.invoice_details_widget)
-                self.stacked_widget.setCurrentIndex(next_index)
-                self._update_step_ui(next_index)
+                # We still need to prepare the data for the invoice details page
+                self.invoice_details_controller.prepare_and_display_data(
+                    self.state_manager.get_customer(),
+                    self.state_manager.get_invoice_items()
+                )
+                next_widget = self.invoice_details_widget
+
+            # Perform the navigation
+            next_index = self.stacked_widget.indexOf(next_widget)
+            self.stacked_widget.setCurrentIndex(next_index)
+            self._update_step_ui(next_index)
+
+        # --- Logic Path 2: Leaving Assignment (Step 3) ---
+        elif current_widget is self.assignment_widget:
+            # Prepare the data for the next step (Invoice Details)
+            self.invoice_details_controller.prepare_and_display_data(
+                self.state_manager.get_customer(),
+                self.state_manager.get_invoice_items()  # Use original, packed items
+            )
+            # Then navigate
+            next_index = self.stacked_widget.indexOf(self.invoice_details_widget)
+            self.stacked_widget.setCurrentIndex(next_index)
+            self._update_step_ui(next_index)
+
+        # --- Logic Path 3: Default behavior for all other steps ---
         else:
-            # --- Default Path: For all other steps, just go to the next one ---
-            current_index = self.stacked_widget.currentIndex()
-            if current_index < self.stacked_widget.count() - 1:
-                next_index = current_index + 1
-                self.stacked_widget.setCurrentIndex(next_index)
-                self._update_step_ui(next_index)
+            next_index = current_index + 1
+            self.stacked_widget.setCurrentIndex(next_index)
+            self._update_step_ui(next_index)
 
     def _go_to_previous_step(self):
         """
@@ -234,17 +268,21 @@ class InvoiceMainWidget(QWidget):
 
     def _unpack_invoice_items(self, items: list[InvoiceItem]) -> list[InvoiceItem]:
         """
-        Unpacks items with quantity > 1 into individual items.
-        This is the solution to Problem 2.
+        Unpacks items with quantity > 1 into individual items, each with a new unique ID.
         """
         unpacked_list = []
         for item in items:
-            if item.quantity > 1 and item.service.type != "خدمات دیگر":
-                for _ in range(item.quantity):
-                    new_item = item.clone()
+            # We use the ORIGINAL quantity from the calculation dialog here
+            original_quantity = item.quantity
+
+            if original_quantity > 1 and item.service.type != "خدمات دیگر":
+                # The total price was for all quantities, so divide it.
+                price_per_item = item.total_price // original_quantity
+
+                for _ in range(original_quantity):
+                    new_item = item.clone()  # clone() gives it a new unique_id
                     new_item.quantity = 1
-                    # Recalculate total price for a single item
-                    new_item.total_price = item.total_price // item.quantity
+                    new_item.total_price = price_per_item
                     unpacked_list.append(new_item)
             else:
                 # Keep items with quantity 1 or "Other Services" as they are

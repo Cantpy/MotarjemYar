@@ -9,9 +9,9 @@ from typing import Callable
 from datetime import date
 
 from InvoicePage.invoice_preview.invoice_preview_view import MainInvoiceWindow
-from InvoicePage import InvoiceService, create_mock_invoice
-from InvoicePage import InvoiceRepository
-from InvoicePage import Invoice, Customer, InvoiceItem
+from InvoicePage.invoice_preview.invoice_preview_logic import InvoiceService, create_mock_invoice
+from InvoicePage.invoice_preview.invoice_preview_repo import InvoiceRepository
+from InvoicePage.invoice_preview.invoice_preview_models import Invoice, Customer, InvoiceItem
 
 from shared import show_warning_message_box, show_information_message_box, show_error_message_box
 
@@ -89,7 +89,7 @@ class InvoiceController:
             items=new_items,
             total_amount=subtotal,
             discount_amount=details_dict.get('discount_amount', 0.0),
-            advance_payment=details_dict.get('advance_payment', 0.0),
+            advance_payment=details_dict.get('advance_payment_amount', 0.0),
             emergency_cost=details_dict.get('emergency_cost', 0.0),
             remarks=details_dict.get('remarks', '')
         )
