@@ -691,14 +691,3 @@ class SummaryDialog(QDialog):
         close_btn = QPushButton("بستن")
         close_btn.clicked.connect(self.accept)
         layout.addWidget(close_btn)
-
-
-if __name__ == "__main__":
-    from PySide6.QtWidgets import QApplication
-    app = QApplication([])
-    view = InvoiceTableView(
-        invoices_db_url=f"sqlite:///{invoices_db_path}",
-        users_db_url=f"sqlite:///{users_db_path}"
-    )
-    view.show()
-    sys.exit(app.exec())
