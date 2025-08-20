@@ -12,6 +12,7 @@ class OfficeInfo:
     address: str = ""
     phone: str = ""
     email: str = ""
+    socials: str = ""
 
 
 @dataclass

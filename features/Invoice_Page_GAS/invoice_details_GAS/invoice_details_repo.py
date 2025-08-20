@@ -25,6 +25,7 @@ class InvoiceDetailsRepository:
             if db_office:
                 return OfficeInfo(
                     name=db_office.name, reg_no=db_office.reg_no, representative=db_office.representative,
-                    address=db_office.address, phone=db_office.phone, email=db_office.email
+                    address=db_office.address, phone=db_office.phone, email=db_office.email,
+                    socials=db_office.other_media
                 )
             return OfficeInfo()  # Return empty object if not found

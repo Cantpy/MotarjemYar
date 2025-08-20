@@ -1,19 +1,21 @@
 # logic.py
 from features.Invoice_Page_GAS.invoice_preview_GAS.invoice_preview_models import (Invoice, Customer, TranslationOffice,
-                                                                                  InvoiceItem)
-from datetime import date
+                                                                                  PreviewItem)
+from PySide6.QtCore import QObject
+from datetime import datetime, date
 from typing import List
 import math
 
 
-class InvoiceService:
+class InvoicePreviewLogic(QObject):
     """
     Handles business logic related to invoices, such as pagination and data preparation.
     """
 
-    def __init__(self, invoice_data: Invoice):
-        self.invoice = invoice_data
-
+    def __init__(self, state_manager):
+        super().__init__()
+        self.state_manager = state_manager
+        self.invoice: Invoice = None
         self.pagination_config = {
             'one_page_max_rows': 12,  # For single-page invoices (with header & footer)
             'first_page_max_rows': 24,  # First of many pages (header, no footer)
@@ -21,40 +23,79 @@ class InvoiceService:
             'last_page_max_rows': 22  # Last of many pages (no header, with footer)
         }
 
+    # def get_total_pages(self) -> int:
+    #     """
+    #     Calculates total pages based on the advanced, content-aware rules.
+    #     """
+    #     total_items = len(self.invoice.items)
+    #     if total_items == 0:
+    #         return 1
+    #
+    #     # Rule 1: Does it fit on a single page?
+    #     if total_items <= self.pagination_config['one_page_max_rows']:
+    #         return 1
+    #
+    #     # Rule 2: If not, does it fit on exactly two pages?
+    #     # A two-page invoice has one "first_page" and one "last_page".
+    #     if total_items <= (self.pagination_config['first_page_max_rows'] +
+    #                        self.pagination_config['last_page_max_rows']):
+    #         return 2
+    #
+    #     # Rule 3: It must be three or more pages.
+    #     # We subtract the items that will go on the dedicated first and last pages.
+    #     items_for_middle_pages = (total_items -
+    #                               self.pagination_config['first_page_max_rows'] -
+    #                               self.pagination_config['last_page_max_rows'])
+    #
+    #     # Calculate how many "other" pages are needed for the remaining items.
+    #     middle_pages = math.ceil(items_for_middle_pages / self.pagination_config['other_page_max_rows'])
+    #
+    #     # Total is 1 (first) + 1 (last) + the number of middle pages.
+    #     return 2 + middle_pages
+
     def get_total_pages(self) -> int:
         """
         Calculates total pages based on the advanced, content-aware rules.
         """
+        # --- FIX: Add a check for a null invoice object ---
+        if not self.invoice:
+            return 1
+
         total_items = len(self.invoice.items)
         if total_items == 0:
             return 1
 
-        # Rule 1: Does it fit on a single page?
-        if total_items <= self.pagination_config['one_page_max_rows']:
+        conf = self.pagination_config
+
+        if total_items <= conf['one_page_max_rows']:
             return 1
 
-        # Rule 2: If not, does it fit on exactly two pages?
-        # A two-page invoice has one "first_page" and one "last_page".
-        if total_items <= (self.pagination_config['first_page_max_rows'] +
-                           self.pagination_config['last_page_max_rows']):
+        # --- SUBTLE BUG FIX: Handle the case where the last page is empty ---
+        items_on_first_page = conf['first_page_max_rows']
+        if total_items <= items_on_first_page:
+            # This can happen if one_page_max_rows is smaller than first_page_max_rows
+            return 1
+
+        items_for_middle_and_last = total_items - items_on_first_page
+
+        # We need at least one last page
+        if items_for_middle_and_last <= conf['last_page_max_rows']:
             return 2
 
-        # Rule 3: It must be three or more pages.
-        # We subtract the items that will go on the dedicated first and last pages.
-        items_for_middle_pages = (total_items -
-                                  self.pagination_config['first_page_max_rows'] -
-                                  self.pagination_config['last_page_max_rows'])
+        items_for_middle_pages = items_for_middle_and_last - conf['last_page_max_rows']
 
-        # Calculate how many "other" pages are needed for the remaining items.
-        middle_pages = math.ceil(items_for_middle_pages / self.pagination_config['other_page_max_rows'])
+        # Use integer division for clarity
+        middle_pages = (items_for_middle_pages + conf['other_page_max_rows'] - 1) // conf['other_page_max_rows']
 
-        # Total is 1 (first) + 1 (last) + the number of middle pages.
         return 2 + middle_pages
 
-    def get_items_for_page(self, page_number: int) -> List[InvoiceItem]:
+    def get_items_for_page(self, page_number: int) -> List[PreviewItem]:
         """
         Returns the correct slice of invoice items based on the page type.
         """
+        if not self.invoice:
+            return []
+
         total_pages = self.get_total_pages()
         if page_number < 1 or page_number > total_pages:
             return []
@@ -87,6 +128,61 @@ class InvoiceService:
             end_index = start_index + conf['other_page_max_rows']
             return self.invoice.items[start_index:end_index]
 
+    def assemble_invoice_data(self):
+        """
+        The core method that builds the final Invoice object from the StateManager.
+        """
+        customer = self.state_manager.get_customer()
+        doc_items = self.state_manager.get_invoice_items()  # The list from step 2
+        assignments = self.state_manager.get_assignments()
+        details = self.state_manager.get_invoice_details()
+
+        # --- Create PreviewItem list from assignments ---
+        preview_items = []
+        if assignments:
+            for person_name, assigned_items in assignments.items():
+                if person_name == "__unassigned__": continue
+                for item in assigned_items:
+                    preview_items.append(
+                        PreviewItem(
+                            name=f"{item.service.name} ({person_name})",
+                            type="رسمی" if item.is_official else "غیر رسمی",
+                            quantity=1,  # Items are already unpacked
+                            judiciary_seal="✔" if item.has_judiciary_seal else "-",
+                            foreign_affairs_seal="✔" if item.has_foreign_affairs_seal else "-",
+                            total_price=item.total_price
+                        )
+                    )
+
+        try:
+            # Assuming your DatePickerLineEdit uses a 'YYYY/MM/DD' format
+            delivery_date_obj = datetime.strptime(details.delivery_date, "%Y/%m/%d").date()
+        except (ValueError, TypeError):
+            delivery_date_obj = date.today()  # Fallback if parsing fails
+
+        try:
+            # Assuming get_persian_date returns a string in 'YYYY/MM/DD' format
+            issue_date_obj = datetime.strptime(details.issue_date, "%Y/%m/%d").date()
+        except (ValueError, TypeError):
+            issue_date_obj = date.today()
+
+        self.invoice = Invoice(
+            invoice_number=str(details.invoice_number),
+            issue_date=date.today(),  # Placeholder, you'd parse details.issue_date
+            delivery_date=date.today(),  # Placeholder, you'd parse details.delivery_date
+            username=details.user,
+            customer=customer,  # The full Customer object
+            office=details.office_info,  # The full OfficeInfo object
+            source_language=details.src_lng,
+            target_language=details.trgt_lng,
+            items=preview_items,
+            total_amount=details.total_before_discount,
+            discount_amount=details.discount_amount,
+            advance_payment=details.advance_payment_amount,
+            emergency_cost=details.emergency_cost_amount,
+            remarks=details.remarks
+        )
+        return self.invoice
 
 def create_mock_invoice() -> Invoice:
     """Creates a sample invoice object with mock data for demonstration."""
@@ -110,10 +206,10 @@ def create_mock_invoice() -> Invoice:
     )
 
     items = [
-                InvoiceItem(f"ترجمه رسمی شناسنامه به همراه تاییدات", "رسمی", 1, "دارد", "دارد", 1500000),
-                InvoiceItem(f"ترجمه رسمی کارت ملی", "رسمی", 2, "دارد", "ندارد", 800000),
-                InvoiceItem(f"ترجمه مقاله ISI در زمینه مهندسی", "غیررسمی", 15, "ندارد", "ندارد", 2250000),
-                InvoiceItem(f"ترجمه رسمی دانشنامه و ریزنمرات", "رسمی", 1, "دارد", "دارد", 3500000),
+                PreviewItem(f"ترجمه رسمی شناسنامه به همراه تاییدات", "رسمی", 1, "دارد", "دارد", 1500000),
+                PreviewItem(f"ترجمه رسمی کارت ملی", "رسمی", 2, "دارد", "ندارد", 800000),
+                PreviewItem(f"ترجمه مقاله ISI در زمینه مهندسی", "غیررسمی", 15, "ندارد", "ندارد", 2250000),
+                PreviewItem(f"ترجمه رسمی دانشنامه و ریزنمرات", "رسمی", 1, "دارد", "دارد", 3500000),
             ] * 3
 
     subtotal = sum(item.total_price for item in items)

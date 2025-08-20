@@ -28,7 +28,7 @@ class Customer:
 
 
 @dataclass
-class InvoiceItem:
+class PreviewItem:
     """Represents a single item line in an invoice."""
     name: str
     type: str
@@ -49,7 +49,7 @@ class Invoice:
     office: TranslationOffice
     source_language: str
     target_language: str
-    items: List[InvoiceItem] = field(default_factory=list)
+    items: List[PreviewItem] = field(default_factory=list)
     total_amount: float = 0.0
     discount_amount: float = 0.0
     advance_payment: float = 0.0

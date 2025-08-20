@@ -87,7 +87,7 @@ def test_db_session():
 
 @pytest.fixture
 def invoice_repo():
-    """Fixture to provide an instance of InvoiceRepository."""
+    """Fixture to provide an instance of InvoicePreviewRepository."""
     # In a real scenario, you would mock the session or use a test DB
     return InvoiceRepository()
 

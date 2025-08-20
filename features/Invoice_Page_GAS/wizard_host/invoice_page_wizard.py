@@ -16,6 +16,7 @@ from features.Invoice_Page_GAS.document_selection_GAS.document_selection_models 
 from features.Invoice_Page_GAS.workflow_manager.invoice_page_state_manager import WorkflowStateManager
 from features.Invoice_Page_GAS.invoice_details_GAS.invoice_details_controller import InvoiceDetailsController
 from features.Invoice_Page_GAS.customer_info_GAS.customer_info_logic import CustomerStatus
+from features.Invoice_Page_GAS.invoice_preview_GAS.invoice_preview_controller import InvoicePreviewController
 
 from shared import show_question_message_box
 
@@ -38,18 +39,22 @@ class InvoiceMainWidget(QWidget):
         self.setGeometry(100, 100, 1200, 900)
         self.state_manager = WorkflowStateManager()
 
-        self.state_manager.customer_updated.connect(self._print_customer_state)
-        self.state_manager.invoice_items_updated.connect(self._print_items_state)
-        self.state_manager.assignments_updated.connect(self._print_assignments_state)
+        self._connect_signals()
+        self._setup_state_listeners()
+        self._setup_ui()
 
-        # Attributes to hold key widget references
-        self.customer_widget = None
-        self.document_selection_widget = None
-        self.assignment_widget = None
-        self.invoice_details_widget = None  # Placeholder for step 4
-        self.preview_widget = None
+        self.next_step_handlers = {
+            self.customer_widget: self._handle_next_from_customer_info,
+            self.document_selection_widget: self._handle_next_from_document_selection,
+            self.assignment_widget: self._handle_next_from_assignment,
+            self.invoice_details_widget: self._handle_next_from_invoice_details
+        }
 
-        # --- 2. UI Setup ---
+    # ----------------------------------------------------------------------
+    # UI Creation Methods
+    # ----------------------------------------------------------------------
+    def _setup_ui(self):
+
         # The main layout is a vertical box: top bar, stacked widget, bottom bar.
         self.main_layout = QVBoxLayout(self)
 
@@ -65,10 +70,6 @@ class InvoiceMainWidget(QWidget):
 
         # Set the initial UI state for the first step
         self._update_step_ui(0)
-
-    # ----------------------------------------------------------------------
-    # UI Creation Methods
-    # ----------------------------------------------------------------------
 
     def _create_top_bar(self):
         """Creates the top progress bar with step labels."""
@@ -109,12 +110,14 @@ class InvoiceMainWidget(QWidget):
         self.assignment_widget = AssignmentWidget(self.state_manager)
         self.stacked_widget.addWidget(self.assignment_widget)
 
-        # Step 4 & 5 (Placeholders with references)
+        # --- Step 4: Invoice details ---
         self.invoice_details_controller = InvoiceDetailsController(self.state_manager)
         self.invoice_details_widget = self.invoice_details_controller.get_widget()
         self.stacked_widget.addWidget(self.invoice_details_widget)
 
-        self.preview_widget = QLabel("صفحه پیش‌نمایش و چاپ", alignment=Qt.AlignCenter)
+        # --- Step 5: Invoice preview ---
+        self.preview_controller = InvoicePreviewController(self.state_manager)
+        self.preview_widget = self.preview_controller.get_widget()
         self.stacked_widget.addWidget(self.preview_widget)
 
     def _create_bottom_bar(self):
@@ -131,6 +134,22 @@ class InvoiceMainWidget(QWidget):
         self.bottom_bar_layout.addStretch()
         self.bottom_bar_layout.addWidget(self.prev_button)
         self.bottom_bar_layout.addWidget(self.next_button)
+
+    # ----------------------------------------------------------------------
+    # Connecting Signals
+    # ----------------------------------------------------------------------
+    def _connect_signals(self):
+        self.state_manager.customer_updated.connect(self._print_customer_state)
+        self.state_manager.invoice_items_updated.connect(self._print_items_state)
+        self.state_manager.assignments_updated.connect(self._print_assignments_state)
+
+    def _setup_state_listeners(self):
+        """Attributes to hold key widget references."""
+        self.customer_widget = None
+        self.document_selection_widget = None
+        self.assignment_widget = None
+        self.invoice_details_widget = None  # Placeholder for step 4
+        self.preview_controller = None  # Add new attribute
 
     # ----------------------------------------------------------------------
     # Data Handling Slots
@@ -157,148 +176,121 @@ class InvoiceMainWidget(QWidget):
 
     def _go_to_next_step(self):
         """
-        Handles forward navigation using object comparison and a proper if/elif/else structure.
+        A clean, dispatch-based method for handling forward navigation.
         """
         current_widget = self.stacked_widget.currentWidget()
-        current_index = self.stacked_widget.currentIndex()
 
-        # --- Check if we are at the last page ---
-        if current_index >= self.stacked_widget.count() - 1:
-            return
+        # Look up the specific handler for the current page.
+        handler = self.next_step_handlers.get(current_widget)
 
-            # --- NEW "Smart" Logic when leaving Customer Info (Step 1) ---
-        if current_widget is self.customer_widget:
-            # 1. Get the raw data from the view
-            raw_data = self.customer_widget.get_current_data()
-
-            # 2. Ask the controller to check its status
-            status, customer_obj = self.customer_controller.check_status(raw_data)
-
-            if status == CustomerStatus.NEW:
-                # 3. Customer is new, ask user if they want to save
-                def save_customer():
-                    self.customer_controller.save_current_customer(raw_data)
-                    # The state manager will be updated automatically by the controller
-                    self._navigate_to_next_page()
-
-                def skip_saving_customer():
-                    temp_customer = self.customer_controller._logic._build_customer_from_data(raw_data)
-                    self.state_manager.set_customer(temp_customer)
-                    self._navigate_to_next_page()
-
-                show_question_message_box(self,
-                                          title="ذخیره مشتری",
-                                          message="این مشتری در پایگاه داده وجود ندارد. آیا مایل به ذخیره آن هستید؟",
-                                          button_1="بله",
-                                          yes_func=save_customer,
-                                          button_2="انصراف",
-                                          button_3="خیر",
-                                          action_func=skip_saving_customer
-                                          )
-
-            else:  # Customer is EXISTING_UNMODIFIED or EXISTING_MODIFIED
-                # Silently update the state manager and proceed
-                # (You could add a check for MODIFIED here if you want another warning)
-                self.state_manager.set_customer(customer_obj)
-                self._navigate_to_next_page()
-        # --- End of Customer Info Logic ---
-
-        # --- Logic Path 1: Leaving Document Selection (Step 2) ---
-        if current_widget is self.document_selection_widget:
-            if not self.state_manager.get_customer():
-                QMessageBox.warning(self, "خطا", "لطفا ابتدا اطلاعات مشتری در مرحله ۱ را ذخیره کنید.")
-                return
-
-            num_people = self.state_manager.get_num_people()
-            next_widget = None
-
-            if num_people > 1:
-                # --- This block now correctly prepares the data ---
-                # 1. Unpack the items from the state manager.
-                print("INFO: More than one person detected. Proceeding to Assignment step.")
-                unpacked_items = self._unpack_invoice_items(self.state_manager.get_invoice_items())
-
-                # 2. Get the previously saved assignments to restore state.
-                saved_assignments = self.state_manager.get_assignments()
-
-                # 3. Pass all necessary data to the assignment widget.
-                self.assignment_widget.set_data(
-                    self.state_manager.get_customer(),
-                    unpacked_items,
-                    saved_assignments
-                )
-
-                next_index = self.stacked_widget.indexOf(self.assignment_widget)
-                self.stacked_widget.setCurrentIndex(next_index)
-                self._update_step_ui(next_index)
-
-            else:
-                # Skip to Invoice Details step
-                print("INFO: Only one person detected. Skipping Assignment step.")
-                self.state_manager.auto_assign_for_single_person()
-
-                # We still need to prepare the data for the invoice details page
-                self.invoice_details_controller.prepare_and_display_data(
-                    self.state_manager.get_customer(),
-                    self.state_manager.get_invoice_items()
-                )
-                next_widget = self.invoice_details_widget
-
-            # Perform the navigation
-            next_index = self.stacked_widget.indexOf(next_widget)
-            self.stacked_widget.setCurrentIndex(next_index)
-            self._update_step_ui(next_index)
-
-        # --- Logic Path 2: Leaving Assignment (Step 3) ---
-        elif current_widget is self.assignment_widget:
-            # Prepare the data for the next step (Invoice Details)
-            self.invoice_details_controller.prepare_and_display_data(
-                self.state_manager.get_customer(),
-                self.state_manager.get_invoice_items()  # Use original, packed items
-            )
-            # Then navigate
-            next_index = self.stacked_widget.indexOf(self.invoice_details_widget)
-            self.stacked_widget.setCurrentIndex(next_index)
-            self._update_step_ui(next_index)
-
-        # --- Logic Path 3: Default behavior for all other steps ---
+        if handler:
+            # If a specific handler exists, call it.
+            # The handler is now responsible for validation and navigation.
+            handler()
         else:
-            next_index = current_index + 1
-            self.stacked_widget.setCurrentIndex(next_index)
-            self._update_step_ui(next_index)
-
-    def _navigate_to_next_page(self):
-        """Helper method to handle the actual page switch."""
-        current_index = self.stacked_widget.currentIndex()
-        if current_index < self.stacked_widget.count() - 1:
-            self.stacked_widget.setCurrentIndex(current_index + 1)
-            self._update_step_ui(current_index + 1)
+            # If no specific handler, perform the default navigation.
+            self._navigate_by_offset(1)
 
     def _go_to_previous_step(self):
-        """
-        Handles backward navigation using object comparison and indexOf.
-        """
+        """Handles backward navigation with conditional skipping."""
         current_widget = self.stacked_widget.currentWidget()
-        current_index = self.stacked_widget.currentIndex()
 
-        if current_index <= 0:
-            return
-
-        prev_index = -1
-
-        # --- Special Logic when going back FROM Invoice Details (Step 4) ---
+        # Special case: If we are on Invoice Details and skipped Assignment, go back 2 steps.
         if current_widget is self.invoice_details_widget:
-            num_people = self.state_manager.get_num_people()
-            if num_people <= 1:
-                # The assignment step was skipped, so go back to document selection
-                prev_index = self.stacked_widget.indexOf(self.document_selection_widget)
+            if self.state_manager.get_num_people() <= 1:
+                self._navigate_to_widget(self.document_selection_widget)
+                return  # Stop further execution
 
-        # If no special logic was triggered, use the default behavior
-        if prev_index == -1:
-            prev_index = current_index - 1
+        # Default behavior for all other cases
+        self._navigate_by_offset(-1)
 
-        self.stacked_widget.setCurrentIndex(prev_index)
-        self._update_step_ui(prev_index)
+    # --- Specific "Next Step" Handlers ---
+
+    def _handle_next_from_customer_info(self):
+        """Logic for when the 'Next' button is clicked on the customer info page."""
+        raw_data = self.customer_widget.get_current_data()
+        status, customer_obj = self.customer_controller.check_status(raw_data)
+
+        if status == CustomerStatus.NEW:
+            reply = QMessageBox.question(
+                self, "ذخیره مشتری",
+                "این مشتری در پایگاه داده وجود ندارد. آیا مایل به ذخیره آن هستید؟",
+                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+                QMessageBox.Yes
+            )
+            if reply == QMessageBox.Yes:
+                self.customer_controller.save_current_customer(raw_data)
+                # The state manager is updated automatically by the controller's success path
+                self._navigate_to_widget(self.document_selection_widget)
+            elif reply == QMessageBox.No:
+                # Create a temporary customer object for the state manager
+                temp_customer = self.customer_controller._logic._build_customer_from_data(raw_data)
+                self.state_manager.set_customer(temp_customer)
+                self._navigate_to_widget(self.document_selection_widget)
+            # If Cancel, do nothing.
+        else:  # Existing customer (modified or not)
+            self.state_manager.set_customer(customer_obj)
+            self._navigate_to_widget(self.document_selection_widget)
+
+    def _handle_next_from_document_selection(self):
+        """Logic for leaving the document selection page."""
+        if self.state_manager.get_num_people() > 1:
+            # Go to Assignment step
+            unpacked_items = self._unpack_invoice_items(self.state_manager.get_invoice_items())
+            saved_assignments = self.state_manager.get_assignments()
+            self.assignment_widget.set_data(
+                self.state_manager.get_customer(), unpacked_items, saved_assignments
+            )
+            self._navigate_to_widget(self.assignment_widget)
+        else:
+            # Skip to Invoice Details step
+            self.state_manager.auto_assign_for_single_person()
+            self.invoice_details_controller.prepare_and_display_data(
+                self.state_manager.get_customer(),
+                self.state_manager.get_invoice_items()
+            )
+            self._navigate_to_widget(self.invoice_details_widget)
+
+    def _handle_next_from_assignment(self):
+        """Logic for leaving the assignment page."""
+        self.invoice_details_controller.prepare_and_display_data(
+            self.state_manager.get_customer(),
+            self.state_manager.get_invoice_items()  # Use original items
+        )
+        self._navigate_to_widget(self.invoice_details_widget)
+
+    def _handle_next_from_invoice_details(self):
+        """Logic for leaving the invoice details page."""
+        current_widget = self.stacked_widget.currentWidget()
+        # --- NEW LOGIC: When leaving Invoice Details (Step 4) ---
+        if current_widget is self.invoice_details_widget:
+            # --- FIX: "Activate" the preview controller ---
+            # Tell the preview controller to assemble all the data from the state manager
+            # and render its view for the first time.
+            self.preview_controller.prepare_and_display_data()
+
+            # Now, navigate to the preview page
+            next_index = self.stacked_widget.indexOf(self.preview_widget)
+            self.stacked_widget.setCurrentIndex(next_index)
+            self._update_step_ui(next_index)
+        # self.preview_controller.prepare_and_display_data()
+        # self._navigate_to_widget(self.preview_widget)
+
+    # --- Navigation Helper Methods ---
+    def _navigate_to_widget(self, widget: QWidget):
+        """Navigates the stack to a specific widget."""
+        index = self.stacked_widget.indexOf(widget)
+        if index != -1:
+            self.stacked_widget.setCurrentIndex(index)
+            self._update_step_ui(index)
+
+    def _navigate_by_offset(self, offset: int):
+        """Navigates forward (1) or backward (-1) from the current page."""
+        current_index = self.stacked_widget.currentIndex()
+        new_index = current_index + offset
+        if 0 <= new_index < self.stacked_widget.count():
+            self.stacked_widget.setCurrentIndex(new_index)
+            self._update_step_ui(new_index)
 
     def _update_step_ui(self, current_index):
         """Updates the top bar styles and enables/disables navigation buttons."""

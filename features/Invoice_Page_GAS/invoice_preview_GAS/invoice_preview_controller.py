@@ -1,6 +1,6 @@
 # controller.py
 
-from PySide6.QtWidgets import QFileDialog, QMessageBox, QApplication
+from PySide6.QtWidgets import QFileDialog, QMessageBox, QApplication, QWidget
 from PySide6.QtGui import QPixmap, QPainter, QPageSize, QRegion
 from PySide6.QtPrintSupport import QPrinter, QPrintDialog
 from PySide6.QtCore import QPoint
@@ -8,37 +8,47 @@ from PySide6.QtCore import QPoint
 from typing import Callable
 from datetime import date
 
-from features.Invoice_Page_GAS.invoice_preview_GAS.invoice_preview_view import MainInvoiceWindow
-from features.Invoice_Page_GAS.invoice_preview_GAS.invoice_preview_logic import InvoiceService, create_mock_invoice
-from features.Invoice_Page_GAS.invoice_preview_GAS.invoice_preview_repo import InvoiceRepository
-from features.Invoice_Page_GAS.invoice_preview_GAS.invoice_preview_models import Invoice, Customer, InvoiceItem
+from features.Invoice_Page_GAS.invoice_preview_GAS.invoice_preview_view import MainInvoicePreviewWidget
+from features.Invoice_Page_GAS.invoice_preview_GAS.invoice_preview_logic import InvoicePreviewLogic, create_mock_invoice
+from features.Invoice_Page_GAS.invoice_preview_GAS.invoice_preview_repo import InvoicePreviewRepository
+from features.Invoice_Page_GAS.invoice_preview_GAS.invoice_preview_models import Invoice, Customer, PreviewItem
 
 from shared import show_warning_message_box, show_information_message_box, show_error_message_box
 
 
-class InvoiceController:
+class InvoicePreviewController:
     """
     Manages the application flow, connecting the UI (View) with the business logic (Service).
     """
 
-    def __init__(self, view: MainInvoiceWindow):
-        self.view = view
-        self.invoice_data = create_mock_invoice()
-        self.service = InvoiceService(self.invoice_data)
-        self.repo = InvoiceRepository()
+    def __init__(self, state_manager):
+        self.state_manager = state_manager
+        self._logic = InvoicePreviewLogic(state_manager)
+        self._view = MainInvoicePreviewWidget()
+        self._repo = InvoicePreviewRepository()
 
         self.current_page = 1
-        self.total_pages = self.service.get_total_pages()
+        self.total_pages = 1
 
         self._connect_signals()
-        self.update_view()
 
     def _connect_signals(self):
-        self.view.action_panel.print_button.clicked.connect(self.print_invoice)
-        self.view.action_panel.save_pdf_button.clicked.connect(self.save_as_pdf)
-        self.view.action_panel.save_png_button.clicked.connect(self.save_as_png)
-        self.view.pagination_panel.next_button.clicked.connect(self.next_page)
-        self.view.pagination_panel.prev_button.clicked.connect(self.prev_page)
+        self._view.print_clicked.connect(self.print_invoice)
+        self._view.save_pdf_clicked.connect(self.save_as_pdf)
+        self._view.save_png_clicked.connect(self.save_as_png)
+        self._view.next_page_clicked.connect(self.next_page)
+        self._view.prev_page_clicked.connect(self.prev_page)
+
+    def prepare_and_display_data(self):
+        """Assembles the final invoice and updates the view for the first time."""
+        self._logic.assemble_invoice_data()
+        if self._logic.invoice:
+            self.current_page = 1
+            self.total_pages = self._logic.get_total_pages()
+            self._update_view()
+        else:
+            # Handle the case where data might be missing
+            print("CONTROLLER ERROR: Could not assemble invoice data.")
 
     def load_new_invoice(self, builder_data: 'InvoiceBuilder'):
         """
@@ -62,7 +72,7 @@ class InvoiceController:
         new_items = []
         for item_dict in builder_data.document_items:
             new_items.append(
-                InvoiceItem(
+                PreviewItem(
                     name=item_dict.get('name', ''),
                     type=item_dict.get('type', ''),
                     quantity=item_dict.get('count', 1),
@@ -100,39 +110,24 @@ class InvoiceController:
         self.service = InvoiceService(self.invoice_data)
         self.current_page = 1
         self.total_pages = self.service.get_total_pages()
-        self.update_view()  # This will refresh the UI with the complete invoice
+        self._update_view()  # This will refresh the UI with the complete invoice
 
-    def update_view(self):
-        """
-        Updates the invoice preview, now passing the pagination config to the view.
-        """
-        items = self.service.get_items_for_page(self.current_page)
-
-        # Get the config from the service
-        pagination_config = self.service.pagination_config
-
-        # Pass the config to the view's update method
-        self.view.invoice_preview.update_content(
-            self.invoice_data,
-            items,
-            self.current_page,
-            self.total_pages,
-            pagination_config  # Pass the config dictionary
+    def _update_view(self):
+        """Fetches the correct items for the current page and tells the view to render."""
+        items = self._logic.get_items_for_page(self.current_page)
+        self._view.update_view(
+            self._logic.invoice, items, self.current_page, self.total_pages
         )
-
-        # Update external pagination controls
-        self.view.pagination_panel.prev_button.setEnabled(self.current_page > 1)
-        self.view.pagination_panel.next_button.setEnabled(self.current_page < self.total_pages)
 
     def next_page(self):
         if self.current_page < self.total_pages:
             self.current_page += 1
-            self.update_view()
+            self._update_view()
 
     def prev_page(self):
         if self.current_page > 1:
             self.current_page -= 1
-            self.update_view()
+            self._update_view()
 
     def save_as_pdf(self):
         """Orchestrates saving the invoice as a PDF."""
@@ -146,7 +141,7 @@ class InvoiceController:
         """Orchestrates saving the invoice as a PNG."""
         if self.total_pages > 1:
             show_warning_message_box(
-                self.view,
+                self._view,
                 "عملیات نامعتبر",
                 "فاکتورهای چندصفحه‌ای را نمی‌توان با فرمت PNG ذخیره کرد.\n"
                 "این عمل فقط صفحه اول را ذخیره می‌کند. برای ذخیره تمام صفحات، لطفاً از گزینه 'ذخیره PDF' استفاده نمایید."
@@ -166,12 +161,12 @@ class InvoiceController:
         invoice_number = self.invoice_data.invoice_number
 
         # 1. Check for existing path in the database
-        existing_path = self.repo.get_invoice_path(invoice_number)
+        existing_path = self._repo.get_invoice_path(invoice_number)
 
         # 2. If path exists, ask for confirmation
         if existing_path:
             reply = QMessageBox.question(
-                self.view,
+                self._view,
                 "تایید ذخیره مجدد",
                 f"این فاکتور قبلاً در مسیر زیر ذخیره شده است:\n\n{existing_path}\n\nآیا می‌خواهید دوباره آن را ذخیره کرده و مسیر جدید را جایگزین نمایید؟",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
@@ -181,21 +176,21 @@ class InvoiceController:
                 return  # Abort the operation
 
         # 3. Show file save dialog to get the new path
-        file_path, _ = QFileDialog.getSaveFileName(self.view, file_dialog_title, "", file_filter)
+        file_path, _ = QFileDialog.getSaveFileName(self._view, file_dialog_title, "", file_filter)
         if not file_path:
             return  # User cancelled the dialog
 
         # 4. Execute the actual save logic (for PDF or PNG)
         if save_logic_func(file_path):
             # 5. If save was successful, update the path in the database
-            if self.repo.update_invoice_path(invoice_number, file_path):
-                show_information_message_box(self.view, "موفق",
+            if self._repo.update_invoice_path(invoice_number, file_path):
+                show_information_message_box(self._view, "موفق",
                                              f"فاکتور با موفقیت ذخیره و مسیر آن در پایگاه داده به‌روزرسانی شد:\n{file_path}")
             else:
-                show_warning_message_box(self.view, "خطای پایگاه داده",
+                show_warning_message_box(self._view, "خطای پایگاه داده",
                                          "فاکتور ذخیره شد، اما در به‌روزرسانی مسیر آن در پایگاه داده خطایی رخ داد.")
         else:
-            show_error_message_box(self.view, "خطا", f"خطا در ذخیره سازی فایل در مسیر:\n{file_path}")
+            show_error_message_box(self._view, "خطا", f"خطا در ذخیره سازی فایل در مسیر:\n{file_path}")
 
     def _save_to_pdf_file(self, file_path: str) -> bool:
         """Contains the specific logic to render and save a PDF."""
@@ -209,7 +204,7 @@ class InvoiceController:
 
     def _save_to_png_file(self, file_path: str) -> bool:
         """Contains the specific logic to render and save a PNG."""
-        widget_to_render = self.view.get_invoice_widget()
+        widget_to_render = self._view.get_invoice_widget_for_render()
         pixmap = QPixmap(widget_to_render.size())
         widget_to_render.render(pixmap)
         return pixmap.save(file_path, "PNG")
@@ -224,7 +219,7 @@ class InvoiceController:
 
         if print_dialog.exec() == QPrintDialog.Accepted:
             if not self._render_document(printer):
-                show_error_message_box(self.view, "خطا", "خطا در فرآیند چاپ.")
+                show_error_message_box(self._view, "خطا", "خطا در فرآیند چاپ.")
 
     def _render_document(self, printer: QPrinter) -> bool:
         """
@@ -240,11 +235,11 @@ class InvoiceController:
         try:
             for page in range(1, self.total_pages + 1):
                 self.current_page = page
-                self.update_view()
+                self._update_view()
 
                 QApplication.processEvents()
 
-                widget_to_render = self.view.get_invoice_widget()
+                widget_to_render = self._view.get_invoice_widget_for_render()
 
                 # --- Scaling Logic ---
                 page_rect_pixels = printer.pageRect(QPrinter.DevicePixel)
@@ -279,6 +274,9 @@ class InvoiceController:
         finally:
             painter.end()
             self.current_page = original_page
-            self.update_view()
+            self._update_view()
 
         return True
+
+    def get_widget(self) -> QWidget:
+        return self._view

@@ -79,7 +79,7 @@ class InvoiceItemModel(BaseInvoices):
     foreign_affairs_seal: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     remarks: Mapped[Optional[str]] = mapped_column(Text)
 
-    # Many-to-one: InvoiceItem → IssuedInvoice
+    # Many-to-one: PreviewItem → IssuedInvoice
     issued_invoice: Mapped["IssuedInvoiceModel"] = relationship(
         "IssuedInvoiceModel", back_populates="invoice_items"
     )

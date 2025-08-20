@@ -3,9 +3,9 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QTableWidget, QTableWidgetItem,
                                QHeaderView, QSizePolicy, QScrollArea, QSpacerItem, QAbstractItemView, QGridLayout,
                                QToolButton)
-from PySide6.QtGui import QFont, QPixmap, QIcon, QPainter
-from PySide6.QtCore import Qt, QSize, QByteArray
-from features.Invoice_Page_GAS.invoice_preview_GAS.invoice_preview_models import Invoice, InvoiceItem
+from PySide6.QtGui import QFont, QPixmap, QIcon
+from PySide6.QtCore import Qt, QSize, Signal
+from features.Invoice_Page_GAS.invoice_preview_GAS.invoice_preview_models import Invoice, PreviewItem
 from typing import List, Dict
 from features.Invoice_Page_GAS.invoice_preview_GAS.invoice_preview_assets import (PRINT_ICON_PATH, PDF_ICON_PATH,
                                                                                   PNG_ICON_PATH, SHARE_ICON_PATH)
@@ -267,7 +267,7 @@ class InvoicePreviewWidget(QFrame):
         separator.setStyleSheet(f"color: {INVOICE_BORDER_COLOR};")
         return separator
 
-    def update_content(self, invoice: Invoice, items_on_page: List[InvoiceItem], page_num: int, total_pages: int,
+    def update_content(self, invoice: Invoice, items_on_page: List[PreviewItem], page_num: int, total_pages: int,
                        pagination_config: Dict[str, int]):
 
         is_first_page = (page_num == 1)
@@ -285,7 +285,7 @@ class InvoicePreviewWidget(QFrame):
                 f"شماره ثبت: {to_persian_number(office.reg_no)} | مترجم مسئول: {office.representative}")
             self.office_contact_label.setText(
                 f"آدرس: {office.address}\nتلفن: {to_persian_number(office.phone)} | ایمیل: {office.email} | {office.socials}")
-            self.logo_label.setPixmap(QPixmap(office.logo_path))
+            # self.logo_label.setPixmap(QPixmap(office.logo_path))
             self.invoice_number_label.setText(f"فاکتور شماره: {to_persian_number(invoice.invoice_number)}")
             self.issuer_label.setText(f"صادر کننده: {invoice.username}")
             self.dates_label.setText(
@@ -410,8 +410,13 @@ class PaginationPanel(QWidget):
         return button
 
 
-class MainInvoiceWindow(QWidget):
+class MainInvoicePreviewWidget(QWidget):
     """The main application window that orchestrates all UI components."""
+    print_clicked = Signal()
+    save_pdf_clicked = Signal()
+    save_png_clicked = Signal()
+    next_page_clicked = Signal()
+    prev_page_clicked = Signal()
 
     def __init__(self):
         super().__init__()
@@ -444,6 +449,31 @@ class MainInvoiceWindow(QWidget):
         main_layout.addLayout(center_layout, 1)
         main_layout.addWidget(self.action_panel)
 
-    def get_invoice_widget(self) -> QWidget:
+        self._connect_signals()
+
+    def _connect_signals(self):
+        """Connect internal buttons to this widget's public signals"""
+        self.action_panel.print_button.clicked.connect(self.print_clicked.emit)
+        self.action_panel.save_pdf_button.clicked.connect(self.save_pdf_clicked.emit)
+        self.action_panel.save_png_button.clicked.connect(self.save_png_clicked.emit)
+        self.pagination_panel.next_button.clicked.connect(self.next_page_clicked.emit)
+        self.pagination_panel.prev_button.clicked.connect(self.prev_page_clicked.emit)
+
+    def update_view(self, invoice, items_on_page, current_page, total_pages):
+        """Public slot to refresh the entire display."""
+        # This is where the logic from your old controller's update_view goes.
+        # It calls self.invoice_preview.update_content(...)
+        # and enables/disables the pagination buttons.
+        pagination_config = {  # This should ideally come from the logic layer
+            'one_page_max_rows': 12, 'first_page_max_rows': 24,
+            'other_page_max_rows': 28, 'last_page_max_rows': 22
+        }
+        self.invoice_preview.update_content(
+            invoice, items_on_page, current_page, total_pages, pagination_config
+        )
+        self.pagination_panel.prev_button.setEnabled(current_page > 1)
+        self.pagination_panel.next_button.setEnabled(current_page < total_pages)
+
+    def get_invoice_widget_for_render(self) -> QWidget:
         """Returns the widget to be rendered for saving/printing."""
         return self.invoice_preview

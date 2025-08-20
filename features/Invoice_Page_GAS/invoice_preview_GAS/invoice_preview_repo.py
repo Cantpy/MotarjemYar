@@ -24,7 +24,7 @@ InvoicesSession = sessionmaker(bind=invoices_engine)
 
 
 # --- Repository for Data Export ---
-class InvoiceRepository:
+class InvoicePreviewRepository:
     """Handles database operations for exporting invoice data."""
 
     def __init__(self):
@@ -63,7 +63,7 @@ class InvoiceRepository:
         finally:
             session.close()
 
-    def get_invoice_path(self, invoice_number: str) -> Optional[str]:
+    def get_invoice_path(self, invoice_number: str) -> str | None:
         """Retrieves the saved file path for a given invoice number."""
         session = InvoicesSession()
         try:

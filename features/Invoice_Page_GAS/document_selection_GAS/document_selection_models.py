@@ -57,8 +57,8 @@ class InvoiceItem:
 
     unique_id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
-    def clone(self) -> 'InvoiceItem':
-        """Creates a deep copy of this InvoiceItem."""
+    def clone(self) -> 'PreviewItem':
+        """Creates a deep copy of this PreviewItem."""
         new_item = copy.deepcopy(self)
         new_item.unique_id = str(uuid.uuid4())  # Ensure the clone is unique
         return new_item

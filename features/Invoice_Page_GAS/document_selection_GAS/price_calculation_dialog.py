@@ -365,7 +365,7 @@ class CalculationDialog(QDialog):
 
     def accept(self):
         """
-        Constructs the final InvoiceItem object using the robust, pre-calculated prices.
+        Constructs the final PreviewItem object using the robust, pre-calculated prices.
         """
         if not self._validate_inputs():
             return  # Stop the accept process if validation fails
