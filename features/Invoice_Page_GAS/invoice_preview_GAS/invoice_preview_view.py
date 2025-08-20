@@ -1,15 +1,13 @@
 # view.py
-
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QTableWidget, QTableWidgetItem,
                                QHeaderView, QSizePolicy, QScrollArea, QSpacerItem, QAbstractItemView, QGridLayout,
                                QToolButton)
-from PySide6.QtGui import QFont, QPixmap, QIcon
+from PySide6.QtGui import QFont, QIcon
 from PySide6.QtCore import Qt, QSize, Signal
 from features.Invoice_Page_GAS.invoice_preview_GAS.invoice_preview_models import Invoice, PreviewItem
 from typing import List, Dict
 from features.Invoice_Page_GAS.invoice_preview_GAS.invoice_preview_assets import (PRINT_ICON_PATH, PDF_ICON_PATH,
                                                                                   PNG_ICON_PATH, SHARE_ICON_PATH)
-
 from shared import to_persian_number
 
 # --- Constants for Styling ---
@@ -38,6 +36,7 @@ class InvoicePreviewWidget(QFrame):
     def __init__(self):
         super().__init__()
         self.setObjectName("InvoicePreviewWidget")
+        self.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
         self.setFixedSize(A4_WIDTH_PX, A4_HEIGHT_PX)
         self.setStyleSheet(f"""
             #InvoicePreviewWidget {{

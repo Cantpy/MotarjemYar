@@ -1,7 +1,7 @@
 # document_selection/controller.py
 from features.Invoice_Page_GAS.document_selection_GAS.document_selection_logic import DocumentSelectionLogic
 from features.Invoice_Page_GAS.document_selection_GAS.document_selection_view import DocumentSelectionWidget
-from features.Invoice_Page_GAS.workflow_manager.invoice_page_state_manager import WorkflowStateManager
+from features.Invoice_Page_GAS.invoice_page_state_manager import WorkflowStateManager
 
 
 class DocumentSelectionController:

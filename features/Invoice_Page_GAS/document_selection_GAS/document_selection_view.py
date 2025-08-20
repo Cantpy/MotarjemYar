@@ -8,7 +8,7 @@ from PySide6.QtGui import QColor, QAction, QFont
 from features.Invoice_Page_GAS.document_selection_GAS.document_selection_models import InvoiceItem
 from features.Invoice_Page_GAS.document_selection_GAS.document_selection_qss_styles import (DOC_SELECTION_STYLES,
                                                                                             COMPLETER_POPUP)
-from features.Invoice_Page_GAS.workflow_manager.invoice_page_state_manager import WorkflowStateManager
+from features.Invoice_Page_GAS.invoice_page_state_manager import WorkflowStateManager
 from typing import List
 from shared import to_persian_number
 

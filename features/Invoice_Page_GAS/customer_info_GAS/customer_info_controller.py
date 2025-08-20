@@ -2,11 +2,11 @@
 from features.Invoice_Page_GAS.customer_info_GAS.customer_info_models import Customer
 from features.Invoice_Page_GAS.customer_info_GAS.customer_info_logic import CustomerLogic, CustomerExistsError
 from features.Invoice_Page_GAS.customer_info_GAS.customer_info_view import CustomerInfoWidget
-from features.Invoice_Page_GAS.workflow_manager.invoice_page_state_manager import WorkflowStateManager
+from features.Invoice_Page_GAS.invoice_page_state_manager import WorkflowStateManager
 from typing import List, Optional, Dict
 
 
-class CustomerController:
+class CustomerInfoController:
     def __init__(self, state_manager: WorkflowStateManager):
         self._logic = CustomerLogic()
         self._view = CustomerInfoWidget()

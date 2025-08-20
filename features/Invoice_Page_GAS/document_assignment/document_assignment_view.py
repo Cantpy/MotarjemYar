@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Signal, Qt
 from features.Invoice_Page_GAS.customer_info_GAS.customer_info_models import Customer
 from features.Invoice_Page_GAS.document_selection_GAS.document_selection_models import InvoiceItem
-from features.Invoice_Page_GAS.workflow_manager.invoice_page_state_manager import WorkflowStateManager
+from features.Invoice_Page_GAS.invoice_page_state_manager import WorkflowStateManager
 
 
 MIME_TYPE = "application/x-invoice-item-assignment"

@@ -1,7 +1,7 @@
 # invoice_details/invoice_details_entry_point.py
 
 from features.Invoice_Page_GAS.invoice_details_GAS.invoice_details_controller import InvoiceDetailsController
-from features.Invoice_Page_GAS.workflow_manager.invoice_page_state_manager import WorkflowStateManager
+from features.Invoice_Page_GAS.invoice_page_state_manager import WorkflowStateManager
 from PySide6.QtWidgets import QApplication
 import sys
 

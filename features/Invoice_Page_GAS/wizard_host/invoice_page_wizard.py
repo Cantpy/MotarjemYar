@@ -1,24 +1,22 @@
 # invoice_page_wizard.py
 from typing import List
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QWidget, QStackedWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QMessageBox
 )
 
-from features.Invoice_Page_GAS.customer_info_GAS.customer_info_controller import CustomerController
+from features.Invoice_Page_GAS.customer_info_GAS.customer_info_controller import CustomerInfoController
 # Import the data models to hold the state
 from features.Invoice_Page_GAS.customer_info_GAS.customer_info_models import Customer
 # Import the widgets for each step
 from features.Invoice_Page_GAS.document_assignment.document_assignment_view import AssignmentWidget
 from features.Invoice_Page_GAS.document_selection_GAS.document_selection_controller import DocumentSelectionController
 from features.Invoice_Page_GAS.document_selection_GAS.document_selection_models import InvoiceItem
-from features.Invoice_Page_GAS.workflow_manager.invoice_page_state_manager import WorkflowStateManager
+from features.Invoice_Page_GAS.invoice_page_state_manager import WorkflowStateManager
 from features.Invoice_Page_GAS.invoice_details_GAS.invoice_details_controller import InvoiceDetailsController
 from features.Invoice_Page_GAS.customer_info_GAS.customer_info_logic import CustomerStatus
 from features.Invoice_Page_GAS.invoice_preview_GAS.invoice_preview_controller import InvoicePreviewController
-
-from shared import show_question_message_box
 
 
 class InvoiceMainWidget(QWidget):
@@ -96,7 +94,7 @@ class InvoiceMainWidget(QWidget):
         self.stacked_widget = QStackedWidget()
 
         # --- Step 1: Customer Info ---
-        self.customer_controller = CustomerController(self.state_manager)
+        self.customer_controller = CustomerInfoController(self.state_manager)
         self.customer_widget = self.customer_controller.get_widget()
         self.stacked_widget.addWidget(self.customer_widget)
 
