@@ -17,7 +17,7 @@ from shared import show_warning_message_box, show_information_message_box, show_
 class InvoicePreviewController:
     """
     Manages the application flow for the preview step, connecting the
-    UI (View) with the business logic (Logic).
+    UI (View) with the business _logic (Logic).
     """
 
     def __init__(self, state_manager):

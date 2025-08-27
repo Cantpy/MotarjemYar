@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class InvoiceTableLogic:
-    """Business logic for invoice operations"""
+    """Business _logic for invoice operations"""
 
     def __init__(self, repo_manager: RepositoryManager):
         self.repo_manager = repo_manager

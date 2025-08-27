@@ -1,5 +1,5 @@
 """
-Business logic for SMS and Email notifications.
+Business _logic for SMS and Email notifications.
 """
 import requests
 import smtplib

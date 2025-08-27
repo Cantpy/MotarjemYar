@@ -92,7 +92,7 @@ def test_iranian_phone_validator(phone, expected):
 def logic():
     """Creates a CustomerInfoLogic instance with a mocked repository for each test."""
     logic_instance = CustomerLogic()
-    # Mock the repository to isolate the logic for testing
+    # Mock the repository to isolate the _logic for testing
     logic_instance._repo = MagicMock()
     return logic_instance
 
@@ -124,7 +124,7 @@ def test_save_customer_with_valid_legal_nid_succeeds(logic):
 
 
 def test_save_customer_with_invalid_nid_fails(logic):
-    """Tests that logic raises a ValueError for a structurally invalid National ID."""
+    """Tests that _logic raises a ValueError for a structurally invalid National ID."""
     # Using a string now, as per the current architecture
     raw_data = {"name": "تست نامعتبر", "national_id": "12345", "phone": "09123456789"}
 

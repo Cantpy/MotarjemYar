@@ -12,7 +12,7 @@ if __name__ == "__main__":
     # The main window which is the primary view
     state_manager = WorkflowStateManager()
 
-    # The controller that binds the view to the logic
+    # The controller that binds the view to the _logic
     controller = InvoicePreviewController(state_manager)
     view = controller.get_widget()
 

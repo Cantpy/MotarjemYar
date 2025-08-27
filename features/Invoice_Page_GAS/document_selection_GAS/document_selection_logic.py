@@ -1,4 +1,4 @@
-# document_selection/logic.py
+# document_selection/_logic.py
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QDialog
 from typing import List
@@ -28,7 +28,7 @@ class DocumentSelectionLogic(QObject):
     def add_service_by_name(self, name: str):
         """
         This is a "slot" that the view's signal will connect to.
-        It contains all the logic for adding a new item.
+        It contains all the _logic for adding a new item.
         """
         service = self._services_map.get(name)
         if not service: return

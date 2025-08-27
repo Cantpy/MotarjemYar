@@ -43,7 +43,7 @@ class CollapsibleBox(QWidget):
         main_layout.addWidget(separator)
         main_layout.addWidget(self.content_area)
 
-        # --- The animation logic is correct from the previous answer ---
+        # --- The animation _logic is correct from the previous answer ---
         self.animation = QPropertyAnimation(self.content_area, b"maximumHeight")
         self.animation.setDuration(200)
         self.animation.setEasingCurve(QEasingCurve.InOutQuad)

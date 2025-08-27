@@ -1,4 +1,4 @@
-"""services_management_logic.py - Business logic layer for services management"""
+"""services_management_logic.py - Business _logic layer for services management"""
 
 import pandas as pd
 import os
@@ -13,7 +13,7 @@ class ValidationError(Exception):
 
 
 class ServicesLogic:
-    """Business logic for services management"""
+    """Business _logic for services management"""
 
     def __init__(self, db_path: str, excel_path: str = None):
         self.db_manager = DatabaseManager(db_path)
@@ -151,7 +151,7 @@ class ServicesLogic:
 
 
 class FixedPricesLogic:
-    """Business logic for fixed prices management"""
+    """Business _logic for fixed prices management"""
 
     def __init__(self, db_path: str):
         self.db_manager = DatabaseManager(db_path)
@@ -230,7 +230,7 @@ class FixedPricesLogic:
 
 
 class OtherServicesLogic:
-    """Business logic for other services management"""
+    """Business _logic for other services management"""
 
     def __init__(self, db_path: str):
         self.db_manager = DatabaseManager(db_path)

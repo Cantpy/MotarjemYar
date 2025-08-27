@@ -1,4 +1,4 @@
-# logic.py
+# _logic.py
 
 from InvoicePage.invoice_preview.invoice_preview_models import (Invoice, Customer, TranslationOffice, InvoiceItem)
 from datetime import date
@@ -8,7 +8,7 @@ import math
 
 class InvoiceService:
     """
-    Handles business logic related to invoices, such as pagination and data preparation.
+    Handles business _logic related to invoices, such as pagination and data preparation.
     """
 
     def __init__(self, invoice_data: Invoice):

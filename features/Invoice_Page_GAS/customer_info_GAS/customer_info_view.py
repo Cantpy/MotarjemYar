@@ -306,7 +306,7 @@ class CustomerInfoWidget(QWidget):
     def populate_completer(self, all_people_info: list[dict]):
         """Public slot to receive completer data and set up the completer."""
         # The key for the map is the displayed name, the value is the NID to FETCH.
-        # For companions, the logic layer has already mapped this to the main customer's NID.
+        # For companions, the _logic layer has already mapped this to the main customer's NID.
         self.completer_map = {person['name']: person['national_id'] for person in all_people_info}
 
         model = QStringListModel(list(self.completer_map.keys()))
@@ -420,7 +420,7 @@ class CustomerInfoWidget(QWidget):
 
     def get_current_data(self) -> dict:
         """A new public method to get the raw data from the form fields."""
-        # This is the same logic that was in your old _on_save_clicked method
+        # This is the same _logic that was in your old _on_save_clicked method
         companions = []
         # Find all companion groups and get their raw text
         for group_box in self.companions_widget.findChildren(QGroupBox, "CompanionGroup"):

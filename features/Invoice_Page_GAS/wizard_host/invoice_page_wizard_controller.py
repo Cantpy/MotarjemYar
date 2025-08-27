@@ -47,7 +47,7 @@ class MainWindowController:
             'preview': {'controller': preview_ctrl, 'widget': preview_widget}
         }
 
-        # 6. Create the navigation logic, passing it all the pieces it needs
+        # 6. Create the navigation _logic, passing it all the pieces it needs
         self._logic = MainWindowLogic(self._view, self.state_manager, self.controllers_and_widgets)
 
         # 7. Connect the high-level signals and bridge data flow

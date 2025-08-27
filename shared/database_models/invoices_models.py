@@ -36,9 +36,10 @@ class IssuedInvoiceModel(BaseInvoices):
     total_additional_doc_count: Mapped[int] = mapped_column(Integer, default=0)
     source_language: Mapped[Optional[str]] = mapped_column(Text)
     target_language: Mapped[Optional[str]] = mapped_column(Text)
-    username: Mapped[Optional[str]] = mapped_column(
-        Text, ForeignKey("users.username", ondelete="SET NULL")
-    )
+
+    # ⚡ FIXED: no real FK, just store the username
+    username: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     pdf_file_path: Mapped[Optional[str]] = mapped_column(Text)
 
     # One-to-many: IssuedInvoice → InvoiceItems

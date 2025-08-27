@@ -14,7 +14,7 @@ def invoice_service():
 
 def test_get_total_pages(invoice_service):
     """
-    Tests the page calculation logic.
+    Tests the page calculation _logic.
     Mock data has 25 items. First page: 10, Others: 18.
     Page 1: 10 items.
     Remaining: 15 items. Needs 1 more page.

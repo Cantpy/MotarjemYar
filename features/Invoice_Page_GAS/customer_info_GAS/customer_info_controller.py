@@ -28,14 +28,14 @@ class CustomerInfoController:
     def _on_fetch_details_requested(self, national_id: str):
         """
         Handles the request to autofill the form. The NID will always be the
-        correct main customer NID, thanks to the logic layer.
+        correct main customer NID, thanks to the _logic layer.
         """
         customer = self._logic.get_customer_details(national_id)
         if customer:
             self._view.display_customer_details(customer)
 
     def check_status(self, raw_data: dict):
-        """Exposes the logic's status check method."""
+        """Exposes the _logic's status check method."""
         return self._logic.check_customer_status(raw_data)
 
     def save_current_customer(self, raw_data: dict):

@@ -6,7 +6,7 @@ from features.Invoice_Page_GAS.invoice_page_state_manager import WorkflowStateMa
 
 class DocumentSelectionController:
     def __init__(self, state_manager: WorkflowStateManager):
-        # The controller creates and owns the logic (presenter) and the view
+        # The controller creates and owns the _logic (presenter) and the view
         self._state_manager = state_manager
         self._logic = DocumentSelectionLogic()
         self._view = DocumentSelectionWidget(self._state_manager)

@@ -1,6 +1,6 @@
 """
 Controller layer for home page.
-Handles coordination between the view and business logic.
+Handles coordination between the view and business _logic.
 """
 from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtWidgets import QWidget
@@ -47,7 +47,7 @@ class HomePageController(QObject):
     context_menu_data = Signal(list)
 
     def __init__(self, logic: HomePageLogic, parent=None):
-        """Initialize controller with business logic dependency."""
+        """Initialize controller with business _logic dependency."""
         super().__init__(parent)
         self.logic = logic
         self.timer = None
@@ -309,7 +309,7 @@ class HomePageControllerFactory:
                                         invoices_db_path=invoices_database,
                                         services_db_path=services_database)
 
-        # Create business logic
+        # Create business _logic
         logic = HomePageLogic(repository)
 
         # Create controller

@@ -1,4 +1,4 @@
-# logic.py
+# _logic.py
 from features.Invoice_Page_GAS.customer_info_GAS.customer_info_models import Customer, Companion
 from features.Invoice_Page_GAS.customer_info_GAS.customer_info_repo import CustomerRepository
 
@@ -97,7 +97,7 @@ class CustomerLogic:
         if not nid or not raw_data.get('name') or not raw_data.get('phone'):
             raise ValueError("کدملی، نام و شماره تماس اجباری هستند.")
 
-        # (Add your other validation logic here for format, etc.)
+        # (Add your other validation _logic here for format, etc.)
 
         companions = [
             Companion(name=comp['name'], national_id=comp['national_id'])

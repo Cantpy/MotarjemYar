@@ -207,7 +207,7 @@ class HomePageView(QWidget):
 
             # Apply table settings
             if hasattr(self, 'invoices_table'):
-                # Set row count (this might need adjustment based on your data loading logic)
+                # Set row count (this might need adjustment based on your data loading _logic)
                 self.invoices_table.setRowCount(self.current_settings.row_count)
 
             # Update stats cards count

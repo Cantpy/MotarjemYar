@@ -1,6 +1,6 @@
 """
-Business logic layer for home page functionality.
-Contains all the business rules and data processing logic.
+Business _logic layer for home page functionality.
+Contains all the business rules and data processing _logic.
 """
 import jdatetime
 from typing import List, Tuple, Optional
@@ -16,7 +16,7 @@ from shared.database_models.invoices_models import IssuedInvoiceModel
 
 
 class HomePageLogic:
-    """Business logic for home page operations."""
+    """Business _logic for home page operations."""
 
     def __init__(self, repository: HomePageRepository):
         """Initialize with repository dependency."""

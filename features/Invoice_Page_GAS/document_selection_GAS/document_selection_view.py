@@ -212,7 +212,7 @@ class DocumentSelectionWidget(QWidget):
                 # Only send an update if the price has actually changed.
                 if new_price != invoice_item.total_price:
                     self.manual_item_updated.emit(invoice_item, new_price, invoice_item.remarks)
-                # If the user types invalid text, the logic layer won't be called,
+                # If the user types invalid text, the _logic layer won't be called,
                 # and the next full redraw will fix the cell's text automatically.
 
             except (ValueError, TypeError):

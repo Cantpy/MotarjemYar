@@ -295,7 +295,7 @@ class InvoicePreviewWidget(QFrame):
                 f"کد ملی: {to_persian_number(customer.national_id)} | تلفن: {to_persian_number(customer.phone)}")
             self.customer_address_label.setText(f"آدرس: {customer.address}")
 
-        # Visibility logic for the table container
+        # Visibility _logic for the table container
         if not items_on_page:
             self.table_container.setVisible(False)
         else:
@@ -306,7 +306,7 @@ class InvoicePreviewWidget(QFrame):
         # Calculate the starting row number for the current page
         start_row_num = 0
         if not is_first_page:
-            # This logic mirrors get_items_for_page to find the first item's index
+            # This _logic mirrors get_items_for_page to find the first item's index
             first_page_count = pagination_config['first_page_max_rows']
             other_page_count = pagination_config['other_page_max_rows']
 
@@ -460,10 +460,10 @@ class MainInvoicePreviewWidget(QWidget):
 
     def update_view(self, invoice, items_on_page, current_page, total_pages):
         """Public slot to refresh the entire display."""
-        # This is where the logic from your old controller's update_view goes.
+        # This is where the _logic from your old controller's update_view goes.
         # It calls self.invoice_preview.update_content(...)
         # and enables/disables the pagination buttons.
-        pagination_config = {  # This should ideally come from the logic layer
+        pagination_config = {  # This should ideally come from the _logic layer
             'one_page_max_rows': 12, 'first_page_max_rows': 24,
             'other_page_max_rows': 28, 'last_page_max_rows': 22
         }

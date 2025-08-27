@@ -8,7 +8,7 @@ from features.Invoice_Page_GAS.document_selection_GAS.document_selection_models 
 
 class MainWindowLogic(QObject):
     """
-    The 'brain' of the wizard. Contains all navigation and workflow logic.
+    The 'brain' of the wizard. Contains all navigation and workflow _logic.
     It knows nothing about UI elements, only about the controllers and state.
     """
 
@@ -59,7 +59,7 @@ class MainWindowLogic(QObject):
 
     def _handle_next_from_customer_info(self):
         customer_controller = self.controllers['customer']['controller']
-        raw_data = customer_controller.get_widget().get_current_data()
+        raw_data = customer_controller.get_view().get_current_data()
         status, customer_obj = customer_controller._logic.check_customer_status(raw_data)
         if status == CustomerStatus.NEW:
             reply = QMessageBox.question(self.view, "ذخیره مشتری",

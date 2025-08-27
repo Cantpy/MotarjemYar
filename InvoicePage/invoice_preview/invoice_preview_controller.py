@@ -18,7 +18,7 @@ from shared import show_warning_message_box, show_information_message_box, show_
 
 class InvoiceController:
     """
-    Manages the application flow, connecting the UI (View) with the business logic (Service).
+    Manages the application flow, connecting the UI (View) with the business _logic (Service).
     """
 
     def __init__(self, view: MainInvoiceWindow):
@@ -185,7 +185,7 @@ class InvoiceController:
         if not file_path:
             return  # User cancelled the dialog
 
-        # 4. Execute the actual save logic (for PDF or PNG)
+        # 4. Execute the actual save _logic (for PDF or PNG)
         if save_logic_func(file_path):
             # 5. If save was successful, update the path in the database
             if self.repo.update_invoice_path(invoice_number, file_path):
@@ -198,7 +198,7 @@ class InvoiceController:
             show_error_message_box(self.view, "خطا", f"خطا در ذخیره سازی فایل در مسیر:\n{file_path}")
 
     def _save_to_pdf_file(self, file_path: str) -> bool:
-        """Contains the specific logic to render and save a PDF."""
+        """Contains the specific _logic to render and save a PDF."""
         printer = QPrinter(QPrinter.HighResolution)
         printer.setOutputFormat(QPrinter.PdfFormat)
         printer.setOutputFileName(file_path)
@@ -208,7 +208,7 @@ class InvoiceController:
         return self._render_document(printer)
 
     def _save_to_png_file(self, file_path: str) -> bool:
-        """Contains the specific logic to render and save a PNG."""
+        """Contains the specific _logic to render and save a PNG."""
         widget_to_render = self.view.get_invoice_widget()
         pixmap = QPixmap(widget_to_render.size())
         widget_to_render.render(pixmap)

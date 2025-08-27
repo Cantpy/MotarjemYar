@@ -11,7 +11,7 @@ if __name__ == "__main__":
     # The main window which is the primary view
     main_window = MainInvoiceWindow()
 
-    # The controller that binds the view to the logic
+    # The controller that binds the view to the _logic
     controller = InvoiceController(main_window)
 
     main_window.show()

@@ -14,19 +14,19 @@ class InvoiceDetailsController:
         # Connect the layers
         self._logic.details_updated.connect(self._on_logic_updated)
 
-        # --- Connect the new, specific signals to the new logic slots ---
+        # --- Connect the new, specific signals to the new _logic slots ---
         self._view.percent_changed.connect(self._logic.on_percent_changed)
         self._view.amount_changed.connect(self._logic.on_amount_changed)
         self._view.other_input_changed.connect(self._logic.on_other_input_changed)
 
     def prepare_and_display_data(self, customer: Customer, items: list[InvoiceItem]):
         """Public method called by MainWindow to kick off this step."""
-        # Pass data to both the view (for static display) and the logic (for calculations)
+        # Pass data to both the view (for static display) and the _logic (for calculations)
         self._view.display_static_info(customer, self._logic._repo.get_office_info())
         self._logic.prepare_initial_details(customer, items)
 
     def _on_logic_updated(self, details):
-        """When logic recalculates, update the view and the global state."""
+        """When _logic recalculates, update the view and the global state."""
         self._view.update_display(details)
         self.state_manager.set_invoice_details(details)
 

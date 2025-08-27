@@ -12,11 +12,11 @@ from features.Invoice_Table_GAS.invoice_table_GAS_models import InvoiceData, Inv
 logger = logging.getLogger(__name__)
 
 
-# The MainController now creates the view and handles all logic.
+# The MainController now creates the view and handles all _logic.
 class MainController(QObject):
     """
     Main controller that coordinates all components for the invoice table feature.
-    It creates and manages the view, and connects UI signals to application logic.
+    It creates and manages the view, and connects UI signals to application _logic.
     """
 
     def __init__(self):

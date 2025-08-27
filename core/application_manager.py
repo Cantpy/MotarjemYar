@@ -483,7 +483,7 @@ class ApplicationManager:
     def set_spring_palette(self, app):
         """Apply spring theme palette"""
         try:
-            # Implement your spring palette logic here
+            # Implement your spring palette _logic here
             from modules.palettes import set_spring_palette
             set_spring_palette(app)
 

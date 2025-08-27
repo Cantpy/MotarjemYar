@@ -1,4 +1,4 @@
-# logic.py
+# _logic.py
 from features.Invoice_Page_GAS.invoice_preview_GAS.invoice_preview_models import (Invoice, Customer, TranslationOffice,
                                                                                   PreviewItem)
 from PySide6.QtCore import QObject
@@ -9,7 +9,7 @@ import math
 
 class InvoicePreviewLogic(QObject):
     """
-    Handles business logic related to invoices, such as pagination and data preparation.
+    Handles business _logic related to invoices, such as pagination and data preparation.
     """
 
     def __init__(self, state_manager):

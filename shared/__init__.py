@@ -56,10 +56,6 @@ from shared.dialogs.status_change_dialog import StatusChangeDialog
 
 from shared.context.user_context import UserContext
 
-from shared.calendar.PersianCalendar import CalendarDialog, PersianCalendarWidget
-from shared.calendar.BirthdayCalendar import BirthdayPopup, BirthdayPickerLineEdit
-from shared.calendar.CalendadrPopup import DatePickerLineEdit
-
 from shared.entities.common_entities import InvoiceDetailsEntity, InvoiceDocumentsEntity, ServicesEntity, CustomerEntity
 
 
@@ -89,9 +85,6 @@ __all__ = [
     "LanguageDialog", "NotificationDialog", "RichTextEdit", "StatusChangeDialog",
     # user context
     "UserContext",
-    # calendar
-    "CalendarDialog", "PersianCalendarWidget",
-    "BirthdayPopup", "BirthdayPickerLineEdit", "DatePickerLineEdit",
     # entities
     "InvoiceDetailsEntity", "InvoiceDocumentsEntity", "ServicesEntity", "CustomerEntity"
 ]

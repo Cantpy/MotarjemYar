@@ -1,4 +1,4 @@
-# invoice_details/logic.py
+# invoice_details/_logic.py
 from PySide6.QtCore import QObject, Signal
 from features.Invoice_Page_GAS.invoice_details_GAS.invoice_details_repo import InvoiceDetailsRepository
 from features.Invoice_Page_GAS.invoice_details_GAS.invoice_details_models import InvoiceDetails

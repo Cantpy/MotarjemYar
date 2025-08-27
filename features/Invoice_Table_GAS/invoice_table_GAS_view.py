@@ -133,7 +133,7 @@ class InvoiceTableView(QWidget):
         try:
             QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
         except Exception as e:
-            # Although the view is dumb, this is pure UI logic.
+            # Although the view is dumb, this is pure UI _logic.
             # A more advanced setup might involve a "show error" signal.
             print(f"Error opening PDF from view: {e}")
 

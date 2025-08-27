@@ -296,7 +296,7 @@ class InvoicePreviewWidget(QFrame):
                 f"کد ملی: {to_persian_number(customer.national_id)} | تلفن: {to_persian_number(customer.phone)}")
             self.customer_address_label.setText(f"آدرس: {customer.address}")
 
-        # Visibility logic for the table container
+        # Visibility _logic for the table container
         if not items_on_page:
             self.table_container.setVisible(False)
         else:
@@ -307,7 +307,7 @@ class InvoicePreviewWidget(QFrame):
         # Calculate the starting row number for the current page
         start_row_num = 0
         if not is_first_page:
-            # This logic mirrors get_items_for_page to find the first item's index
+            # This _logic mirrors get_items_for_page to find the first item's index
             first_page_count = pagination_config['first_page_max_rows']
             other_page_count = pagination_config['other_page_max_rows']
 
