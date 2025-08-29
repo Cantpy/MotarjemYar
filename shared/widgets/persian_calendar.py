@@ -208,10 +208,21 @@ class BirthdayPicker(DatePicker):
         self.setPlaceholderText("تاریخ تولد را انتخاب کنید")
         self.popup = CalendarPopup(self, year_range_past=90)
         self.popup.selection_made.connect(self.set_date)
+        self._selected_date = None
 
     def set_date(self, date_obj):
         if isinstance(date_obj, jdatetime.date):
+            self._selected_date = date_obj
             self.setText(to_persian_number(date_obj.strftime("%Y/%m/%d")))
+
+    def get_date(self):
+        """
+        Returns the selected date as a datetime.date (Gregorian).
+        If no date is selected, returns None.
+        """
+        if self._selected_date is None:
+            return None
+        return self._selected_date.togregorian()
 
 
 class InvoiceDatePicker(DatePicker):

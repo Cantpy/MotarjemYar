@@ -1,69 +1,78 @@
-# Admin_Panel/wage_calculator/wage_calculator_controller.py
+# motarjemyar/wage_calculator/wage_calculator_controller.py
 
-from .wage_calculator_view import WageCalculatorView
-from .wage_calculator_logic import WageCalculatorLogic
-from .wage_calculator_models import EmployeeData
-import jdatetime  # For Jalali date handling
+import jdatetime
+from PySide6.QtWidgets import QMessageBox, QDialog
+from features.Admin_Panel.wage_calculator.wage_calculator_view import WageCalculatorView, OvertimeInputDialog
+from features.Admin_Panel.wage_calculator.wage_calculator_logic import WageCalculatorLogic
 
 
 class WageCalculatorController:
     def __init__(self, view: WageCalculatorView, logic: WageCalculatorLogic):
         self._view = view
         self._logic = logic
-        self._current_employee_for_calc: EmployeeData | None = None
-
-        # --- NEW: Manage selected date state ---
         today = jdatetime.date.today()
         self._current_year = today.year
         self._current_month = today.month
 
-        # Connect signals
-        self._view.calculation_requested.connect(self._on_calculation_requested)
-        self._view.perform_calculation_requested.connect(self._perform_calculation)
-        self._view.month_changed.connect(self._on_month_changed)
+        self._view.period_changed.connect(self._on_period_changed)
+        self._view.run_payroll_requested.connect(self._on_run_payroll_requested)
+        self._view.employee_selected.connect(self._on_employee_selected)
 
-        self.load_page_data()  # Changed from load_initial_data
-
-    def load_page_data(self):
-        """Loads all data for the payroll tab based on the current state."""
-        try:
-            # --- Load data based on the selected month and year ---
-            stats_data = self._logic.get_payroll_stats_for_month(self._current_year, self._current_month)
-            self._view.update_payroll_stats(stats_data)
-
-            # --- These are now considered general info, not month-specific ---
-            employees = self._logic.get_all_employees_for_display()
-            self._view.populate_employee_table(employees)
-
-            summary_data = self._logic.get_role_summary_data()
-            self._view.update_role_summary(summary_data)
-        except Exception as e:
-            print(f"Error loading wage data: {e}")
-
-    def _on_month_changed(self, month: int):
-        """Updates the state and triggers a full data refresh."""
-        self._current_month = month
         self.load_page_data()
 
-    def _on_calculation_requested(self, employee: EmployeeData):
-        """Stores the selected employee and tells the view to show the correct panel."""
-        self._current_employee_for_calc = employee
-        self._view.show_calculation_panel(employee)
-
-    def _perform_calculation(self, inputs: dict):
-        """Takes inputs from the view and calls the logic to get the result."""
-        if not self._current_employee_for_calc:
-            return
-
+    def load_page_data(self):
         try:
-            result = self._logic.calculate_wage(self._current_employee_for_calc.user_id, inputs)
-            self._view.display_calculation_result(result)
+            records = self._logic.get_payroll_run_summary(self._current_year, self._current_month)
+            print(f"records: {records}")  # Debugging line
+            self._view.populate_table(records)
         except Exception as e:
-            print(f"Error during wage calculation: {e}")
-            # Optionally show an error message in the UI
+            QMessageBox.critical(self._view, "خطا", f"خطایی در بارگذاری اطلاعات حقوق رخ داد:\n{e}")
+
+    def _on_period_changed(self, period: dict):
+        self._current_year = period['year']
+        self._current_month = period['month']
+        self.load_page_data()
+
+    def _on_run_payroll_requested(self):
+        """
+        Handles the entire 'Run Payroll' workflow.
+        This is the correct location for this logic.
+        """
+        try:
+            # 1. Get the full list of employees from the logic layer.
+            employees = self._logic.get_employee_list()
+
+            # 2. Perform validation within the controller.
+            if not employees:
+                QMessageBox.warning(self._view, "هشدار", "هیچ کارمند فعالی برای محاسبه حقوق وجود ندارد.")
+                return
+
+            # 3. Create and show the dialog to get overtime hours.
+            dialog = OvertimeInputDialog(employees, self._view)
+            if dialog.exec() == QDialog.Accepted:
+                overtime_data = dialog.get_overtime_data()
+
+                # 4. Execute the pay run with the collected data.
+                self._logic.execute_pay_run(self._current_year, self._current_month, overtime_data)
+
+                # 5. Refresh the page to show the new results.
+                self.load_page_data()
+                QMessageBox.information(self._view, "موفقیت",
+                                        "محاسبه حقوق برای دوره انتخابی با موفقیت انجام و ذخیره شد.")
+
+        except Exception as e:
+            QMessageBox.critical(self._view, "خطا", f"خطایی در حین اجرای محاسبه حقوق رخ داد:\n{e}")
+
+    def _on_employee_selected(self, payroll_id: str):
+        try:
+            details = self._logic.get_payslip_details(payroll_id)
+            if details:
+                self._view.display_payslip_details(details)
+        except Exception as e:
+            QMessageBox.critical(self._view, "خطا", f"خطایی در نمایش جزئیات فیش حقوقی رخ داد:\n{e}")
 
     def get_view(self):
         """
-        Returns the associated view for embedding in the main window.
+        Returns the associated view instance.
         """
         return self._view

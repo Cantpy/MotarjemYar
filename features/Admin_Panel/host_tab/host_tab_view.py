@@ -18,6 +18,10 @@ from features.Admin_Panel.wage_calculator.wage_calculator_controller import Wage
 from features.Admin_Panel.wage_calculator.wage_calculator_view import WageCalculatorView
 from features.Admin_Panel.wage_calculator.wage_calculator_logic import WageCalculatorLogic
 from features.Admin_Panel.wage_calculator.wage_calculator_repo import WageCalculatorRepository
+from features.Admin_Panel.employee_management.employee_management_controller import UserManagementController
+from features.Admin_Panel.employee_management.employee_management_view import UserManagementView
+from features.Admin_Panel.employee_management.employee_management_logic import UserManagementLogic
+from features.Admin_Panel.employee_management.employee_management_repo import EmployeeManagementRepository
 from shared.fonts.font_manager import FontManager
 
 
@@ -80,7 +84,6 @@ class AdminMainWindow(QMainWindow):
         repo = WageCalculatorRepository()
         logic = WageCalculatorLogic(repo,
                                     self.InvoicesSession,
-                                    self.UsersSession,
                                     self.PayrollSession)
         self.wage_controller = WageCalculatorController(view, logic)  # Compose with dependencies
         wage_view = self.wage_controller.get_view()
@@ -103,10 +106,15 @@ class AdminMainWindow(QMainWindow):
         self.tab_widget.addTab(reports_view, reports_icon, "گزارشات")
 
     def _setup_user_management_tab(self):
-        management_placeholder = QLabel("مدیر کاربران جدید در حال ساخت است...")
-        management_placeholder.setAlignment(Qt.AlignCenter)
+        view = UserManagementView()
+        repo = EmployeeManagementRepository()
+        logic = UserManagementLogic(repo,
+                                    self.UsersSession,
+                                    self.PayrollSession)
+        self.users_controller = UserManagementController(view, logic)
+        users_view = self.users_controller.get_view()
         dashboard_icon = qta.icon('fa5s.user-alt', color='black')
-        self.tab_widget.addTab(management_placeholder, dashboard_icon, "مدیریت کاربران")
+        self.tab_widget.addTab(users_view, dashboard_icon, "مدیریت کاربران")
 
     def _setup_settings_tab(self):
         dashboard_placeholder = QLabel("تنظیمات جدید در حال ساخت است...")

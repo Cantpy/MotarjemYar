@@ -38,4 +38,7 @@ class AdminDashboardController:
         dialog.exec()
 
     def get_view(self):
+        """
+        Returns the associated view for embedding in the main window.
+        """
         return self._view

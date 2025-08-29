@@ -7,17 +7,15 @@ from sqlalchemy import create_engine, StaticPool
 from sqlalchemy.orm import sessionmaker
 
 # --- Component Imports ---
-# Import the main window, which acts as the application's composition root
 from features.Admin_Panel.host_tab.host_tab_view import AdminMainWindow
 from shared.fonts.font_manager import FontManager
 from shared.mock_data.mock_data_generator import create_mock_data
 
 # --- Configuration and Model Imports ---
-# Import the database URL constants
 from shared.assets import (
     INVOICES_DB_URL, CUSTOMERS_DB_URL, SERVICES_DB_URL, EXPENSES_DB_URL, USERS_DB_URL, PAYROLL_DB_URL
 )
-# Import all Base classes required to create the database tables
+# --- Import ALL Base classes ---
 from shared.database_models.invoices_models import BaseInvoices
 from shared.database_models.customer_models import BaseCustomers
 from shared.database_models.services_models import BaseServices
@@ -36,33 +34,26 @@ def setup_database_sessions(is_demo: bool, urls: dict):
     """
     engines = {}
     connect_args = {"check_same_thread": False}
+    all_bases = {
+        'invoices': BaseInvoices, 'customers': BaseCustomers, 'services': BaseServices,
+        'expenses': BaseExpenses, 'users': BaseUsers, 'payroll': BasePayroll  # <-- Add payroll
+    }
 
     for key, url in urls.items():
         if is_demo:
-            # For in-memory, use a StaticPool to keep the DB alive on one connection
             engines[key] = create_engine(f"sqlite:///{url}", connect_args=connect_args, poolclass=StaticPool)
         else:
-            # For file-based DB, the default pool is fine
             engines[key] = create_engine(f"sqlite:///{url}")
 
-    # --- Create all tables on their respective engines ---
-    # This ensures tables exist before any data is accessed.
-    BaseInvoices.metadata.create_all(engines['invoices'])
-    BaseCustomers.metadata.create_all(engines['customers'])
-    BaseServices.metadata.create_all(engines['services'])
-    BaseExpenses.metadata.create_all(engines['expenses'])
-    BaseUsers.metadata.create_all(engines['users'])
-    BasePayroll.metadata.create_all(engines['payroll'])
+        if key in all_bases:
+            # This will now create the 'employees' table on the payroll engine
+            all_bases[key].metadata.create_all(engines[key])
 
-    # --- Create Session Factories ---
-    InvoicesSession = sessionmaker(bind=engines['invoices'])
-    CustomersSession = sessionmaker(bind=engines['customers'])
-    ServicesSession = sessionmaker(bind=engines['services'])
-    ExpensesSession = sessionmaker(bind=engines['expenses'])
-    UsersSession = sessionmaker(bind=engines['users'])
-    PayrollSession = sessionmaker(bind=engines['payroll'])
-
-    return InvoicesSession, CustomersSession, ServicesSession, ExpensesSession, UsersSession, PayrollSession
+    sessions = {key: sessionmaker(bind=engine) for key, engine in engines.items()}
+    return (
+        sessions.get('invoices'), sessions.get('customers'), sessions.get('services'),
+        sessions.get('expenses'), sessions.get('users'), sessions.get('payroll')
+    )
 
 
 if __name__ == "__main__":
@@ -100,7 +91,7 @@ if __name__ == "__main__":
         db_urls['payroll'] = os.path.join(BASE_DIR, PAYROLL_DB_URL)
 
     # --- Setup Databases and Get Session Factories ---
-    (InvoicesSession, CustomersSession, ServicesSession, ExpensesSession, UsersSession, PayRollSession) = \
+    (InvoicesSession, CustomersSession, ServicesSession, ExpensesSession, UsersSession, PayrollSession) = \
         setup_database_sessions(is_demo_mode, db_urls)
 
     # --- Populate Databases with Mock Data ---
@@ -110,16 +101,16 @@ if __name__ == "__main__":
             ServicesSession() as srv_session, \
             ExpensesSession() as exp_session, \
             UsersSession() as usr_session, \
-            PayRollSession() as prl_session:
+            PayrollSession() as prl_session:
 
         # --- FIX: Pass all required sessions to the mock data function ---
         create_mock_data(
-            invoices_session=inv_session,
-            customers_session=cust_session,
-            services_session=srv_session,
-            expenses_session=exp_session,
-            users_session=usr_session,
-            payroll_session=prl_session
+            invoices_session_factory=InvoicesSession,
+            customers_session_factory=CustomersSession,
+            services_session_factory=ServicesSession,
+            expenses_session_factory=ExpensesSession,
+            users_session_factory=UsersSession,
+            payroll_session_factory=PayrollSession
         )
 
     # --- Create and Show the Main Window ---
@@ -130,7 +121,7 @@ if __name__ == "__main__":
         services_session_factory=ServicesSession,
         expenses_session_factory=ExpensesSession,
         users_session_factory=UsersSession,
-        payroll_session_factory=PayRollSession
+        payroll_session_factory=PayrollSession
     )
     window.show()
 

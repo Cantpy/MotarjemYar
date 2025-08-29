@@ -1,262 +1,174 @@
 # Admin_Panel/wage_calculator/wage_calculator_view.py
 
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame, QTableWidget,
-                               QHeaderView, QTableWidgetItem, QGridLayout, QSpinBox, QGroupBox, QFormLayout,
-                               QComboBox)
-from PySide6.QtCore import Qt, Signal, QDate
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
+                               QFrame, QTableWidget, QHeaderView, QTableWidgetItem,
+                               QComboBox, QDialog, QSpinBox, QDialogButtonBox)
+from PySide6.QtCore import Qt, Signal
 import qtawesome as qta
-from shared.widgets.custom_widgets import create_stat_card
-from shared.widgets.persian_calendar import DataDatePicker      # Using your custom date picker
+import jdatetime
 from shared.fonts.font_manager import FontManager
-from .wage_calculator_models import EmployeeData, PayrollStats, RoleSummaryData
-from shared import to_persian_number
-import jdatetime  # For getting the current Jalali month
+from shared.utils.persian_tools import to_persian_numbers, to_english_numbers
+from features.Admin_Panel.wage_calculator.wage_calculator_models import PayrollRunEmployee, PayslipDetail
+from features.Admin_Panel.wage_calculator.wage_calculator_styles import WAGE_CALCULATOR_STYLES
+
+
+class OvertimeInputDialog(QDialog):
+    """A simple dialog to get overtime hours for all employees before a pay run."""
+
+    def __init__(self, employees: list, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("ورود ساعات اضافه کار")
+        self.layout = QVBoxLayout(self)
+        self.spinboxes = {}
+        for emp in employees:
+            label = QLabel(emp.full_name)
+            spinbox = QSpinBox(maximum=100)
+            self.spinboxes[emp.employee_id] = spinbox
+            row = QHBoxLayout()
+            row.addWidget(label)
+            row.addStretch()
+            row.addWidget(spinbox)
+            self.layout.addLayout(row)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        self.layout.addWidget(buttons)
+
+    def get_overtime_data(self) -> dict:
+        return {emp_id: sb.value() for emp_id, sb in self.spinboxes.items()}
 
 
 class WageCalculatorView(QWidget):
-    calculation_requested = Signal(EmployeeData)
-    perform_calculation_requested = Signal(dict)
-    month_changed = Signal(int)  # Emits the month number (1-12)
+    """
+    The main view for the Wage Calculator feature.
+    """
+    period_changed = Signal(dict)
+    run_payroll_requested = Signal()
+    employee_selected = Signal(str)
+    print_payslip_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._current_calc_payment_type = None
+        self.setObjectName("WageCalculatorView")
+        self._employee_data_map = {}
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(20, 20, 20, 20)
         main_layout.setSpacing(15)
 
-        # --- 1. Title ---
-        title_layout = QHBoxLayout()
-        title_icon = QLabel()
-        title_icon.setPixmap(qta.icon('fa5s.money-check-alt', color='#28a745').pixmap(48, 48))
-        title_label = QLabel("محاسبه حقوق و دستمزد")
-        title_label.setFont(FontManager.get_font(size=18, bold=True))
-        title_layout.addWidget(title_icon)
-        title_layout.addWidget(title_label)
-        title_layout.addStretch()
-        main_layout.addLayout(title_layout)
+        top_bar_layout = QHBoxLayout()
+        today = jdatetime.date.today()
+        self.year_combo = QComboBox()
+        self.year_combo.addItems([to_persian_numbers(y) for y in range(today.year - 2, today.year + 2)])
+        self.year_combo.setCurrentText(to_persian_numbers(today.year))
 
         self.month_combo = QComboBox()
-        persian_months = [
-            "فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور",
-            "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"
-        ]
-        for i, name in enumerate(persian_months, 1):
-            self.month_combo.addItem(name, i)
+        self.month_combo.addItems(
+            ["فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور", "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"])
+        self.month_combo.setCurrentIndex(today.month - 1)
 
-        # Set to current Jalali month
-        current_j_month = jdatetime.date.today().month
-        self.month_combo.setCurrentIndex(current_j_month - 1)
+        self.run_payroll_btn = QPushButton("اجرای محاسبه حقوق")
+        self.run_payroll_btn.setIcon(qta.icon('fa5s.cogs', color='white'))
+        self.run_payroll_btn.setObjectName("runPayrollButton")
 
-        title_layout.addWidget(title_icon)
-        title_layout.addWidget(title_label)
-        title_layout.addStretch()
-        title_layout.addWidget(QLabel("برای ماه:"))
-        title_layout.addWidget(self.month_combo)
-        main_layout.addLayout(title_layout)
+        top_bar_layout.addWidget(QLabel("دوره پرداخت:"))
+        top_bar_layout.addWidget(self.year_combo)
+        top_bar_layout.addWidget(self.month_combo)
+        top_bar_layout.addStretch()
+        top_bar_layout.addWidget(self.run_payroll_btn)
+        main_layout.addLayout(top_bar_layout)
 
-        self.month_combo.currentIndexChanged.connect(self._on_month_changed)
-
-        # --- 2. Stat Cards ---
-        stats_layout = QGridLayout()
-        self.card_total_employees = create_stat_card("کل کارکنان فعال", "#17a2b8")
-        self.card_total_payroll = create_stat_card("کل حقوق ماه (تخمینی)", "#d9534f")
-        self.card_avg_salary = create_stat_card("میانگین حقوق (تخمینی)", "#ffc107")
-        stats_layout.addWidget(self.card_total_employees, 0, 0)
-        stats_layout.addWidget(self.card_total_payroll, 0, 1)
-        stats_layout.addWidget(self.card_avg_salary, 0, 2)
-        main_layout.addLayout(stats_layout)
-
-        # --- 3. Main Area: Table and Calculation Panel ---
         main_area_layout = QHBoxLayout()
         main_layout.addLayout(main_area_layout, 1)
 
         self.employee_table = QTableWidget()
-        self.employee_table.setColumnCount(5)
-        self.employee_table.setHorizontalHeaderLabels(["نام کامل", "نقش", "نوع پرداخت", "جزئیات پرداخت", ""])
+        self.employee_table.setColumnCount(4)
+        self.employee_table.setHorizontalHeaderLabels(["نام کارمند", "درآمد ناخالص", "خالص پرداختی", "وضعیت"])
+        self.employee_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.employee_table.setSelectionMode(QTableWidget.SingleSelection)
         self.employee_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         main_area_layout.addWidget(self.employee_table, 2)
 
-        self.calc_panel = QFrame()
-        self.calc_panel.setFrameShape(QFrame.StyledPanel)
-        self.calc_panel.setVisible(False)
-        self.calc_panel_layout = QVBoxLayout(self.calc_panel)
-        main_area_layout.addWidget(self.calc_panel, 1)
+        self.payslip_panel = self._create_payslip_panel()
+        self.payslip_panel.setVisible(False)
+        main_area_layout.addWidget(self.payslip_panel, 1)
 
-        # --- 4. Bottom Summary Section ---
-        summary_container = QGroupBox("خلاصه وضعیت نقش‌ها")
-        summary_container.setFont(FontManager.get_font(size=12, bold=True))
-        summary_layout = QHBoxLayout(summary_container)  # Use QHBoxLayout for side-by-side boxes
-        main_layout.addWidget(summary_container)
+        self.year_combo.currentIndexChanged.connect(self._on_period_changed)
+        self.month_combo.currentIndexChanged.connect(self._on_period_changed)
+        self.run_payroll_btn.clicked.connect(self._on_run_payroll_btn_clicked)
+        self.employee_table.itemSelectionChanged.connect(self._on_employee_selected)
 
-        # A dictionary to hold the widgets for each role for easy updating
-        self.summary_widgets = {}
+        self.setStyleSheet(WAGE_CALCULATOR_STYLES)
 
-        # Define the roles and their associated icons
-        roles_to_display = {
-            "admin": {"title": "مدیران", "icon": "fa5s.user-shield"},
-            "clerk": {"title": "کارمندان", "icon": "fa5s.user-edit"},
-            "translator": {"title": "مترجمان", "icon": "fa5s.language"},
-            "accountant": {"title": "حسابداران", "icon": "fa5s.file-invoice-dollar"}
-        }
-
-        for key, info in roles_to_display.items():
-            role_box, labels = self._create_role_summary_box(info['title'], info['icon'])
-            summary_layout.addWidget(role_box)
-            self.summary_widgets[key] = labels
-
-    def _create_role_summary_box(self, title: str, icon_name: str) -> tuple[QGroupBox, dict]:
-        """Factory method to create a single styled summary groupbox."""
-        box = QGroupBox()
-
-        # Main layout for the box
-        layout = QVBoxLayout(box)
-        layout.setSpacing(10)
-
-        # Header with icon and title
-        header_layout = QHBoxLayout()
-        icon_label = QLabel()
-        icon_label.setPixmap(qta.icon(icon_name, color='#555').pixmap(24, 24))
-        title_label = QLabel(title)
-        title_label.setFont(FontManager.get_font(size=12, bold=True))
-        title_label.setStyleSheet("color: #333;")
-        header_layout.addWidget(icon_label)
-        header_layout.addWidget(title_label)
-        header_layout.addStretch()
-        layout.addLayout(header_layout)
-
-        # Form layout for the data
-        form_layout = QFormLayout()
-        form_layout.setContentsMargins(10, 5, 10, 5)
-        form_layout.setSpacing(8)
-
-        count_label = QLabel("...")
-        total_label = QLabel("...")
-        average_label = QLabel("...")
-
-        form_layout.addRow("تعداد کارکنان:", count_label)
-        form_layout.addRow("جمع حقوق پایه:", total_label)
-        form_layout.addRow("میانگین حقوق پایه:", average_label)
-        layout.addLayout(form_layout)
-
-        # Return the box and a dictionary of its labels for easy access
-        labels = {"count": count_label, "total": total_label, "average": average_label}
-        return box, labels
-
-    def populate_employee_table(self, employees: list[EmployeeData]):
-        self.employee_table.clearContents()
-        self.employee_table.setRowCount(len(employees))
-        for row, emp in enumerate(employees):
-            self.employee_table.setItem(row, 0, QTableWidgetItem(emp.full_name))
-            self.employee_table.setItem(row, 1, QTableWidgetItem(emp.role))
-            self.employee_table.setItem(row, 2, QTableWidgetItem(emp.payment_type))
-            self.employee_table.setItem(row, 3, QTableWidgetItem(emp.payment_detail))
-
-            calc_btn = QPushButton("محاسبه")
-            calc_btn.clicked.connect(lambda chk, e=emp: self.calculation_requested.emit(e))
-            self.employee_table.setCellWidget(row, 4, calc_btn)
-
-    def show_calculation_panel(self, employee: EmployeeData):
-        """Dynamically builds the calculation input panel."""
-        self._clear_layout(self.calc_panel_layout)
-
-        # --- FIX: Store the payment type as the current context ---
-        self._current_calc_payment_type = employee.payment_type
-
-        title = QLabel(f"<b>محاسبه برای: {employee.full_name}</b>")
-        self.calc_panel_layout.addWidget(title)
-
-        form_layout = QFormLayout()
-        if employee.payment_type == 'Fixed':
-            self.overtime_input = QSpinBox(maximum=100)
-            self.children_input = QSpinBox(maximum=10)
-            form_layout.addRow("ساعات اضافه کار:", self.overtime_input)
-            form_layout.addRow("تعداد فرزندان:", self.children_input)
-        elif employee.payment_type == 'Commission':
-            self.start_date_input = DataDatePicker()
-            self.end_date_input = DataDatePicker()
-            form_layout.addRow("از تاریخ:", self.start_date_input)
-            form_layout.addRow("تا تاریخ:", self.end_date_input)
-
-        self.calc_panel_layout.addLayout(form_layout)
-
-        self.result_details_label = QLabel("...")
-        self.result_total_label = QLabel("<b>جمع نهایی: ...</b>")
-        self.calc_panel_layout.addWidget(self.result_details_label)
-        self.calc_panel_layout.addWidget(self.result_total_label)
-
-        confirm_btn = QPushButton("محاسبه کن")
-        confirm_btn.clicked.connect(lambda: self.perform_calculation_requested.emit(self.get_calculation_inputs()))
-        self.calc_panel_layout.addWidget(confirm_btn)
-        self.calc_panel_layout.addStretch()
-
-        self.calc_panel.setVisible(True)
-
-    def get_calculation_inputs(self) -> dict:
-        """Reads values from the panel based on the stored context."""
-        inputs = {}
-        # --- FIX: Use the stored state variable, not hasattr ---
-        # This is a robust check that is guaranteed to be correct.
-        if self._current_calc_payment_type == 'Fixed':
-            inputs['overtime_hours'] = self.overtime_input.value()
-            inputs['num_children'] = self.children_input.value()
-        elif self._current_calc_payment_type == 'Commission':
-            start_date = self.start_date_input.get_date()
-            end_date = self.end_date_input.get_date()
-            inputs['start_date'] = start_date
-            inputs['end_date'] = end_date
-        return inputs
-
-    def display_calculation_result(self, result):
-        self.result_details_label.setText(result.details)
-        self.result_total_label.setText(f"<b>جمع نهایی: {result.total_wage:,.0f} تومان</b>")
-
-    def update_payroll_stats(self, stats: PayrollStats):
-        """Updates the top-level KPI cards."""
-        self.card_total_employees.findChild(QLabel, "statValue").setText(
-            to_persian_number(stats.total_employees) + " نفر"
-        )
-        self.card_total_payroll.findChild(QLabel, "statValue").setText(
-            f"{to_persian_number(f'{stats.total_payroll_month:,.0f}')} تومان"
-        )
-        self.card_avg_salary.findChild(QLabel, "statValue").setText(
-            f"{to_persian_number(f'{stats.average_salary_month:,.0f}')} تومان"
-        )
-
-    def update_role_summary(self, summary_data: list[RoleSummaryData]):
+    def _create_payslip_panel(self) -> QFrame:
         """
-        Updates the four summary groupboxes with calculated data.
+        Creates the right-side panel to display detailed payslip information.
         """
-        for data_item in summary_data:
-            role_key = data_item.role_key
-            if role_key in self.summary_widgets:
-                labels = self.summary_widgets[role_key]
+        panel = QFrame()
+        panel.setObjectName("payslipPanel")
+        panel.setFrameShape(QFrame.Shape.StyledPanel)
+        layout = QVBoxLayout(panel)
+        self.payslip_name = QLabel()
+        self.payslip_period = QLabel()
+        self.payslip_details = QLabel()
+        self.payslip_details.setWordWrap(True)
+        self.print_btn = QPushButton(" چاپ فیش")
+        self.print_btn.setIcon(qta.icon('fa5s.print'))
+        self.print_btn.clicked.connect(self.print_payslip_requested)
+        layout.addWidget(self.payslip_name)
+        layout.addWidget(self.payslip_period)
+        layout.addWidget(self.payslip_details, 1)
+        layout.addWidget(self.print_btn)
+        return panel
 
-                labels['count'].setText(to_persian_number(data_item.count))
+    def _on_period_changed(self):
+        """
+        A simple handler method that just emits the signal to the controller.
+        """
+        year = int(to_english_numbers(self.year_combo.currentText()))
+        month = self.month_combo.currentIndex() + 1
+        self.period_changed.emit({"year": year, "month": month})
+        self.payslip_panel.setVisible(False)
 
-                if data_item.count == 0:
-                    labels['total'].setText("-")
-                    labels['average'].setText("-")
-                elif data_item.total_salary > 0:
-                    labels['total'].setText(f"{to_persian_number(f'{data_item.total_salary:,.0f}')} تومان")
-                    labels['average'].setText(f"{to_persian_number(f'{data_item.average_salary:,.0f}')} تومان")
-                else:
-                    labels['total'].setText("مبتنی بر کمیسیون")
-                    labels['average'].setText("مبتنی بر کمیسیون")
+    def _on_run_payroll_btn_clicked(self):
+        """
+        A simple handler method that just emits the signal to the controller.
+        It contains no complex logic.
+        """
+        self.run_payroll_requested.emit()
 
-    def _clear_layout(self, layout):
-        """Removes and deletes all widgets from a layout."""
-        while layout.count():
-            item = layout.takeAt(0)
-            widget = item.widget()
-            if widget is not None:
-                widget.deleteLater()
-            # If the item is a layout, recursively clear it
-            elif item.layout() is not None:
-                self._clear_layout(item.layout())
+    def _on_employee_selected(self):
+        """
+        A simple handler method that just emits the signal to the controller.
+        """
+        selected_row = self.employee_table.currentRow()
+        if selected_row < 0:
+            return
+        record = self._employee_data_map.get(selected_row)
+        if record:
+            self.employee_selected.emit(record.payroll_id)
 
-    def _on_month_changed(self):
-        """Emits the new month's data when the user changes the selection."""
-        month_data = self.month_combo.currentData()
-        if month_data:
-            self.month_changed.emit(month_data)
+    def populate_table(self, records: list[PayrollRunEmployee]):
+        """
+        Populates the main employee table with payroll summary data.
+        """
+        self._employee_data_map = {row: rec for row, rec in enumerate(records)}
+        self.employee_table.setRowCount(len(records))
+        for row, rec in enumerate(records):
+            self.employee_table.setItem(row, 0, QTableWidgetItem(rec.full_name))
+            self.employee_table.setItem(row, 1, QTableWidgetItem(to_persian_numbers(f"{rec.gross_income:,.0f}")))
+            self.employee_table.setItem(row, 2, QTableWidgetItem(to_persian_numbers(f"{rec.net_income:,.0f}")))
+            self.employee_table.setItem(row, 3, QTableWidgetItem(rec.status))
+
+    def display_payslip_details(self, payslip: PayslipDetail):
+        """
+        Displays the detailed payslip information in the side panel.
+        """
+        self.payslip_name.setText(f"<b>{payslip.employee_name}</b>")
+        self.payslip_period.setText(to_persian_numbers(payslip.pay_period_str))
+        details_html = ""
+        for comp in payslip.components:
+            sign = "" if comp.type == 'Earning' else "-"
+            details_html += f"<b>{comp.name}:</b> {sign}{to_persian_numbers(f'{comp.amount:,.0f}')}<br>"
+        self.payslip_details.setText(details_html)
+        self.payslip_panel.setVisible(True)
