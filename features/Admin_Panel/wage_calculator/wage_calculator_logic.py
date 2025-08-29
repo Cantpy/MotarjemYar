@@ -7,7 +7,7 @@ import jdatetime
 
 getcontext().prec = 18
 
-from features.Admin_Panel.wage_calculator.wage_calculator_models import (PayrollRunEmployee, PayslipDetail,
+from features.Admin_Panel.wage_calculator.wage_calculator_models import (PayrollRunEmployee, PayslipData,
                                                                          PayrollComponent, EmployeeInfo)
 from features.Admin_Panel.wage_calculator.wage_calculator_repo import WageCalculatorRepository
 from shared.database_models.payroll_models import (EmployeeModel, PayrollRecordModel, PayrollComponentDetailModel,
@@ -35,10 +35,8 @@ class WageCalculatorLogic:
     def get_payroll_run_summary(self, year: int, month: int) -> list[PayrollRunEmployee]:
         """Fetches the summary of a pay run for the main table."""
         start_date, end_date = self._get_jalali_month_range(year, month)
-        print(f"Fetching payroll summary for period: {start_date} to {end_date}")  # Debugging line
         with self.PayrollSession() as session:
             records = self._repo.get_payroll_run_for_period(session, start_date, end_date)
-            print(f"Fetched {len(records)} records from payroll.db")  # Debugging line
             return [
                 PayrollRunEmployee(
                     payroll_id=rec.payroll_id, employee_id=rec.employee_id,
@@ -48,20 +46,32 @@ class WageCalculatorLogic:
                 ) for rec in records
             ]
 
-    def get_payslip_details(self, payroll_id: str) -> PayslipDetail:
-        """Fetches the full details of a single, saved payslip for the side panel."""
+    def get_payslip_data_for_preview(self, payroll_id: str) -> PayslipData:
+        """
+        Fetches a saved PayrollRecord and converts it into a clean PayslipData DTO
+        for the preview dialog to display.
+        """
         with self.PayrollSession() as session:
             record = self._repo.get_detailed_payslip_by_id(session, payroll_id)
-            if not record: return None
+            if not record:
+                raise ValueError(f"فیش حقوقی با شناسه {payroll_id} یافت نشد.")
 
-            components = sorted(
-                [PayrollComponent(name=d.salary_component.name, type=d.salary_component.type, amount=d.amount_tomans)
-                 for d in record.component_details],
-                key=lambda x: (x.type, x.name)
-            )
+            # Sort components by type (Earnings first) and then by name
+            sorted_details = sorted(record.component_details,
+                                    key=lambda d: (d.salary_component.type, d.salary_component.name))
 
-            return PayslipDetail(
+            components = [
+                PayrollComponent(
+                    name=detail.salary_component.name,
+                    type=detail.salary_component.type,
+                    amount=detail.amount_tomans
+                ) for detail in sorted_details
+            ]
+
+            return PayslipData(
+                payroll_id=record.payroll_id,
                 employee_name=f"{record.employee.first_name} {record.employee.last_name}",
+                employee_national_id=record.employee.national_id,
                 pay_period_str=f"{jdatetime.date.fromgregorian(date=record.pay_period_start_date):%Y/%m/%d} تا {jdatetime.date.fromgregorian(date=record.pay_period_end_date):%Y/%m/%d}",
                 gross_income=record.gross_income_tomans,
                 total_deductions=record.total_deductions_tomans,

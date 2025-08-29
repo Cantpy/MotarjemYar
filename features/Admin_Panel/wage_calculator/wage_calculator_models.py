@@ -24,9 +24,11 @@ class PayrollComponent:
 
 
 @dataclass
-class PayslipDetail:
-    """The complete, detailed data for displaying a single payslip in the side panel."""
+class PayslipData:
+    """The complete data needed to display a finalized payslip in the preview."""
+    payroll_id: str
     employee_name: str
+    employee_national_id: str  # Added for completeness
     pay_period_str: str
     gross_income: Decimal
     total_deductions: Decimal

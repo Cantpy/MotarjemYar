@@ -1,9 +1,10 @@
-# motarjemyar/wage_calculator/wage_calculator_controller.py
+# Admin_Panel/wage_calculator/wage_calculator_controller.py
 
 import jdatetime
 from PySide6.QtWidgets import QMessageBox, QDialog
-from features.Admin_Panel.wage_calculator.wage_calculator_view import WageCalculatorView, OvertimeInputDialog
+from features.Admin_Panel.wage_calculator.wage_calculator_view import WageCalculatorView
 from features.Admin_Panel.wage_calculator.wage_calculator_logic import WageCalculatorLogic
+from features.Admin_Panel.wage_calculator_preview.wage_calculator_preview_view import WageCalculatorPreviewDialog
 
 
 class WageCalculatorController:
@@ -23,7 +24,6 @@ class WageCalculatorController:
     def load_page_data(self):
         try:
             records = self._logic.get_payroll_run_summary(self._current_year, self._current_month)
-            print(f"records: {records}")  # Debugging line
             self._view.populate_table(records)
         except Exception as e:
             QMessageBox.critical(self._view, "خطا", f"خطایی در بارگذاری اطلاعات حقوق رخ داد:\n{e}")
@@ -48,24 +48,25 @@ class WageCalculatorController:
                 return
 
             # 3. Create and show the dialog to get overtime hours.
-            dialog = OvertimeInputDialog(employees, self._view)
-            if dialog.exec() == QDialog.Accepted:
-                overtime_data = dialog.get_overtime_data()
-
-                # 4. Execute the pay run with the collected data.
-                self._logic.execute_pay_run(self._current_year, self._current_month, overtime_data)
-
-                # 5. Refresh the page to show the new results.
-                self.load_page_data()
-                QMessageBox.information(self._view, "موفقیت",
-                                        "محاسبه حقوق برای دوره انتخابی با موفقیت انجام و ذخیره شد.")
+            dialog = WageCalculatorPreviewDialog(employees, self._view)
+            dialog.exec()
+            # if dialog.exec() == QDialog.Accepted:
+                # overtime_data = dialog.get_overtime_data()
+                #
+                # # 4. Execute the pay run with the collected data.
+                # self._logic.execute_pay_run(self._current_year, self._current_month, overtime_data)
+                #
+                # # 5. Refresh the page to show the new results.
+                # self.load_page_data()
+                # QMessageBox.information(self._view, "موفقیت",
+                #                         "محاسبه حقوق برای دوره انتخابی با موفقیت انجام و ذخیره شد.")
 
         except Exception as e:
             QMessageBox.critical(self._view, "خطا", f"خطایی در حین اجرای محاسبه حقوق رخ داد:\n{e}")
 
     def _on_employee_selected(self, payroll_id: str):
         try:
-            details = self._logic.get_payslip_details(payroll_id)
+            details = self._logic.get_payslip_data_for_preview(payroll_id)
             if details:
                 self._view.display_payslip_details(details)
         except Exception as e:

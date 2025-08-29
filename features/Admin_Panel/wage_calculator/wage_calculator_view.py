@@ -8,35 +8,8 @@ import qtawesome as qta
 import jdatetime
 from shared.fonts.font_manager import FontManager
 from shared.utils.persian_tools import to_persian_numbers, to_english_numbers
-from features.Admin_Panel.wage_calculator.wage_calculator_models import PayrollRunEmployee, PayslipDetail
+from features.Admin_Panel.wage_calculator.wage_calculator_models import PayrollRunEmployee, PayslipData
 from features.Admin_Panel.wage_calculator.wage_calculator_styles import WAGE_CALCULATOR_STYLES
-
-
-class OvertimeInputDialog(QDialog):
-    """A simple dialog to get overtime hours for all employees before a pay run."""
-
-    def __init__(self, employees: list, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("ورود ساعات اضافه کار")
-        self.layout = QVBoxLayout(self)
-        self.spinboxes = {}
-        for emp in employees:
-            label = QLabel(emp.full_name)
-            spinbox = QSpinBox(maximum=100)
-            self.spinboxes[emp.employee_id] = spinbox
-            row = QHBoxLayout()
-            row.addWidget(label)
-            row.addStretch()
-            row.addWidget(spinbox)
-            self.layout.addLayout(row)
-
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        self.layout.addWidget(buttons)
-
-    def get_overtime_data(self) -> dict:
-        return {emp_id: sb.value() for emp_id, sb in self.spinboxes.items()}
 
 
 class WageCalculatorView(QWidget):
@@ -160,7 +133,7 @@ class WageCalculatorView(QWidget):
             self.employee_table.setItem(row, 2, QTableWidgetItem(to_persian_numbers(f"{rec.net_income:,.0f}")))
             self.employee_table.setItem(row, 3, QTableWidgetItem(rec.status))
 
-    def display_payslip_details(self, payslip: PayslipDetail):
+    def display_payslip_details(self, payslip: PayslipData):
         """
         Displays the detailed payslip information in the side panel.
         """
