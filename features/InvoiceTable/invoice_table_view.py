@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class InvoiceTableView(QWidget):
-    """Main view for the invoice table"""
+    """Main _view for the invoice table"""
 
     # Signals
     add_invoice_requested = Signal()

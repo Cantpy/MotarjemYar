@@ -74,6 +74,6 @@ class WageCalculatorController:
 
     def get_view(self):
         """
-        Returns the associated view instance.
+        Returns the associated _view instance.
         """
         return self._view

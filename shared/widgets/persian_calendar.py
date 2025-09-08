@@ -174,7 +174,7 @@ class DatePicker(QLineEdit):
         if not hasattr(self, "popup"):
             return
 
-        # Get screen geometry to ensure the popup stays within view
+        # Get screen geometry to ensure the popup stays within _view
         screen = self.screen()
         if not screen:
             screen = QApplication.primaryScreen()

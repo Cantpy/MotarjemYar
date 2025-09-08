@@ -5,6 +5,7 @@ import os
 import sys
 import json
 import subprocess
+from pathlib import Path
 
 
 def return_folder(folder1, folder2=None, folder3=None):
@@ -69,6 +70,28 @@ def return_resource(folder1, resource, folder2=None):
         path = os.path.join(project_root, folder1, resource)
 
     return path
+
+
+def get_absolute_path(project_root: Path, relative_path: str) -> str:
+    """
+    Constructs a foolproof, absolute path from the project root
+    and a relative path string.
+
+    Args:
+        project_root: The absolute Path object for the project's root directory.
+        relative_path: The relative path to the resource (e.g., 'data/logo.png').
+
+    Returns:
+        A string representation of the absolute path.
+    """
+    # The '/' operator in pathlib intelligently and safely joins path components,
+    # handling all OS-specific separators for you.
+    absolute_path = project_root / relative_path
+
+    # For PyInstaller's sake, we might need a check here in the future,
+    # but for now, this is much cleaner for development.
+
+    return str(absolute_path)
 
 
 def get_remembered_user_info():

@@ -15,7 +15,7 @@ from PySide6.QtCore import Signal
 
 class AdminDashboardView(QWidget):
     """
-    The main dashboard view for the admin panel.
+    The main dashboard _view for the admin panel.
     """
     calculate_wage_requested = Signal()
 

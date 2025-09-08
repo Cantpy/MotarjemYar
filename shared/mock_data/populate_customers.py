@@ -2,7 +2,7 @@
 
 from sqlalchemy.orm import Session
 from faker import Faker
-from ..database_models.customer_models import CustomerModel, CompanionModel
+from ..orm_models.customer_models import CustomerModel, CompanionModel
 
 # Use Persian locale for realistic names
 fake = Faker('fa_IR')

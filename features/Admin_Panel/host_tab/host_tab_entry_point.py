@@ -16,12 +16,12 @@ from shared.assets import (
     INVOICES_DB_URL, CUSTOMERS_DB_URL, SERVICES_DB_URL, EXPENSES_DB_URL, USERS_DB_URL, PAYROLL_DB_URL
 )
 # --- Import ALL Base classes ---
-from shared.database_models.invoices_models import BaseInvoices
-from shared.database_models.customer_models import BaseCustomers
-from shared.database_models.services_models import BaseServices
-from shared.database_models.expenses_models import BaseExpenses
-from shared.database_models.user_models import BaseUsers
-from shared.database_models.payroll_models import BasePayroll
+from shared.orm_models.invoices_models import BaseInvoices
+from shared.orm_models.customer_models import BaseCustomers
+from shared.orm_models.services_models import BaseServices
+from shared.orm_models.expenses_models import BaseExpenses
+from shared.orm_models.users_models import BaseUsers
+from shared.orm_models.payroll_models import BasePayroll
 
 # --- Robust Path Handling for resources ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

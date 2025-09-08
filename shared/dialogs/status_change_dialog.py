@@ -2,9 +2,10 @@ from PySide6.QtWidgets import (QDialog, QFrame, QScrollArea, QWidget, QVBoxLayou
                                QLineEdit)
 from PySide6.QtCore import Qt, Signal
 
-from features.Home.home_models import StatusChangeRequest, DeliveryStatus
+from features.Home_Page.home_page_models import StatusChangeRequest
+from shared.enums import DeliveryStatus
 from shared.utils.number_utils import to_persian_number
-from shared.entities.common_entities import InvoiceDetailsEntity
+from shared.dtos.invoice_dtos import IssuedInvoiceDTO
 
 
 class StepIndicator(QFrame):
@@ -179,7 +180,7 @@ class StatusChangeDialog(QDialog):
 
     status_change_requested = Signal(StatusChangeRequest)
 
-    def __init__(self, invoice: InvoiceDetailsEntity, next_status: int, step_text: str, parent=None):
+    def __init__(self, invoice: IssuedInvoiceDTO, next_status: int, step_text: str, parent=None):
         super().__init__(parent)
         self.invoice = invoice
         self.next_status = next_status

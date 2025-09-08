@@ -6,10 +6,10 @@ from decimal import Decimal
 from sqlalchemy import func
 import jdatetime
 
-from shared.database_models.payroll_models import (EmployeeModel, SystemConstantModel, TaxBracketModel,
-                                                   PayrollRecordModel, PayrollComponentDetailModel,
-                                                   SalaryComponentModel)
-from shared.database_models.invoices_models import IssuedInvoiceModel
+from shared.orm_models.payroll_models import (EmployeeModel, SystemConstantModel, TaxBracketModel,
+                                              PayrollRecordModel, PayrollComponentDetailModel,
+                                              SalaryComponentModel)
+from shared.orm_models.invoices_models import IssuedInvoiceModel
 
 
 class WageCalculatorRepository:

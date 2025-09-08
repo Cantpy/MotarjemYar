@@ -1,5 +1,5 @@
 """
-PySide6 view for the Notification History widget.
+PySide6 _view for the Notification History widget.
 """
 import os
 import sys
@@ -369,7 +369,7 @@ class NotificationHistoryWidget(QWidget):
         return layout
 
     def connect_signals(self):
-        """Connect controller signals to view slots."""
+        """Connect controller signals to _view slots."""
         self.controller.sms_data_changed.connect(self.update_sms_table)
         self.controller.email_data_changed.connect(self.update_email_table)
         self.controller.loading_changed.connect(self.set_loading)

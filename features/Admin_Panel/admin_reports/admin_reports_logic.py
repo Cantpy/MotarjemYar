@@ -4,7 +4,7 @@ import pandas as pd
 import jdatetime
 from datetime import date
 from features.Admin_Panel.admin_reports.admin_reports_repo import AdminReportsRepository
-from shared.database_models.services_models import ServicesModel
+from shared.orm_models.services_models import ServicesModel
 from collections import defaultdict
 
 

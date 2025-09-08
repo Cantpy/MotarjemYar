@@ -1,4 +1,4 @@
-"""services_documents_view.py - Documents management view using PySide6"""
+"""services_documents_view.py - Documents management _view using PySide6"""
 
 from typing import Dict, List, Optional
 from PySide6.QtWidgets import (

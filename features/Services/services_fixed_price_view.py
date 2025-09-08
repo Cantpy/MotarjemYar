@@ -1,4 +1,4 @@
-"""services_fixed_prices_view.py - Fixed prices management view using PySide6"""
+"""services_fixed_prices_view.py - Fixed prices management _view using PySide6"""
 
 from typing import Dict, List
 from PySide6.QtWidgets import (

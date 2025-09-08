@@ -1,61 +1,71 @@
+# core/navigation.py
+
 from PySide6.QtWidgets import QStackedWidget, QWidget
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QTimer, QObject
 from typing import Callable, Dict, Optional
 
 
 class PageManager:
-    def __init__(self, stacked_widget: QStackedWidget, parent: Optional[object] = None):
-        self.stacked_widget = stacked_widget
-        self.parent = parent
-        self._factories: Dict[str, Callable[[], QWidget]] = {}
-        self._instances: Dict[str, QWidget] = {}
+    """
+    Manages the lifecycle and navigation of page controllers.
+    It creates and caches controllers, and asks them for their views to display.
+    """
 
-    def register(self, name: str, factory: Callable[[], QWidget]):
-        """Register a factory function that creates the widget for a page"""
+    def __init__(self, stacked_widget: QStackedWidget):
+        self.stacked_widget = stacked_widget
+        # These now store controllers (which are QObjects)
+        self._factories: Dict[str, Callable[[], QObject]] = {}
+        self._instances: Dict[str, QObject] = {}
+
+    def register(self, name: str, factory: Callable[[], QObject]):
+        """Register a factory function that creates the CONTROLLER for a page."""
         self._factories[name] = factory
 
-    def get(self, name: str) -> QWidget:
-        """Get an instance of the page, creating it if necessary"""
+    def get_controller(self, name: str) -> QObject:
+        """Get an instance of the page's controller, creating it if necessary."""
         if name in self._instances:
             return self._instances[name]
 
         if name not in self._factories:
-            raise ValueError(f"No factory registered for page: {name}")
+            raise ValueError(f"No factory registered for page controller: {name}")
 
-        widget = self._factories[name]()
-        self.stacked_widget.addWidget(widget)
-        self._instances[name] = widget
-        return widget
+        controller = self._factories[name]()
+        self._instances[name] = controller
+        return controller
 
     def show(self, name: str):
-        """Show a page by name, creating it lazily if needed"""
-        if name in self._instances:
-            page = self._instances[name]
-        else:
-            if name not in self._factories:
-                raise ValueError(f"Unknown page name: {name}")
-            page = self._factories[name]()
-            self._instances[name] = page
-            self.stacked_widget.addWidget(page)
+        """Shows a page by getting its controller and asking for its view."""
+        # 1. Get the controller for the page
+        controller = self.get_controller(name)
 
-            # Apply permissions on first load if available
-            if hasattr(page, 'set_permissions') and self.parent and hasattr(self.parent, 'permissions'):
-                page.set_permissions(self.parent.permissions)
+        # 2. CRITICAL: Ask the controller for its view
+        #    We assume all our page controllers have a get_view() method.
+        page_view = controller.get_view()
 
-        self.stacked_widget.setCurrentWidget(page)
+        # 3. Add the view to the stacked widget if it's not already there
+        #    (This check prevents adding the same widget multiple times)
+        if self.stacked_widget.indexOf(page_view) == -1:
+            self.stacked_widget.addWidget(page_view)
 
-    def preload(self, name: str, delay_ms: int = 0):
-        """Preload a page after a delay (default = immediately)"""
-        QTimer.singleShot(delay_ms, lambda: self.get(name))
+        # 4. Show the view
+        self.stacked_widget.setCurrentWidget(page_view)
+
+    def preload(self, name: str, delay_ms: int = 100):
+        """Preloads a page's controller after a short delay."""
+        QTimer.singleShot(delay_ms, lambda: self.get_controller(name))
 
     def clear_cache(self):
-        """Clear cached pages except home page"""
-        for page_name, page in list(self._instances.items()):
-            if page_name != 'home' and page is not None:
-                # Remove from stacked widget first
-                self.stacked_widget.removeWidget(page)
-                # Then delete the widget
-                if hasattr(page, 'deleteLater'):
-                    page.deleteLater()
-                # Remove from instances dict
-                del self._instances[page_name]
+        """Removes and deletes all cached pages and their controllers."""
+        for name, controller in list(self._instances.items()):
+            # Get the view from the controller
+            view = controller.get_view()
+            if view:
+                self.stacked_widget.removeWidget(view)
+                view.deleteLater()  # Schedule the view for deletion
+
+            # The controller is a QObject, it can also be scheduled for deletion
+            # if it has no parent or its parent is being deleted.
+            if hasattr(controller, 'deleteLater'):
+                controller.deleteLater()
+
+            del self._instances[name]

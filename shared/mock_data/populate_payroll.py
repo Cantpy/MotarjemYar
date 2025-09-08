@@ -6,8 +6,8 @@ import uuid
 import random
 from datetime import date, timedelta
 
-from shared.database_models.payroll_models import (EmployeeModel, EmployeePayrollProfileModel, SystemConstantModel,
-                                                   SalaryComponentModel, TaxBracketModel)
+from shared.orm_models.payroll_models import (EmployeeModel, EmployeePayrollProfileModel, SystemConstantModel,
+                                              SalaryComponentModel, TaxBracketModel)
 from .mock_data_source import MOCK_PEOPLE_DATA
 
 
@@ -68,7 +68,6 @@ def populate_payroll_db(payroll_session: Session):
             employee_id=str(uuid.uuid4()),
             first_name=person['first'],
             last_name=person['last'],
-            # --- The national_id now comes from the shared source ---
             national_id=person['nid'],
             hire_date=date.today() - timedelta(days=random.randint(30, 1000)),
             payroll_profile=EmployeePayrollProfileModel(

@@ -12,11 +12,11 @@ from features.Invoice_Table_GAS.invoice_table_GAS_models import InvoiceData, Inv
 logger = logging.getLogger(__name__)
 
 
-# The MainController now creates the view and handles all _logic.
+# The MainController now creates the _view and handles all _logic.
 class MainController(QObject):
     """
     Main controller that coordinates all components for the invoice table feature.
-    It creates and manages the view, and connects UI signals to application _logic.
+    It creates and manages the _view, and connects UI signals to application _logic.
     """
 
     def __init__(self):
@@ -28,7 +28,7 @@ class MainController(QObject):
         self._file_logic = FileLogic()
         self._validation_logic = ValidationLogic()
 
-        # The controller creates its own view.
+        # The controller creates its own _view.
         self._view = InvoiceTableView()
 
         # --- State Management ---
@@ -42,7 +42,7 @@ class MainController(QObject):
         self._connect_signals()
 
     def get_widget(self) -> QWidget:
-        """Returns the managed view widget to be displayed in the main application."""
+        """Returns the managed _view widget to be displayed in the main application."""
         return self._view
 
     def load_initial_data(self):
@@ -51,7 +51,7 @@ class MainController(QObject):
         self._refresh_data()
 
     def _connect_signals(self):
-        """Connects signals from the view to the controller's handler methods."""
+        """Connects signals from the _view to the controller's handler methods."""
         # View signals
         self._view.refresh_requested.connect(self._refresh_data)
         self._view.search_text_changed.connect(self._filter_invoices)

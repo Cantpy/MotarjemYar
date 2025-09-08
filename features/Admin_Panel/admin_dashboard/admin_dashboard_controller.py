@@ -23,7 +23,7 @@ class AdminDashboardController:
             orders_data = self._logic.get_attention_queue()
             performers_data = self._logic.get_top_performers_data()
 
-            # Pass them directly to the view
+            # Pass them directly to the _view
             self._view.update_kpi_cards(kpi_data)
             self._view.populate_attention_queue(orders_data)
             self._view.populate_top_performers(performers_data)
@@ -39,6 +39,6 @@ class AdminDashboardController:
 
     def get_view(self):
         """
-        Returns the associated view for embedding in the main window.
+        Returns the associated _view for embedding in the main window.
         """
         return self._view

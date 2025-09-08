@@ -6,9 +6,9 @@ from sqlalchemy.orm import Session
 from dateutil.relativedelta import relativedelta
 import jdatetime
 
-from ..database_models.invoices_models import IssuedInvoiceModel
-from ..database_models.customer_models import CustomerModel
-from ..database_models.user_models import UserProfileModel
+from ..orm_models.invoices_models import IssuedInvoiceModel
+from ..orm_models.customer_models import CustomerModel
+from ..orm_models.users_models import UserProfileModel
 
 
 def populate_invoices_db(invoices_session: Session, customers_session: Session, users_session: Session):
@@ -19,11 +19,11 @@ def populate_invoices_db(invoices_session: Session, customers_session: Session, 
     print("Populating Invoices.db with mock invoices...")
 
     # Fetch dependencies from other databases
-    customers = customers_session.query(CustomerModel).all()
+    all_customers = customers_session.query(CustomerModel).all()
     user_profiles = users_session.query(UserProfileModel).all()
 
-    if not customers or not user_profiles:
-        print("[WARNING] Cannot create invoices without customers and users. Skipping invoice population.")
+    if not all_customers or not user_profiles:
+        print("[WARNING] Cannot create invoices without all_customers and users. Skipping invoice population.")
         return
 
     clerks = [p for p in user_profiles if p.user.role == 'clerk']
@@ -39,7 +39,7 @@ def populate_invoices_db(invoices_session: Session, customers_session: Session, 
 
     # --- A) Historical data for reports (last 3 years) ---
     for i in range(300):
-        customer = random.choice(customers)
+        customer = random.choice(all_customers)
         clerk_profile = random.choice(clerks)
         translator_profile = random.choice(translators)
         issue_d = today - relativedelta(months=random.randint(1, 35), days=random.randint(0, 28))
@@ -67,8 +67,8 @@ def populate_invoices_db(invoices_session: Session, customers_session: Session, 
     for i in range(4):
         issue_d = today_j.replace(day=random.randint(1, today_j.day)).togregorian()
         invoices.append(IssuedInvoiceModel(
-            invoice_number=1403200 + i, name=random.choice(customers).name,
-            national_id=random.choice(customers).national_id, phone='09123456789',
+            invoice_number=1403200 + i, name=random.choice(all_customers).name,
+            national_id=random.choice(all_customers).national_id, phone='09123456789',
             issue_date=issue_d, delivery_date=issue_d + timedelta(days=5),
             translator=top_translator.full_name, username=top_clerk.user.username,
             total_items=random.randint(3, 15),  # High document count
@@ -77,14 +77,14 @@ def populate_invoices_db(invoices_session: Session, customers_session: Session, 
         ))
 
     # Invoices for Action Queue
-    invoices.append(IssuedInvoiceModel(invoice_number=1403301, name=random.choice(customers).name,
-                                       national_id=random.choice(customers).national_id, phone='09123456789',
+    invoices.append(IssuedInvoiceModel(invoice_number=1403301, name=random.choice(all_customers).name,
+                                       national_id=random.choice(all_customers).national_id, phone='09123456789',
                                        issue_date=today - timedelta(days=4), delivery_date=today - timedelta(days=1),
                                        translator=second_translator.full_name, total_amount=950000, final_amount=950000,
                                        total_translation_price=800000, payment_status=1, delivery_status=2,
                                        total_items=5, username=top_clerk.user.username))  # Overdue
-    invoices.append(IssuedInvoiceModel(invoice_number=1403302, name=random.choice(customers).name,
-                                       national_id=random.choice(customers).national_id, phone='09121234567',
+    invoices.append(IssuedInvoiceModel(invoice_number=1403302, name=random.choice(all_customers).name,
+                                       national_id=random.choice(all_customers).national_id, phone='09121234567',
                                        issue_date=today - timedelta(days=3), delivery_date=today,
                                        translator=top_translator.full_name, total_amount=2100000, final_amount=2100000,
                                        total_translation_price=1800000, payment_status=0, delivery_status=3,

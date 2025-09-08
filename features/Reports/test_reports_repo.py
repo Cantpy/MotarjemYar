@@ -2,8 +2,8 @@
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from shared.database_models.invoices_models import BaseInvoices, IssuedInvoiceModel
-from shared.database_models.customer_models import BaseCustomers, CustomerModel, CompanionModel
+from shared.orm_models.invoices_models import BaseInvoices, IssuedInvoiceModel
+from shared.orm_models.customer_models import BaseCustomers, CustomerModel, CompanionModel
 from features.Reports.reports_repo import ReportsRepo
 from datetime import date
 

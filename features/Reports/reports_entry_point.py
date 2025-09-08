@@ -11,10 +11,10 @@ DATABASE_URL = "sqlite:///:memory:"
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 # --- This is for demonstration ---
-from shared.database_models.invoices_models import BaseInvoices
-from shared.database_models.customer_models import BaseCustomers
-from shared.database_models.services_models import BaseServices
-from shared.database_models.user_models import BaseUsers
+from shared.orm_models.invoices_models import BaseInvoices
+from shared.orm_models.customer_models import BaseCustomers
+from shared.orm_models.services_models import BaseServices
+from shared.orm_models.users_models import BaseUsers
 
 BaseInvoices.metadata.create_all(bind=engine)
 BaseUsers.metadata.create_all(bind=engine)

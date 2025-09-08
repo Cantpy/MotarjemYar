@@ -1,7 +1,7 @@
 # shared/mock_data/populate_services.py
 
 from sqlalchemy.orm import Session
-from ..database_models.services_models import ServicesModel, FixedPricesModel
+from ..orm_models.services_models import ServicesModel, FixedPricesModel
 
 
 def populate_services_db(services_session: Session):

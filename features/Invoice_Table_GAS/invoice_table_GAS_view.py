@@ -7,10 +7,10 @@ from typing import List, Any
 from features.Invoice_Table_GAS.invoice_table_GAS_models import InvoiceData, InvoiceSummary
 
 
-# This view is now "dumb". It only emits signals and updates its UI when told to.
+# This _view is now "dumb". It only emits signals and updates its UI when told to.
 
 class InvoiceTableView(QWidget):
-    """Main view for the invoice table. It is completely unaware of the controller."""
+    """Main _view for the invoice table. It is completely unaware of the controller."""
 
     # --- Signals Emitted by the View for the Controller to Catch ---
 
@@ -133,9 +133,9 @@ class InvoiceTableView(QWidget):
         try:
             QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
         except Exception as e:
-            # Although the view is dumb, this is pure UI _logic.
+            # Although the _view is dumb, this is pure UI _logic.
             # A more advanced setup might involve a "show error" signal.
-            print(f"Error opening PDF from view: {e}")
+            print(f"Error opening PDF from _view: {e}")
 
     def clear_search_bar(self):
         self.search_bar.clear()

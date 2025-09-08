@@ -3,7 +3,7 @@
 import random
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from shared.database_models.user_models import UsersModel, UserProfileModel, LoginLogsModel
+from shared.orm_models.users_models import UsersModel, UserProfileModel, LoginLogsModel
 from shared.mock_data.mock_data_source import MOCK_PEOPLE_DATA
 
 

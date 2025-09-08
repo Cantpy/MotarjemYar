@@ -5,8 +5,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from features.InvoiceTable.invoice_table_models import (
     InvoiceData, InvoiceSummary
 )
-from shared.database_models.invoices_models import BaseInvoices, IssuedInvoiceModel, InvoiceItemModel
-from shared.database_models.user_models import BaseUsers, UsersModel, UserProfileModel
+from shared.orm_models.invoices_models import BaseInvoices, IssuedInvoiceModel, InvoiceItemModel
+from shared.orm_models.users_models import BaseUsers, UsersModel, UserProfileModel
 import logging
 from shared import return_resource
 

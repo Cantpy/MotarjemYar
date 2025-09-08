@@ -78,6 +78,6 @@ class UserManagementController:
 
     def get_view(self):
         """
-        Returns the associated view for embedding in the main window.
+        Returns the associated _view for embedding in the main window.
         """
         return self._view

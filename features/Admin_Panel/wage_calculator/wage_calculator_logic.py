@@ -10,8 +10,8 @@ getcontext().prec = 18
 from features.Admin_Panel.wage_calculator.wage_calculator_models import (PayrollRunEmployee, PayslipData,
                                                                          PayrollComponent, EmployeeInfo)
 from features.Admin_Panel.wage_calculator.wage_calculator_repo import WageCalculatorRepository
-from shared.database_models.payroll_models import (EmployeeModel, PayrollRecordModel, PayrollComponentDetailModel,
-                                                   TaxBracketModel, SalaryComponentModel)
+from shared.orm_models.payroll_models import (EmployeeModel, PayrollRecordModel, PayrollComponentDetailModel,
+                                              TaxBracketModel, SalaryComponentModel)
 
 
 class WageCalculatorLogic:

@@ -15,19 +15,19 @@ def main():
     invoices_db_path = return_resource('databases', 'invoices.db')
     users_db_path = return_resource('databases', 'users.db')
 
-    # 1. The main application window (as the parent for the view)
+    # 1. The main application window (as the parent for the _view)
     main_window = QMainWindow()
     main_window.setWindowTitle("Invoice Management System")
     main_window.setGeometry(100, 100, 1200, 800)
 
-    # 2. Instantiate the MainController, passing the main window as the parent for the view
+    # 2. Instantiate the MainController, passing the main window as the parent for the _view
     main_controller = MainController(
         invoices_db_url=f"sqlite:///{invoices_db_path}",
         users_db_url=f"sqlite:///{users_db_path}",
         parent_widget=main_window
     )
 
-    # 3. Get the view widget from the controller
+    # 3. Get the _view widget from the controller
     invoice_widget = main_controller.get_widget()
 
     # 4. Set the widget as the central content of the main window

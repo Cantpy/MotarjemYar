@@ -4,7 +4,7 @@ import random
 from datetime import date
 from sqlalchemy.orm import Session
 from dateutil.relativedelta import relativedelta
-from ..database_models.expenses_models import ExpenseModel
+from ..orm_models.expenses_models import ExpenseModel
 
 
 def populate_expenses_db(expenses_session: Session):

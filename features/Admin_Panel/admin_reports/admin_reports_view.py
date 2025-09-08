@@ -16,7 +16,7 @@ class FinancialReportsWidget(QWidget):
     """
     The user interface for the Reports Tab.
     Contains multiple charts controlled by a single year navigator.
-    This view is "dumb" and only displays data provided by the controller.
+    This _view is "dumb" and only displays data provided by the controller.
     """
     # Signals to notify the controller of user actions
     next_year_requested = Signal()
@@ -216,7 +216,7 @@ class FinancialReportsWidget(QWidget):
         """A single, generic handler for showing tooltips on any chart."""
         active_chart = None
         # Determine which chart the mouse is physically inside
-        # Use mapToParent to get coordinates relative to the view, ensuring correct detection
+        # Use mapToParent to get coordinates relative to the _view, ensuring correct detection
         view_pos = self.sender().parent().mapToParent(pos.toPoint())
         if self.revenue_chart.geometry().contains(view_pos):
             active_chart = self.revenue_chart

@@ -9,51 +9,20 @@ from PySide6.QtWidgets import (
     QLineEdit, QTextEdit, QPushButton, QMessageBox, QListWidget,
     QFileDialog, QListWidgetItem, QMenu
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
+from shared.dtos.notification_dialog_dtos import SmsRequestDTO, EmailRequestDTO, NotificationDataDTO
 
 
 class NotificationDialog(QDialog):
     """Dialog for sending SMS or Email notifications to customers."""
+    send_sms_requested = Signal(SmsRequestDTO)
+    send_email_requested = Signal(EmailRequestDTO)
 
-    def __init__(self, invoice_number, invoices_database, customers_database, parent=None):
+    def __init__(self, data: NotificationDataDTO, parent=None):
         super().__init__(parent)
-        self.invoice_number = invoice_number
-        self.invoices_database = invoices_database
-        self.customers_database = customers_database
-        self.customer_data = self._get_customer_data()
+        self.customer_data = data  # Store the DTO
         self.uploaded_files = []
         self._setup_ui()
-
-    def _get_customer_data(self):
-        """Get customer data from database based on invoice number."""
-        try:
-            with sqlite3.connect(self.invoices_database) as inv_conn:
-                cursor = inv_conn.cursor()
-                cursor.execute(
-                    "SELECT name, phone FROM issued_invoices WHERE invoice_number = ?",
-                    (self.invoice_number,)
-                )
-                result = cursor.fetchone()
-                if not result:
-                    return {"name": "", "phone": "", "email": ""}
-
-                name, phone = result
-
-            # Get email from customers database
-            with sqlite3.connect(self.customers_database) as cust_conn:
-                cursor = cust_conn.cursor()
-                cursor.execute(
-                    "SELECT email FROM customers WHERE name = ? AND phone = ?",
-                    (name, phone)
-                )
-                email_result = cursor.fetchone()
-                email = email_result[0] if email_result else ""
-
-            return {"name": name, "phone": phone, "email": email}
-
-        except sqlite3.Error as e:
-            QMessageBox.critical(self, "خطای پایگاه داده", f"خطا در خواندن اطلاعات مشتری: {e}")
-            return {"name": "", "phone": "", "email": ""}
 
     def _setup_ui(self):
         """Setup the dialog UI with tabs."""
@@ -80,7 +49,7 @@ class NotificationDialog(QDialog):
         button_layout = QHBoxLayout()
 
         send_btn = QPushButton("ارسال")
-        send_btn.clicked.connect(self._send_notification)
+        send_btn.clicked.connect(self._on_send_clicked)
 
         cancel_btn = QPushButton("لغو")
         cancel_btn.clicked.connect(self.reject)
@@ -98,13 +67,13 @@ class NotificationDialog(QDialog):
         # Name field
         layout.addWidget(QLabel("نام مشتری:"))
         self.sms_name_edit = QLineEdit()
-        self.sms_name_edit.setText(self.customer_data["name"])
+        self.sms_name_edit.setText(self.customer_data.customer_name)
         layout.addWidget(self.sms_name_edit)
 
         # Phone field
         layout.addWidget(QLabel("شماره تماس:"))
         self.sms_phone_edit = QLineEdit()
-        self.sms_phone_edit.setText(self.customer_data["phone"])
+        self.sms_phone_edit.setText(self.customer_data.customer_phone)
         layout.addWidget(self.sms_phone_edit)
 
         # Message field with rich text editor
@@ -123,13 +92,13 @@ class NotificationDialog(QDialog):
         # Name field
         layout.addWidget(QLabel("نام مشتری:"))
         self.email_name_edit = QLineEdit()
-        self.email_name_edit.setText(self.customer_data["name"])
+        self.email_name_edit.setText(self.customer_data.customer_name)
         layout.addWidget(self.email_name_edit)
 
         # Email field
         layout.addWidget(QLabel("ایمیل (اجباری):"))
         self.email_address_edit = QLineEdit()
-        self.email_address_edit.setText(self.customer_data["email"])
+        self.email_address_edit.setText(self.customer_data.customer_email)
         layout.addWidget(self.email_address_edit)
 
         # Message field with rich text editor
@@ -167,6 +136,53 @@ class NotificationDialog(QDialog):
         layout.addWidget(self.file_list)
 
         return widget
+
+    def _on_send_clicked(self):
+        """
+        Gathers data from the form fields and emits the appropriate signal.
+        This is the dialog's only "action" logic.
+        """
+        current_tab = self.tab_widget.currentIndex()
+
+        if current_tab == 0:  # SMS tab
+            phone = self.sms_phone_edit.text()
+            message = self.sms_text_edit.toPlainText()
+            if not phone or not message:
+                QMessageBox.warning(self, "خطا", "شماره تماس و متن پیام الزامی است.")
+                return
+            # Emit a signal with a DTO
+            request_dto = SmsRequestDTO(recipient_phone=phone, message=message)
+            self.send_sms_requested.emit(request_dto)
+
+        else:  # Email tab
+            name = self.email_name_edit.text()
+            email = self.email_address_edit.text()
+            message = self.email_text_edit.toPlainText()
+
+            # Validate email field (mandatory)
+            if not email:
+                QMessageBox.warning(self, "خطا", "وارد کردن آدرس ایمیل اجباری است")
+                self.email_address_edit.setFocus()
+                return
+
+            # Validate email format
+            if not self._validate_email(email):
+                QMessageBox.warning(self, "خطای فرمت", "فرمت آدرس ایمیل صحیح نیست")
+                self.email_address_edit.setFocus()
+                return
+
+            if not message:
+                QMessageBox.warning(self, "خطا", "متن ایمیل وارد نشده است")
+                return
+
+            # Emit a signal with a DTO
+            request_dto = EmailRequestDTO(
+                recipient_name=name,
+                recipient_email=email,
+                message=message,
+                attachments=self.uploaded_files
+            )
+            self.send_email_requested.emit(request_dto)
 
     def _upload_files(self):
         """Handle file upload for email."""
@@ -257,116 +273,3 @@ class NotificationDialog(QDialog):
         """Validate email format."""
         pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         return re.match(pattern, email) is not None
-
-    def _update_customer_email(self, email):
-        """Update customer email in database."""
-        try:
-            with sqlite3.connect(self.customers_database) as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    "UPDATE customers SET email = ? WHERE name = ? AND phone = ?",
-                    (email, self.customer_data["name"], self.customer_data["phone"])
-                )
-                if cursor.rowcount > 0:
-                    return True
-                else:
-                    # If no rows were updated, try to insert new customer record
-                    cursor.execute(
-                        "INSERT OR IGNORE INTO customers (name, phone, email) VALUES (?, ?, ?)",
-                        (self.customer_data["name"], self.customer_data["phone"], email)
-                    )
-                    return cursor.rowcount > 0
-        except sqlite3.Error as e:
-            QMessageBox.critical(self, "خطای پایگاه داده", f"خطا در به‌روزرسانی ایمیل: {e}")
-            return False
-
-    def _send_notification(self):
-        """Send notification based on active tab."""
-        current_tab = self.tab_widget.currentIndex()
-
-        if current_tab == 0:  # SMS tab
-            self._send_sms()
-        else:  # Email tab
-            self._send_email()
-
-    def _send_sms(self):
-        """Send SMS notification."""
-        # Get values or use placeholders
-        name = self.sms_name_edit.text() or self.customer_data["name"]
-        phone = self.sms_phone_edit.text() or self.customer_data["phone"]
-        message = self.sms_text_edit.toPlainText()
-
-        if not phone:
-            QMessageBox.warning(self, "خطا", "شماره تماس وارد نشده است")
-            return
-
-        if not message:
-            QMessageBox.warning(self, "خطا", "متن پیام وارد نشده است")
-            return
-
-        try:
-            self._execute_sms_send(phone, message)
-            QMessageBox.information(self, "موفقیت", "پیامک با موفقیت ارسال شد")
-            self.accept()
-
-        except Exception as e:
-            QMessageBox.critical(self, "خطا در ارسال", f"خطا در ارسال پیامک: {str(e)}")
-
-    @staticmethod
-    def _execute_sms_send(recipient, text):
-        """Execute SMS sending using the provided API."""
-        url = 'https://console.melipayamak.com/api/send/simple/02518acf41404001be90c2baafb85767'
-
-        data = {
-            'from': '50002710094507',
-            'to': recipient,
-            'text': text
-        }
-
-        response = requests.post(url, json=data)
-
-        if response.status_code == 200:
-            return response.json()
-        else:
-            raise Exception(f"SMS sending failed: {response.status_code} - {response.text}")
-
-    def _send_email(self):
-        """Send email notification with validation."""
-        name = self.email_name_edit.text() or self.customer_data["name"]
-        email = self.email_address_edit.text().strip()
-        message = self.email_text_edit.toPlainText()
-
-        # Validate email field (mandatory)
-        if not email:
-            QMessageBox.warning(self, "خطا", "وارد کردن آدرس ایمیل اجباری است")
-            self.email_address_edit.setFocus()
-            return
-
-        # Validate email format
-        if not self._validate_email(email):
-            QMessageBox.warning(self, "خطای فرمت", "فرمت آدرس ایمیل صحیح نیست")
-            self.email_address_edit.setFocus()
-            return
-
-        if not message:
-            QMessageBox.warning(self, "خطا", "متن ایمیل وارد نشده است")
-            return
-
-        # Update customer email in database if it's different
-        if email != self.customer_data["email"]:
-            if self._update_customer_email(email):
-                QMessageBox.information(
-                    self,
-                    "به‌روزرسانی",
-                    "آدرس ایمیل مشتری در پایگاه داده به‌روزرسانی شد."
-                )
-
-        # Placeholder for email functionality
-        QMessageBox.information(
-            self,
-            "در حال توسعه",
-            f"ارسال ایمیل به {email} با {len(self.uploaded_files)} فایل پیوست\n"
-            f"متن ایمیل: {message[:50]}{'...' if len(message) > 50 else ''}\n"
-            "(این قابلیت در حال توسعه است)"
-        )
-        self.accept()

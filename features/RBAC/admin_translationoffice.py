@@ -387,7 +387,7 @@ class TranslationOfficeWidget(QWidget):
                     '''
                     self.web_view.setHtml(html_content)
 
-                # Replace placeholder with web view
+                # Replace placeholder with web _view
                 layout = self.map_placeholder.parent().layout()
                 index = layout.indexOf(self.map_placeholder)
                 layout.removeWidget(self.map_placeholder)
@@ -477,7 +477,7 @@ class TranslationOfficeWidget(QWidget):
             if child.widget():
                 child.widget().deleteLater()
 
-        # Reset web view
+        # Reset web _view
         self.web_view = None
         self.setup_ui()
 
@@ -587,7 +587,7 @@ class TranslationOfficeWidget(QWidget):
 #     def setup_ui(self):
 #         layout = QVBoxLayout(self)
 #
-#         # Create web view in separate dialog
+#         # Create web _view in separate dialog
 #         self.web_view = QWebEngineView()
 #
 #         if self.map_url:

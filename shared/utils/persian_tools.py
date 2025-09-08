@@ -2,6 +2,7 @@
 
 import jdatetime
 from datetime import date
+from shared.enums import DeliveryStatus
 
 # Mapping of Persian to English numbers
 PERSIAN_TO_ENGLISH_MAP = str.maketrans('۰۱۲۳۴۵۶۷۸۹', '0123456789')
@@ -29,3 +30,15 @@ def to_persian_jalali_string(g_date: date) -> str:
     """Converts a Gregorian date object to a Jalali date string with Persian numbers."""
     jalali_str = to_jalali_string(g_date)
     return to_persian_numbers(jalali_str)
+
+
+def get_persian_delivery_status(status: DeliveryStatus) -> str:
+    """Helper function to get display text for a status."""
+    status_map = {
+        DeliveryStatus.ISSUED: "صادر شده",
+        DeliveryStatus.ASSIGNED: "مترجم تعیین شده",
+        DeliveryStatus.TRANSLATED: "ترجمه شده",
+        DeliveryStatus.READY: "آماده تحویل",
+        DeliveryStatus.COLLECTED: "تحویل داده شده"
+    }
+    return status_map.get(status, "نامشخص")

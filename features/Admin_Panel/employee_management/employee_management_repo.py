@@ -2,8 +2,8 @@
 from typing import List, Type
 
 from sqlalchemy.orm import Session, joinedload
-from shared.database_models.user_models import UsersModel, UserProfileModel
-from shared.database_models.payroll_models import EmployeeModel, EmployeePayrollProfileModel
+from shared.orm_models.users_models import UsersModel, UserProfileModel
+from shared.orm_models.payroll_models import EmployeeModel, EmployeePayrollProfileModel
 
 
 class EmployeeManagementRepository:

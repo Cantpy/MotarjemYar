@@ -35,7 +35,7 @@ class WageCalculatorPreviewController:
         self._view = view
         self._newly_created_payroll_id: str | None = None
 
-        # --- Connect signals from the view to the controller's methods ---
+        # --- Connect signals from the _view to the controller's methods ---
         self._view.generate_requested.connect(self._generate_and_preview)
         self._view.print_requested.connect(self._handle_print)
         self._view.share_requested.connect(self._handle_share)
@@ -62,7 +62,7 @@ class WageCalculatorPreviewController:
             # 2. Immediately fetch the clean, formatted DTO for that new record.
             payslip_data_for_display = self._logic.get_payslip_data_for_preview(self._newly_created_payroll_id)
 
-            # 3. Tell the view to switch to its "preview" state and display the data.
+            # 3. Tell the _view to switch to its "preview" state and display the data.
             self._view.show_preview(payslip_data_for_display)
             self._view.accept()  # Mark the dialog as successfully completed.
 

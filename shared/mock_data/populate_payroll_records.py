@@ -5,7 +5,7 @@ from dateutil.relativedelta import relativedelta
 import random
 from features.Admin_Panel.wage_calculator.wage_calculator_logic import WageCalculatorLogic
 from features.Admin_Panel.wage_calculator.wage_calculator_repo import WageCalculatorRepository
-from shared.database_models.payroll_models import PayrollRecordModel
+from shared.orm_models.payroll_models import PayrollRecordModel
 
 
 def populate_historical_payroll_records(

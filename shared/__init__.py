@@ -39,7 +39,7 @@ from shared.utils.validation_utils import (
     validate_numeric_field,
     validate_text_length
 )
-from shared.widgets.clickablelabel import ClickableLabel
+from shared.widgets.clickable_label import ClickableLabel
 from shared.widgets.color_delegate import PriorityColorDelegate, PriorityColorDelegateNoRole
 from shared.widgets.toast_widget import show_toast
 from shared.theming.palettes import (
@@ -55,8 +55,6 @@ from shared.dialogs.rich_text_editor import RichTextEdit
 from shared.dialogs.status_change_dialog import StatusChangeDialog
 
 from shared.context.user_context import UserContext
-
-from shared.entities.common_entities import InvoiceDetailsEntity, InvoiceDocumentsEntity, ServicesEntity, CustomerEntity
 
 
 __all__ = [
@@ -85,6 +83,4 @@ __all__ = [
     "LanguageDialog", "NotificationDialog", "RichTextEdit", "StatusChangeDialog",
     # user context
     "UserContext",
-    # entities
-    "InvoiceDetailsEntity", "InvoiceDocumentsEntity", "ServicesEntity", "CustomerEntity"
 ]

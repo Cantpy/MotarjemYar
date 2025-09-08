@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class InvoiceController(QObject):
     """Controller for managing invoice table operations"""
 
-    # Signals for view updates
+    # Signals for _view updates
     data_loaded = Signal(list)  # List[InvoiceData]
     data_filtered = Signal(list)  # List[InvoiceData]
     invoice_updated = Signal(str)  # invoice_number

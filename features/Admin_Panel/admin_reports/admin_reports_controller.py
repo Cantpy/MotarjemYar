@@ -19,7 +19,7 @@ class FinancialReportsController:
         self._logic = logic
         self._current_year = jdatetime.date.today().year
 
-        # Connect signals from the financial view to its methods
+        # Connect signals from the financial _view to its methods
         self._view.next_year_requested.connect(self._next_year)
         self._view.previous_year_requested.connect(self._previous_year)
         self._view.export_requested.connect(self._handle_export)
@@ -90,7 +90,7 @@ class AdvancedSearchController:
         self._current_headers = []
 
         self._connect_signals()
-        # Fetch completer data and set it up in the view ---
+        # Fetch completer data and set it up in the _view ---
         self._setup_completer()
 
     def _connect_signals(self):
@@ -112,7 +112,7 @@ class AdvancedSearchController:
                                      "متاسفانه منظور شما از این درخواست مشخص نشد.")
 
     def _setup_completer(self):
-        """Fetches service names and initializes the QCompleter in the view."""
+        """Fetches service names and initializes the QCompleter in the _view."""
         try:
             service_names = self._logic.get_all_service_names()
             self._view.set_document_completer(service_names)
@@ -211,11 +211,11 @@ class AdminReportsController:
         self._view = view
         self._logic = logic
 
-        # --- Create and store the sub-controllers, giving them their view and dependencies ---
+        # --- Create and store the sub-controllers, giving them their _view and dependencies ---
         # The sub-controllers are stored as attributes to keep them alive.
         self.financial_controller = FinancialReportsController(self._view.financial_reports, self._logic)
         self.advanced_search_controller = AdvancedSearchController(self._view.advanced_search, self._logic)
 
     def get_view(self) -> AdminReportsView:
-        """Returns the main container view for the entire Reports tab."""
+        """Returns the main container _view for the entire Reports tab."""
         return self._view

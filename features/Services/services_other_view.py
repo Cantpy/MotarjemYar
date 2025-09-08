@@ -1,4 +1,4 @@
-"""services_other_view.py - Other services management view using PySide6"""
+"""services_other_view.py - Other services management _view using PySide6"""
 
 from typing import Dict, List
 from PySide6.QtWidgets import (

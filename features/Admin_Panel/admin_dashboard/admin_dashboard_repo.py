@@ -3,9 +3,9 @@
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 from datetime import date, timedelta
-from shared.database_models.invoices_models import IssuedInvoiceModel
-from shared.database_models.user_models import LoginLogsModel, UserProfileModel
-from shared.database_models.customer_models import CompanionModel
+from shared.orm_models.invoices_models import IssuedInvoiceModel
+from shared.orm_models.users_models import LoginLogsModel, UserProfileModel
+from shared.orm_models.customer_models import CompanionModel
 import jdatetime  # For Jalali date handling
 
 

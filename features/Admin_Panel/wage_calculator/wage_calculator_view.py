@@ -14,7 +14,7 @@ from features.Admin_Panel.wage_calculator.wage_calculator_styles import WAGE_CAL
 
 class WageCalculatorView(QWidget):
     """
-    The main view for the Wage Calculator feature.
+    The main _view for the Wage Calculator feature.
     """
     period_changed = Signal(dict)
     run_payroll_requested = Signal()

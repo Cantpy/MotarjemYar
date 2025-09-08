@@ -7,8 +7,8 @@ import bcrypt
 
 from features.Admin_Panel.employee_management.employee_management_models import EmployeeFullData
 from features.Admin_Panel.employee_management.employee_management_repo import EmployeeManagementRepository
-from shared.database_models.payroll_models import EmployeeModel, EmployeePayrollProfileModel
-from shared.database_models.user_models import UsersModel, UserProfileModel
+from shared.orm_models.payroll_models import EmployeeModel, EmployeePayrollProfileModel
+from shared.orm_models.users_models import UsersModel, UserProfileModel
 
 
 class UserManagementLogic:
@@ -20,7 +20,7 @@ class UserManagementLogic:
     def get_all_employees_for_display(self) -> list[EmployeeFullData]:
         """
         Fetches all employees and their corresponding user data, combining them
-        into a complete DTO for the view.
+        into a complete DTO for the _view.
         """
         with self.PayrollSession() as p_sess, self.UsersSession() as u_sess:
             employees = self._repo.get_all_employees_with_details(p_sess)

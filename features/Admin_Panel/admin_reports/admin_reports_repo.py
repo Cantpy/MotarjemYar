@@ -4,11 +4,11 @@ from sqlalchemy import func, extract
 from sqlalchemy.orm import Session
 from datetime import date, timedelta
 import jdatetime
-from shared.database_models.invoices_models import IssuedInvoiceModel, InvoiceItemModel
-from shared.database_models.services_models import FixedPricesModel
-from shared.database_models.expenses_models import ExpenseModel
-from shared.database_models.customer_models import CustomerModel, CompanionModel
-from shared.database_models.services_models import ServicesModel
+from shared.orm_models.invoices_models import IssuedInvoiceModel, InvoiceItemModel
+from shared.orm_models.services_models import FixedPricesModel
+from shared.orm_models.expenses_models import ExpenseModel
+from shared.orm_models.customer_models import CustomerModel, CompanionModel
+from shared.orm_models.services_models import ServicesModel
 
 
 class AdminReportsRepository:
