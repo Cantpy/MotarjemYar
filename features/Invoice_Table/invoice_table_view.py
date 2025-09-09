@@ -1,13 +1,13 @@
+# features/Invoice_Table/invoice_table_view.py
+
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QTableWidget, QCheckBox, QLabel,
                                QPushButton, QHeaderView, QTableWidgetItem, QComboBox, QMenu, QDialog)
 from PySide6.QtCore import Qt, Signal, QPoint, QUrl
 from PySide6.QtGui import QDesktopServices, QAction
 from functools import partial
 from typing import List, Any
-from features.Invoice_Table_GAS.invoice_table_GAS_models import InvoiceData, InvoiceSummary
+from features.Invoice_Table.invoice_table_models import InvoiceData, InvoiceSummary
 
-
-# This _view is now "dumb". It only emits signals and updates its UI when told to.
 
 class InvoiceTableView(QWidget):
     """Main _view for the invoice table. It is completely unaware of the controller."""

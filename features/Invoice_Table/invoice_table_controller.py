@@ -4,10 +4,12 @@ from PySide6.QtWidgets import QMessageBox, QFileDialog, QWidget
 from typing import List, Any, Optional, Callable
 
 # Import other components
-from features.Invoice_Table_GAS.invoice_table_GAS_view import InvoiceTableView, EditInvoiceDialog, SummaryDialog
-from features.Invoice_Table_GAS.invoice_table_GAS_logic import InvoiceTableLogic, FileLogic, ValidationLogic
-from features.Invoice_Table_GAS.invoice_table_GAS_repo import RepositoryManager
-from features.Invoice_Table_GAS.invoice_table_GAS_models import InvoiceData, InvoiceSummary
+from features.Invoice_Table.invoice_table_view import InvoiceTableView, EditInvoiceDialog, SummaryDialog
+from features.Invoice_Table.invoice_table_logic import (InvoiceService, FileService, ValidationService, SortService,
+                                                        SearchService, InvoiceExportService, NumberFormatService,
+                                                        BulkOperationService)
+from features.Invoice_Table.invoice_table_repo import RepositoryManager
+from features.Invoice_Table.invoice_table_models import InvoiceData, InvoiceSummary
 
 logger = logging.getLogger(__name__)
 
@@ -19,17 +21,29 @@ class MainController(QObject):
     It creates and manages the _view, and connects UI signals to application _logic.
     """
 
-    def __init__(self):
+    def __init__(self,
+                 view: InvoiceTableView,
+                 invoice_service: InvoiceService,
+                 file_service: FileService,
+                 validation_service: ValidationService,
+                 sort_service: SortService,
+                 search_service: SearchService,
+                 export_service: InvoiceExportService,
+                 format_service: NumberFormatService,
+                 operation_service: BulkOperationService
+                 ):
         super().__init__()
 
         # --- Component Initialization ---
-        self._repo_manager = RepositoryManager()
-        self._logic = InvoiceTableLogic(self._repo_manager)
-        self._file_logic = FileLogic()
-        self._validation_logic = ValidationLogic()
-
-        # The controller creates its own _view.
-        self._view = InvoiceTableView()
+        self._invoice_service = invoice_service
+        self._file_service = file_service
+        self._validation_service = validation_service
+        self._sort_service = sort_service
+        self._search_service = search_service
+        self._export_service = export_service
+        self._format_service = format_service
+        self._operation_service = operation_service
+        self._view = view
 
         # --- State Management ---
         self._all_invoices: List[InvoiceData] = []
@@ -41,7 +55,7 @@ class MainController(QObject):
 
         self._connect_signals()
 
-    def get_widget(self) -> QWidget:
+    def get_view(self) -> InvoiceTableView:
         """Returns the managed _view widget to be displayed in the main application."""
         return self._view
 
@@ -71,10 +85,10 @@ class MainController(QObject):
 
     def _refresh_data(self):
         try:
-            self._all_invoices = self._logic.load_invoices()
-            self._doc_counts = self._logic.get_all_document_counts()
-            self._translator_names = self._logic.get_translator_names()
-            self._filter_invoices(self._view.search_bar.text())  # Re-apply current filter
+            self._all_invoices = self._invoice_service.get_all_invoices()
+            self._doc_counts = self._invoice_service.get_all_document_counts()
+            self._translator_names = self._invoice_service.get_translator_names()
+            self._filter_invoices(self._view.search_bar.text())
             self._view.clear_search_bar()
             self.show_success("به‌روزرسانی", f"{len(self._all_invoices)} فاکتور با موفقیت بارگذاری شد.")
         except Exception as e:
@@ -82,7 +96,7 @@ class MainController(QObject):
             self.show_error("خطا", f"خطا در بارگذاری اطلاعات: {e}")
 
     def _filter_invoices(self, search_text: str):
-        self._filtered_invoices = self._logic.search_invoices(search_text, self._all_invoices)
+        self._filtered_invoices = self._invoice_service.search_invoices(search_text, self._all_invoices)
         self._view.update_table(self._filtered_invoices, self._doc_counts, self._translator_names)
         self._update_selection_display()
 
@@ -97,7 +111,7 @@ class MainController(QObject):
 
     def _delete_single_invoice(self, invoice_number: str):
         if self.show_confirmation(f"آیا از حذف فاکتور شماره {invoice_number} مطمئن هستید؟"):
-            if self._logic.delete_single_invoice(invoice_number):
+            if self._invoice_service.delete_single_invoice(invoice_number):
                 self.show_success("موفقیت", "فاکتور با موفقیت حذف شد.")
                 self._refresh_data()
             else:
@@ -110,7 +124,7 @@ class MainController(QObject):
             return
 
         if self.show_confirmation(f"آیا از حذف {count} فاکتور انتخاب شده مطمئن هستید؟"):
-            if self._logic.delete_multiple_invoices(self._selected_invoice_numbers):
+            if self._invoice_service.delete_multiple_invoices(self._selected_invoice_numbers):
                 self.show_success("موفقیت", f"{count} فاکتور با موفقیت حذف شدند.")
                 self._selected_invoice_numbers.clear()
                 self._refresh_data()
@@ -118,7 +132,7 @@ class MainController(QObject):
                 self.show_error("خطا", "عملیات حذف گروهی ناموفق بود.")
 
     def _edit_invoice(self, invoice_number: str):
-        invoice_to_edit = self._repo_manager.get_invoice_repository().get_invoice_by_number(invoice_number)
+        invoice_to_edit = self._invoice_service.get_invoice_by_number(invoice_number)
         if not invoice_to_edit:
             self.show_error("خطا", "فاکتور مورد نظر یافت نشد.")
             return
@@ -127,12 +141,12 @@ class MainController(QObject):
         if dialog.exec_():
             updated_data = dialog.get_updated_data()
             # Add validation here using self._validation_logic
-            is_valid, errors = self._logic.validate_invoice_data(updated_data)
+            is_valid, errors = self._validation_service.validate_invoice_data(updated_data)
             if not is_valid:
                 self.show_error("خطای اعتبارسنجی", "\n".join(errors))
                 return
 
-            if self._logic.update_invoice_data(invoice_number, updated_data):
+            if self._invoice_service.update_invoice_data(invoice_number, updated_data):
                 self.show_success("موفقیت", "فاکتور با موفقیت ویرایش شد.")
                 self._refresh_data()
             else:
@@ -140,26 +154,26 @@ class MainController(QObject):
 
     def _update_translator(self, invoice_number: str, translator_name: str):
         # Optional: Add confirmation
-        if self._logic.update_translator(invoice_number, translator_name):
+        if self._invoice_service.update_translator(invoice_number, translator_name):
             # No need for a success message, the UI update is enough
             self._refresh_data()  # Quick way to reflect change
         else:
             self.show_error("خطا", "به‌روزرسانی نام مترجم ناموفق بود.")
 
     def _open_pdf(self, invoice_number: str):
-        invoice = self._repo_manager.get_invoice_repository().get_invoice_by_number(invoice_number)
-        if invoice and invoice.pdf_file_path and self._file_logic.validate_pdf_path(invoice.pdf_file_path):
+        invoice = self._invoice_service.get_invoice_by_number(invoice_number)
+        if invoice and invoice.pdf_file_path and self._file_service.validate_pdf_path(invoice.pdf_file_path):
             self._view.open_pdf_file_path(invoice.pdf_file_path)
         else:
             if self.show_confirmation(
                     f"فایل PDF برای فاکتور {invoice_number} یافت نشد. آیا میخواهید فایل را انتخاب کنید؟"):
                 file_path = self._show_file_dialog("انتخاب فایل PDF", "*.pdf")
                 if file_path:
-                    self._repo_manager.get_invoice_repository().update_pdf_path(invoice_number, file_path)
+                    self._invoice_service.update_pdf_path(invoice_number, file_path)
                     self._view.open_pdf_file_path(file_path)
 
     def _show_summary(self):
-        summary = self._logic.get_invoice_summary()
+        summary = self._invoice_service.get_invoice_summary()
         if summary:
             dialog = SummaryDialog(summary, self._view)
             dialog.exec_()
@@ -172,7 +186,7 @@ class MainController(QObject):
 
         file_path = self._show_save_dialog("ذخیره فایل CSV", "invoices.csv", "*.csv")
         if file_path:
-            if self._logic.export_invoices_to_csv(self._selected_invoice_numbers, file_path):
+            if self._invoice_service.export_invoices_to_csv(self._selected_invoice_numbers, file_path):
                 self.show_success("موفقیت", f"اطلاعات {count} فاکتور با موفقیت در فایل ذخیره شد.")
             else:
                 self.show_error("خطا", "عملیات صدور فایل ناموفق بود.")
@@ -184,18 +198,18 @@ class MainController(QObject):
         self._view.toggle_column_filter_widgets(self._is_column_filter_visible)
 
     def _set_column_visibility(self, col_index: int, is_visible: bool):
-        self._logic.set_column_visibility(col_index, is_visible)
+        self._invoice_service.set_column_visibility(col_index, is_visible)
         self._view.set_column_visibility(col_index, is_visible)
 
     def _load_column_settings(self):
         # Pretend settings are loaded from a file/QSettings
-        visibility_states = self._logic.load_column_settings_from_source()
+        visibility_states = self._invoice_service.load_column_settings_from_source()
         self._view.restore_column_checkboxes(visibility_states)
         for i, is_visible in enumerate(visibility_states):
             self._set_column_visibility(i, is_visible)
 
     def _save_column_settings(self):
-        self._logic.save_column_settings_to_source()
+        self._invoice_service.save_column_settings_to_source()
         logger.info("Column settings saved.")
 
     # --- Dialog Helpers ---
