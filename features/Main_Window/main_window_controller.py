@@ -3,8 +3,12 @@
 from PySide6.QtCore import QObject
 from core.navigation import PageManager
 
+from features.Main_Window.main_window_view import MainWindowView
+from features.Main_Window.main_window_logic import MainWindowLogic
+
 from features.Home_Page.home_page_factory import HomePageFactory
 from features.Invoice_Page.wizard_host.invoice_wizard_factory import InvoiceWizardFactory
+from features.Admin_Panel.host_tab.host_tab_factory import AdminPanelFactory
 
 
 class MainWindowController(QObject):
@@ -13,7 +17,7 @@ class MainWindowController(QObject):
     Connects user actions from the _view to the application's business logic.
     """
 
-    def __init__(self, view: "InvoiceWizardWidget", logic: "InvoiceWizardLogic"):
+    def __init__(self, view: "MainWindowView", logic: "MainWindowLogic"):
         super().__init__()
 
         self._view = view
@@ -56,6 +60,14 @@ class MainWindowController(QObject):
             )
         )
 
+        self.page_manager.register(
+            "users",
+            lambda: AdminPanelFactory.create(
+                session_provider,
+                self._view
+            )
+        )
+
         print("Pages registered with PageManager.")
 
     def _connect_signals(self):
@@ -63,6 +75,7 @@ class MainWindowController(QObject):
         # --- Sidebar Navigation to use the PageManager ---
         self._view.home_button.clicked.connect(lambda: self.page_manager.show("home"))
         self._view.invoice_button.clicked.connect(lambda: self.page_manager.show("invoice"))
+        self._view.large_user_pic.clicked.connect(lambda: self.page_manager.show("users"))
         self._view.settings_button_clicked.connect(self._on_settings_button_clicked)
 
         # --- Titlebar Click ---

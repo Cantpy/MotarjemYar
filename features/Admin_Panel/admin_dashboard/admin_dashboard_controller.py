@@ -1,4 +1,4 @@
-# motarjemyar/admin_dashboard/admin_dashboard_controller.py
+# Admin_Panel/admin_dashboard/admin_dashboard_controller.py
 
 from .admin_dashboard_view import AdminDashboardView
 from .admin_dashboard_logic import AdminDashboardLogic

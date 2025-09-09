@@ -306,6 +306,7 @@ class AdminReportsView(QWidget):
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setFrameShape(QFrame.NoFrame)
+
         self.financial_reports = FinancialReportsWidget()
         scroll_area.setWidget(self.financial_reports)
 

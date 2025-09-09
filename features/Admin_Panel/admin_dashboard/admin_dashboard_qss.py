@@ -1,4 +1,4 @@
-# features/Admin_Panel/admin_dashboard_qss.py
+# features/Admin_Panel/admin_dashboard/admin_dashboard_qss.py
 
 ADMIN_DASHBOARD_STYLES = """
 QMainWindow {

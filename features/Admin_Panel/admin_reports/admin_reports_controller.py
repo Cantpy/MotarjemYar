@@ -1,4 +1,4 @@
-# motarjemyar/admin_reports/admin_reports_controller.py
+# Admin_Panel/admin_reports/admin_reports_controller.py
 
 from PySide6.QtWidgets import QFileDialog
 from shared import show_information_message_box, show_error_message_box, show_warning_message_box
@@ -212,7 +212,6 @@ class AdminReportsController:
         self._logic = logic
 
         # --- Create and store the sub-controllers, giving them their _view and dependencies ---
-        # The sub-controllers are stored as attributes to keep them alive.
         self.financial_controller = FinancialReportsController(self._view.financial_reports, self._logic)
         self.advanced_search_controller = AdvancedSearchController(self._view.advanced_search, self._logic)
 

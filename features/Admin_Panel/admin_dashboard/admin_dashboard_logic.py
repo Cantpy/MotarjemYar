@@ -1,17 +1,19 @@
-# motarjemyar/admin_dashboard/admin_dashboard_logic.py
+# features/Admin_Panel/admin_dashboard/admin_dashboard_logic.py
+
 from .admin_dashboard_repo import AdminDashboardRepository
 from .admin_dashboard_models import KpiData, AttentionQueueItem, TopPerformer
 from shared.utils.persian_tools import to_persian_numbers
 
+from shared. session_provider import SessionProvider
+
 
 class AdminDashboardLogic:
-    def __init__(self, repository, invoices_session_factory, customers_session_factory):
+    def __init__(self, repository: AdminDashboardRepository, session_provider: SessionProvider,):
         self._repo = repository
-        self.InvoicesSession = invoices_session_factory
-        self.CustomersSession = customers_session_factory
+        self._session_provider = session_provider
 
     def get_kpi_data(self) -> KpiData:
-        with self.InvoicesSession() as session:
+        with self._session_provider.invoices() as session:
             # Fetch raw numbers
             revenue_today = self._repo.get_revenue_today(session)
             revenue_month = self._repo.get_revenue_this_month(session)
@@ -28,7 +30,7 @@ class AdminDashboardLogic:
 
     def get_top_performers_data(self) -> dict:
         """Fetches and prepares data for the top performers widget."""
-        with self.InvoicesSession() as session:
+        with self._session_provider.invoices() as session:
             raw_translators = self._repo.get_top_translators_this_month(session)
             raw_clerks = self._repo.get_top_clerks_this_month(session)
 
@@ -44,7 +46,7 @@ class AdminDashboardLogic:
         """
         Fetches orders needing attention and enriches them with companion counts.
         """
-        with self.InvoicesSession() as inv_session, self.CustomersSession() as cust_session:
+        with self._session_provider.invoices() as inv_session, self._session_provider.customers() as cust_session:
             # 1. Get the primary invoice data
             raw_orders = self._repo.get_orders_needing_attention(inv_session)
             if not raw_orders:

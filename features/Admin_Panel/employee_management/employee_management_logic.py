@@ -10,19 +10,20 @@ from features.Admin_Panel.employee_management.employee_management_repo import Em
 from shared.orm_models.payroll_models import EmployeeModel, EmployeePayrollProfileModel
 from shared.orm_models.users_models import UsersModel, UserProfileModel
 
+from shared.session_provider import SessionProvider
+
 
 class UserManagementLogic:
-    def __init__(self, repository: EmployeeManagementRepository, users_session_factory, payroll_session_factory):
+    def __init__(self, repository: EmployeeManagementRepository, session_provider: SessionProvider):
         self._repo = repository
-        self.UsersSession = users_session_factory
-        self.PayrollSession = payroll_session_factory
+        self._session_provider = session_provider
 
     def get_all_employees_for_display(self) -> list[EmployeeFullData]:
         """
         Fetches all employees and their corresponding user data, combining them
         into a complete DTO for the _view.
         """
-        with self.PayrollSession() as p_sess, self.UsersSession() as u_sess:
+        with self._session_provider.payroll() as p_sess, self._session_provider.users() as u_sess:
             employees = self._repo.get_all_employees_with_details(p_sess)
             national_ids = [emp.national_id for emp in employees if emp.national_id]
             users_map = self._repo.get_users_map(u_sess, national_ids)
@@ -102,7 +103,7 @@ class UserManagementLogic:
             )
         )
 
-        with self.PayrollSession() as p_sess, self.UsersSession() as u_sess:
+        with self._session_provider.payroll() as p_sess, self._session_provider.users() as u_sess:
             self._repo.save_new_employee_and_user(p_sess, u_sess, employee, user, profile)
 
     def _update_existing_employee(self, data: EmployeeFullData):
@@ -128,7 +129,7 @@ class UserManagementLogic:
             'children_count': data.children_count
         }
 
-        with self.PayrollSession() as p_sess, self.UsersSession() as u_sess:
+        with self._session_provider.payroll() as p_sess, self._session_provider.users() as u_sess:
             self._repo.update_employee_and_user(payroll_session=p_sess, users_session=u_sess,
                                                 employee_id=data.employee_id, user_id=data.user_id,
                                                 employee_changes=employee_changes, user_changes=user_changes,
@@ -140,6 +141,6 @@ class UserManagementLogic:
         if not employee_id and user_national_id:
             raise ValueError("شناسه کارمند و کد ملی برای حذف ضروری است.")
 
-        with self.PayrollSession() as p_sess, self.UsersSession() as u_sess:
+        with self._session_provider.payroll() as p_sess, self._session_provider.users() as u_sess:
             self._repo.delete_employee_and_user(payroll_session=p_sess, users_session=u_sess,
                                                 employee_id=employee_id, national_id=user_national_id)

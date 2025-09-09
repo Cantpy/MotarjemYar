@@ -1,4 +1,4 @@
-# motarjemyar/admin_dashboard/admin_dashboard_view.py
+# features/Admin_Panel/admin_dashboard/admin_dashboard_view.py
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QGroupBox,
                                QFrame, QGridLayout, QListWidget, QListWidgetItem)

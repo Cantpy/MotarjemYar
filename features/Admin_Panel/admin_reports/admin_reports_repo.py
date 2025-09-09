@@ -80,11 +80,17 @@ class AdminReportsRepository:
             label_name='foreign_affairs_seal').scalar() or 0
 
         # 2. Get monthly counts of seals from invoices.db
-        results = invoices_session.query(
-            extract('month', IssuedInvoiceModel.issue_date).label('month'),
-            func.sum(IssuedInvoiceModel.total_judiciary_count).label('jud_count'),
-            func.sum(IssuedInvoiceModel.total_foreign_affairs_count).label('fa_count')
-        ).filter(IssuedInvoiceModel.issue_date.between(start_date, end_date)).group_by('month').all()
+        results = (
+            invoices_session.query(
+                extract('month', IssuedInvoiceModel.issue_date).label('month'),
+                func.sum(InvoiceItemModel.has_judiciary_seal).label('jud_count'),
+                func.sum(InvoiceItemModel.has_foreign_affairs_seal).label('fa_count')
+            )
+            .join(InvoiceItemModel, IssuedInvoiceModel.invoice_number == InvoiceItemModel.invoice_number)
+            .filter(IssuedInvoiceModel.issue_date.between(start_date, end_date))
+            .group_by('month')
+            .all()
+        )
 
         # 3. Calculate total cost per month
         monthly_costs = {}

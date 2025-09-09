@@ -1,4 +1,4 @@
-# motarjemyar/wage_calculator/wage_calculator_repo.py
+# Admin_Panel/wage_calculator/wage_calculator_repo.py
 
 from sqlalchemy.orm import Session, joinedload
 from datetime import date, timedelta
