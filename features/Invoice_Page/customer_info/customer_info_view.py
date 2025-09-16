@@ -26,7 +26,6 @@ class CustomerInfoWidget(QWidget):
         super().__init__(parent)
         self.setObjectName("CustomerInfoWidget")
         self.setWindowTitle("فرم اطلاعات مشتریان")
-        self.setGeometry(100, 100, 1200, 800)
 
         # Set stylesheets
         self.setStyleSheet(CUSTOMER_INFO_STYLES)

@@ -421,7 +421,6 @@ class MainInvoicePreviewWidget(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("پیش نمایش فاکتور")
-        self.setGeometry(100, 100, 1200, 900)
         self.setStyleSheet(f"background-color: {PRIMARY_BACKGROUND_COLOR};")
 
         main_layout = QHBoxLayout(self)

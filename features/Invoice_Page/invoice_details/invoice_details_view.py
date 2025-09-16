@@ -22,7 +22,6 @@ class InvoiceDetailsWidget(QWidget):
     def __init__(self):
         super().__init__()
         self.setObjectName("InvoiceDetailsView")
-        self.resize(1200, 800)
         self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
 
         self._is_programmatically_updating = False

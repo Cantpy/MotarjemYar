@@ -23,7 +23,6 @@ class DocumentSelectionWidget(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.resize(1200, 800)
         self.setObjectName("DocumentSelectionWidget")
         self.setStyleSheet(DOC_SELECTION_STYLES)
         self._is_updating_table = False

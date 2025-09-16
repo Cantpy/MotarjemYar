@@ -140,7 +140,6 @@ class UserManagementWidget(QWidget):
         self.avatar_path = None
         self.db_path = dp_path
         self.setWindowTitle("مدیریت کاربران")
-        self.resize(1200, 800)
         self.setup_ui()
         self.load_users()
 

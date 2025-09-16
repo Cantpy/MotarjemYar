@@ -49,7 +49,6 @@ class HomePageView(QWidget):
     def _init_ui(self):
         """Initialize the user interface."""
         self.setObjectName("HomePageView")
-        self.setGeometry(100, 100, 1200, 800)
 
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(20, 20, 20, 20)

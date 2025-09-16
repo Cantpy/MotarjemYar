@@ -36,47 +36,26 @@ class FixedPricesFactory:
 
 
 if __name__ == '__main__':
+    import sys
+    from PySide6.QtWidgets import QApplication
+    from core.database_init import DatabaseInitializer
+    from core.database_seeder import DatabaseSeeder
+    from core.config import DATABASE_PATHS
+
     app = QApplication(sys.argv)
 
-    customers_engine = create_engine(f"sqlite:///{CUSTOMERS_DB_URL}")
-    invoices_engine = create_engine(f"sqlite:///{INVOICES_DB_URL}")
-    services_engine = create_engine(f"sqlite:///{SERVICES_DB_URL}")
-    expenses_engine = create_engine(f"sqlite:///{EXPENSES_DB_URL}")
-    users_engine = create_engine(f"sqlite:///{USERS_DB_URL}")
-    payroll_engine = create_engine(f"sqlite:///{PAYROLL_DB_URL}")
+    # 1. Initialize databases
+    initializer = DatabaseInitializer()
+    session_provider = initializer.setup_file_databases(DATABASE_PATHS)
 
-    # 2. Create the tables in the database
-    BaseCustomers.metadata.create_all(customers_engine)
-    BaseInvoices.metadata.create_all(invoices_engine)
-    BaseServices.metadata.create_all(services_engine)
-    BaseExpenses.metadata.create_all(expenses_engine)
-    BaseUsers.metadata.create_all(users_engine)
-    BasePayroll.metadata.create_all(payroll_engine)
+    # 2. Seed (optional – dev/test mode)
+    seeder = DatabaseSeeder(session_provider)
+    seeder.seed_initial_data()
 
-    # 3. Create the application-wide SessionProvider instance
-    app_engines = {
-        'customers': customers_engine,
-        'invoices': invoices_engine,
-        'services': services_engine,
-        'expenses': expenses_engine,
-        'users': users_engine,
-        'payroll': payroll_engine,
-    }
-    session_provider = SessionProvider(app_engines)
+    # 3. Use factory
+    controller = FixedPricesFactory.create(session_provider=session_provider)
 
-    create_mock_data(session_provider.invoices, session_provider.customers,
-                     session_provider.services, session_provider.expenses,
-                     session_provider.users, session_provider.payroll)
-
-    # --- Factory Usage Phase ---
-    # Now, we use the clean factory, passing in the dependencies we just created.
-    controller = FixedPricesFactory.create(
-        session_provider=session_provider,
-    )
-
-    # --- Run the UI ---
     main_widget = controller.get_view()
     main_widget.show()
 
     sys.exit(app.exec())
-

@@ -11,6 +11,7 @@ from features.Invoice_Page.wizard_host.invoice_wizard_factory import InvoiceWiza
 from features.Admin_Panel.host_tab.host_tab_factory import AdminPanelFactory
 from features.Invoice_Table.invoice_table_factory import InvoiceTableFactory
 from features.Services.tab_manager.tab_manager_factory import ServicesManagementFactory
+from features.Info_Page.info_page_factory import InfoPageFactory
 
 
 class MainWindowController(QObject):
@@ -87,6 +88,14 @@ class MainWindowController(QObject):
                 self._view
             )
         )
+
+        self.page_manager.register(
+            'info_page',
+            lambda: InfoPageFactory.create(
+                session_provider,
+                self._view
+            )
+        )
         print("Pages registered with PageManager.")
 
     def _connect_signals(self):
@@ -97,6 +106,7 @@ class MainWindowController(QObject):
         self._view.large_user_pic.clicked.connect(lambda: self.page_manager.show("users"))
         self._view.issued_invoices_button.clicked.connect(lambda: self.page_manager.show('invoice_table'))
         self._view.documents_button.clicked.connect(lambda: self.page_manager.show('services'))
+        self._view.help_button.clicked.connect(lambda: self.page_manager.show('info_page'))
         self._view.settings_button_clicked.connect(self._on_settings_button_clicked)
 
         # --- Titlebar Click ---
