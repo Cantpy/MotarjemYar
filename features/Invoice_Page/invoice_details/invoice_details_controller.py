@@ -33,7 +33,7 @@ class InvoiceDetailsController:
         office_info = self._logic.get_static_office_info()
         self._view.display_static_info(customer, office_info)
 
-        # 2. Ask logic to calculate the initial DTO
+        # 2. Ask _logic to calculate the initial DTO
         self._current_details = self._logic.create_initial_details(customer, items)
 
         # 3. Update the view and the global state with the initial DTO

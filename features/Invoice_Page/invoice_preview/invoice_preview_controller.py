@@ -50,10 +50,10 @@ class InvoicePreviewController:
             show_error_message_box(self._view, "خطای داده", "اطلاعات لازم برای ساخت پیش‌نمایش فاکتور یافت نشد.")
             return
 
-        # 2. Ask the logic layer to assemble the final Invoice DTO
+        # 2. Ask the _logic layer to assemble the final Invoice DTO
         self._invoice = self._logic.assemble_invoice_data(customer, details, assignments)
 
-        # 3. Use the logic layer for pagination calculations
+        # 3. Use the _logic layer for pagination calculations
         self.current_page = 1
         self.total_pages = self._logic.get_total_pages(self._invoice)
         self._update_view()

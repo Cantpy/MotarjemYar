@@ -65,7 +65,7 @@ class MainWindowView(QMainWindow):
     The main application window (View).
     - It is "dumb" and only knows how to display data and emit signals on user actions.
     - It is initialized and shown by the main application entry point.
-    - A Controller will connect to its signals to add logic.
+    - A Controller will connect to its signals to add _logic.
     """
     # --- Action Signals ---
     # Signals the _view emits for the controller to listen to.

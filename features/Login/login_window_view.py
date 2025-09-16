@@ -190,7 +190,7 @@ class LoginWidget(QWidget):
     def toggle_password_visibility_ui(self, current_echo_mode: int) -> None:
         """
         PUBLIC SLOT: Toggles the visibility of the password input field.
-        This method contains all the UI update logic.
+        This method contains all the UI update _logic.
         """
         if current_echo_mode == QLineEdit.Password:
             self.password_input.setEchoMode(QLineEdit.Normal)

@@ -60,11 +60,11 @@ class DocumentSelectionController(QObject):
             if dialog.exec() == QDialog.Accepted:
                 # 1. Get the raw user input from the dialog
                 item_shell = dialog.result_item
-                # 2. Ask the logic layer to perform the authoritative calculation
+                # 2. Ask the _logic layer to perform the authoritative calculation
                 final_item = self._logic.calculate_invoice_item(item_shell)
 
         if final_item:
-            # The logic returns the new, complete list
+            # The _logic returns the new, complete list
             updated_items = self._logic.add_item(final_item)
 
             # Refresh the local view AND emit the signal for the outside world

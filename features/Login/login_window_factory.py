@@ -30,7 +30,7 @@ class LoginWindowFactory:
         login_repo = LoginRepository()
         settings_repo = LoginSettingsRepository()
 
-        # 2. Instantiate the logic layer, injecting both repositories
+        # 2. Instantiate the _logic layer, injecting both repositories
         #    and the specific session maker it needs.
         logic = LoginService(
             repo=login_repo,

@@ -51,7 +51,7 @@ class AdminDashboardRepository:
         """
         today = date.today()
         start_of_month = today.replace(day=1)
-        # Simplified logic: count distinct customers with an invoice this month
+        # Simplified _logic: count distinct customers with an invoice this month
         # A more complex version would check if their *first ever* invoice was this month.
         count = session.query(func.count(IssuedInvoiceModel.national_id.distinct())).filter(
             IssuedInvoiceModel.issue_date >= start_of_month

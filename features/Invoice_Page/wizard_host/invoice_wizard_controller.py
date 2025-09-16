@@ -55,7 +55,7 @@ class InvoiceWizardController(QObject):
         """Orchestrates the entire forward navigation workflow."""
         current_index = self._view.stacked_widget.currentIndex()
 
-        # 1. Ask the logic layer for the next step and any necessary actions
+        # 1. Ask the _logic layer for the next step and any necessary actions
         next_index, payload = self._logic.get_next_step(current_index, self._state_manager)
 
         # 2. Perform actions based on the payload BEFORE navigating
@@ -87,11 +87,11 @@ class InvoiceWizardController(QObject):
         self._view.set_current_step(prev_index)
 
     def _handle_customer_save_confirmation(self) -> bool:
-        """Handles the UI logic for confirming if a new customer should be saved."""
+        """Handles the UI _logic for confirming if a new customer should be saved."""
         customer_ctrl = self.sub_controllers['customer']
         raw_data = customer_ctrl.get_view().get_current_data()
 
-        # Here we need to access the sub-controller's logic to check status. This is acceptable.
+        # Here we need to access the sub-controller's _logic to check status. This is acceptable.
         status, customer_obj = customer_ctrl._logic.check_customer_status(raw_data)
 
         if status == "NEW":  # CustomerStatus.NEW

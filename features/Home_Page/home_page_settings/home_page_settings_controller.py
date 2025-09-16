@@ -28,6 +28,6 @@ class HomepageSettingsController(QObject):
             show_warning_message_box(self._dialog, "خطای اعتبارسنجی", message)
             return  # Keep dialog open for user to fix
 
-        # If validation passes, tell logic to save
+        # If validation passes, tell _logic to save
         self._logic.save_settings(updated_settings)
         self._dialog.accept()     # Close the dialog

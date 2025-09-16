@@ -24,7 +24,7 @@ from shared.utils.persian_tools import get_persian_delivery_status
 class HomePageController(QObject):
     """
     Controller for home page operations.
-    Connects the View to the business logic and settings manager.
+    Connects the View to the business _logic and settings manager.
     """
 
     def __init__(self, view: HomePageView, logic: HomePageLogic, settings_manager: HomepageSettingsLogic):
@@ -62,10 +62,10 @@ class HomePageController(QObject):
     def _on_operations_menu_requested(self, invoice_number: int, global_pos: QPoint):
         """
         Creates and shows the operations context menu for a given invoice.
-        This logic now resides ENTIRELY in the controller.
+        This _logic now resides ENTIRELY in the controller.
         """
-        # 1. Get the necessary data from the logic layer
-        # Assuming you have a DTO and a logic method for this
+        # 1. Get the necessary data from the _logic layer
+        # Assuming you have a DTO and a _logic method for this
         invoice_details = self._logic.get_invoice_details_for_menu(invoice_number)
 
         if not invoice_details:
@@ -135,7 +135,7 @@ class HomePageController(QObject):
     def handle_change_invoice_status_request(self, invoice_number: int):
         """Handles the request to open the status change dialog."""
 
-        # 1. Ask the logic layer for the next step info
+        # 1. Ask the _logic layer for the next step info
         next_step_info = self._logic.get_available_next_step(invoice_number)
 
         if next_step_info is None:
@@ -167,7 +167,7 @@ class HomePageController(QObject):
         This is the single point of action.
         """
         try:
-            # REFACTORED: A single call to the logic layer's unit of work.
+            # REFACTORED: A single call to the _logic layer's unit of work.
             success, message = self._logic.change_invoice_status(request)
 
             if success:
@@ -186,10 +186,10 @@ class HomePageController(QObject):
     def _show_notification_dialog(self, invoice_number: int):
         """
         Shows the SMS/Email notification dialog.
-        It gets data from the logic layer first.
+        It gets data from the _logic layer first.
         """
         try:
-            # REFACTORED: Get a DTO from the logic layer.
+            # REFACTORED: Get a DTO from the _logic layer.
             notification_data = self._logic.get_data_for_notification(invoice_number)
             if not notification_data:
                 show_error_message_box(self._view, "خطا", "اطلاعات مورد نیاز برای اطلاع‌رسانی یافت نشد.")
@@ -200,7 +200,7 @@ class HomePageController(QObject):
 
             # 2. Connect to its signals
             dialog.send_sms_requested.connect(self._on_send_sms_requested)
-            # We need the national_id for the email update logic, so we fetch it here
+            # We need the national_id for the email update _logic, so we fetch it here
             national_id = self._logic.get_invoice_for_menu(invoice_number).national_id
             dialog.send_email_requested.connect(
                 lambda req: self._on_send_email_requested(req, str(national_id))

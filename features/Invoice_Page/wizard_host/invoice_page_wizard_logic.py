@@ -7,7 +7,7 @@ from features.Invoice_Page.document_selection.document_selection_models import I
 
 class InvoiceWizardLogic:
     """
-    The pure Python 'brain' of the wizard. Contains all navigation and workflow logic.
+    The pure Python 'brain' of the wizard. Contains all navigation and workflow _logic.
     """
 
     # --- Public Slots for the Controller to Call ---
@@ -18,7 +18,7 @@ class InvoiceWizardLogic:
         Returns the new index and an optional data payload for the controller.
         """
         if current_index == 0:  # From Customer Info
-            # The logic to decide whether to show a dialog now returns a "command"
+            # The _logic to decide whether to show a dialog now returns a "command"
             # as part of the data payload.
             return 1, {'action': 'CHECK_CUSTOMER_STATUS'}
 
@@ -51,7 +51,7 @@ class InvoiceWizardLogic:
     def _unpack_invoice_items(self, items: list) -> list:  # list[InvoiceItem]
         """
         Unpacks items with quantity > 1 into individual items.
-        This is pure data transformation, perfect for the logic layer.
+        This is pure data transformation, perfect for the _logic layer.
         """
         unpacked_list = []
         for item in items:

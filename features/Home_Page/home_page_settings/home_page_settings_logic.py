@@ -1,4 +1,4 @@
-# features/home_page/settings/logic.py
+# features/home_page/settings/_logic.py
 from typing import Optional, List
 from PySide6.QtCore import QObject, Signal
 from features.Home_Page.home_page_settings.home_page_settings_models import Settings

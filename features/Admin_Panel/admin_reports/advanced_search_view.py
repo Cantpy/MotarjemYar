@@ -150,7 +150,7 @@ class AdvancedSearchView(QWidget):
 
             # Add validation
             if start_date_obj and end_date_obj:
-                # Convert the jdatetime object to a standard Python date for the logic layer
+                # Convert the jdatetime object to a standard Python date for the _logic layer
                 criteria['start_date'] = start_date_obj
                 criteria['end_date'] = end_date_obj
             else:

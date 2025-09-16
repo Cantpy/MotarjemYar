@@ -2,8 +2,7 @@
 
 import sys
 from PySide6.QtWidgets import QApplication
-from sqlalchemy import create_engine, Engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine
 
 from features.Admin_Panel.admin_dashboard.admin_dashboard_controller import AdminDashboardController
 from features.Admin_Panel.admin_dashboard.admin_dashboard_view import AdminDashboardView

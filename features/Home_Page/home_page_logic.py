@@ -1,4 +1,4 @@
-# home_page/logic.py
+# home_page/_logic.py
 
 import jdatetime
 from datetime import date, timedelta
@@ -18,7 +18,7 @@ from shared.session_provider import SessionProvider
 
 
 class HomePageLogic:
-    """Business logic for home page operations. Manages units of work."""
+    """Business _logic for home page operations. Manages units of work."""
 
     def __init__(self, repository: HomePageRepository,
                  session_provider: SessionProvider):
@@ -57,7 +57,7 @@ class HomePageLogic:
     def get_recent_invoices_with_priority(self, days_threshold: int = 7) -> List[Tuple[IssuedInvoiceDTO, str]]:
         """
         Get recent invoices with priority labels.
-        This business logic does not belong in the repository.
+        This business _logic does not belong in the repository.
         """
         today = date.today()
         threshold_date = today + timedelta(days=days_threshold)
@@ -77,7 +77,7 @@ class HomePageLogic:
                 invoice_dto = self._map_orm_to_invoice_dto(model)
                 invoice_priority_list.append((invoice_dto, priority))
 
-        # Sorting is business logic
+        # Sorting is business _logic
         invoice_priority_list.sort(key=lambda x: x[0].delivery_date)
         return invoice_priority_list
 
@@ -103,7 +103,7 @@ class HomePageLogic:
 
         # Now, map the data from our ORM models into the clean DTO.
         # Prioritize the data from the official customer record, but fall back
-        # to the data stored on the invoice if necessary. This is business logic!
+        # to the data stored on the invoice if necessary. This is business _logic!
         customer_name = customer_model.name if customer_model else invoice_model.name
         customer_phone = customer_model.phone if customer_model else invoice_model.phone
         customer_email = customer_model.email if customer_model else None
@@ -117,7 +117,7 @@ class HomePageLogic:
 
     def change_invoice_status(self, request: StatusChangeRequest) -> Tuple[bool, str]:
         """
-        Handles all business logic for changing an invoice's status.
+        Handles all business _logic for changing an invoice's status.
         This is a single, consolidated transactional unit of work.
         """
         with self.session_provider.invoices() as session:
@@ -189,7 +189,7 @@ class HomePageLogic:
         if not raw_data:
             return None
         name, total_qty = raw_data
-        # Formatting and conversion logic lives here!
+        # Formatting and conversion _logic lives here!
         return f"{name} - {to_persian_numbers(total_qty)}"
 
     @staticmethod
@@ -213,7 +213,7 @@ class HomePageLogic:
                                12: "اسفند"}
 
         try:
-            # Date and number conversion logic lives here!
+            # Date and number conversion _logic lives here!
             g_date = jdatetime.date.fromgregorian(year=int(year), month=int(month), day=1)
             persian_month = persian_month_names.get(g_date.month, "")
             persian_year = to_persian_numbers(g_date.year)
@@ -297,12 +297,12 @@ class HomePageLogic:
             if not invoice:
                 return None
 
-            # The business logic from the old `can_advance` method is now here.
+            # The business _logic from the old `can_advance` method is now here.
             # Note how readable this is with the Enum!
             if invoice.delivery_status >= DeliveryStatus.COLLECTED:
                 return None
 
-            # The business logic from `get_next_step_text` is now here.
+            # The business _logic from `get_next_step_text` is now here.
             current_status = DeliveryStatus(invoice.delivery_status)  # Cast int to Enum
             next_step_map = {
                 DeliveryStatus.ISSUED: "تعیین مترجم",
@@ -319,7 +319,7 @@ class HomePageLogic:
 
     def send_sms_notification(self, sms_request: SmsRequestDTO) -> Tuple[bool, str]:
         """
-        Handles the business logic of sending an SMS via an external API.
+        Handles the business _logic of sending an SMS via an external API.
         """
         try:
             url = 'https://console.melipayamak.com/api/send/simple/...'  # Your API key
@@ -335,7 +335,7 @@ class HomePageLogic:
 
     def send_email_notification(self, email_request: EmailRequestDTO, national_id: str) -> Tuple[bool, str]:
         """
-        Handles the business logic of sending an email and updating customer info.
+        Handles the business _logic of sending an email and updating customer info.
         """
         # Business Rule: Update the customer's email if it has changed.
         with self.session_provider.customers() as session:
@@ -348,7 +348,7 @@ class HomePageLogic:
                 session.rollback()
                 return False, f"خطا در به‌روزرسانی ایمیل مشتری: {e}"
 
-        # Actual email sending logic would go here.
+        # Actual email sending _logic would go here.
         # For now, we simulate success.
         print(
             f"Simulating email send to {email_request.recipient_email} with {len(email_request.attachments)} attachments.")

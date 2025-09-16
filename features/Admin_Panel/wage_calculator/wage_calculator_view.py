@@ -106,7 +106,7 @@ class WageCalculatorView(QWidget):
     def _on_run_payroll_btn_clicked(self):
         """
         A simple handler method that just emits the signal to the controller.
-        It contains no complex logic.
+        It contains no complex _logic.
         """
         self.run_payroll_requested.emit()
 

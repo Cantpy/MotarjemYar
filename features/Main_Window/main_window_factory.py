@@ -20,7 +20,7 @@ class MainWindowFactory:
         Returns:
             The fully configured InvoiceWizardController.
         """
-        # The logic layer holds the session provider to pass down to sub-features.
+        # The _logic layer holds the session provider to pass down to sub-features.
         login_repository = LoginRepository()
         logic = MainWindowLogic(session_provider, login_repository)
         view = MainWindowView()  # The QMainWindow widget

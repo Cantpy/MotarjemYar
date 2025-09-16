@@ -11,7 +11,7 @@ from shared import to_persian_number
 from shared.widgets.custom_widgets import create_stat_card
 
 
-# --- NEW: Move all old chart logic into its own class for cleanliness ---
+# --- NEW: Move all old chart _logic into its own class for cleanliness ---
 class FinancialReportsWidget(QWidget):
     """
     The user interface for the Reports Tab.

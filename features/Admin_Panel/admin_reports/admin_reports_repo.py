@@ -37,7 +37,7 @@ class AdminReportsRepository:
         """Fetches aggregated paid revenue for each month of a specific Jalali year."""
         start_date, end_date = self._get_gregorian_date_range_for_jalali_year(year)
 
-        # The query logic is already correct
+        # The query _logic is already correct
         revenue_data = session.query(
             extract('month', IssuedInvoiceModel.issue_date).label('gregorian_month'),
             func.sum(IssuedInvoiceModel.final_amount).label('total_revenue')

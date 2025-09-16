@@ -7,7 +7,7 @@ from decimal import Decimal
 
 @dataclass
 class EmployeeFullData:
-    """A DTO for transferring all Employee data between UI and logic."""
+    """A DTO for transferring all Employee data between UI and _logic."""
     employee_id: str | None = None
     # Personal Info (from EmployeeModel)
     first_name: str = ""

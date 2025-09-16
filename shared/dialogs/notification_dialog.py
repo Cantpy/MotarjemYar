@@ -140,7 +140,7 @@ class NotificationDialog(QDialog):
     def _on_send_clicked(self):
         """
         Gathers data from the form fields and emits the appropriate signal.
-        This is the dialog's only "action" logic.
+        This is the dialog's only "action" _logic.
         """
         current_tab = self.tab_widget.currentIndex()
 

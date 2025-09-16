@@ -12,7 +12,7 @@ from .descriptive_search_parser import DescriptiveSearchParser
 
 # --- Sub-Controller for the Financial Charts Tab ---
 class FinancialReportsController:
-    """Manages the logic for the annual financial charts."""
+    """Manages the _logic for the annual financial charts."""
 
     def __init__(self, view, logic):
         self._view = view
@@ -78,7 +78,7 @@ class FinancialReportsController:
 
 # --- Sub-Controller for the Advanced Search Tab ---
 class AdvancedSearchController:
-    """Manages the logic for the advanced search queries."""
+    """Manages the _logic for the advanced search queries."""
 
     def __init__(self, view, logic):
         self._view = view
@@ -105,7 +105,7 @@ class AdvancedSearchController:
 
         if criteria:
             print(f"Parsed criteria: {criteria}")
-            self.perform_search(criteria)  # Reuse the existing search logic!
+            self.perform_search(criteria)  # Reuse the existing search _logic!
         else:
             show_warning_message_box(self._view,
                                      "نامفهوم",

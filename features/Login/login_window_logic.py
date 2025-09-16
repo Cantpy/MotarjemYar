@@ -15,7 +15,7 @@ from shared.dtos.auth_dtos import RememberSettingsDTO, UserLoginDTO, LoggedInUse
 
 class LoginService:
     """
-    The refactored logic layer for the login feature.
+    The refactored _logic layer for the login feature.
     """
     def __init__(self, repo: LoginRepository, settings_repo: LoginSettingsRepository,
                  user_session_factory: sessionmaker):
@@ -26,14 +26,14 @@ class LoginService:
     def login(self, login_dto: UserLoginDTO) -> tuple[bool, str, Optional[LoggedInUserDTO]]:
         """
         A single, powerful method to handle the entire login process.
-        It authenticates and then handles the 'remember me' logic internally.
+        It authenticates and then handles the 'remember me' _logic internally.
         """
         # Step 1: Authenticate the user.
         success, message, user_dto = self.authenticate_user(login_dto)
         if not success:
             return False, message, None
 
-        # Step 2: If authentication is successful, handle the 'remember me' logic.
+        # Step 2: If authentication is successful, handle the 'remember me' _logic.
         # This is the business rule: "On successful login, update the remember me state."
         if login_dto.remember_me:
             self._setup_remember_me(login_dto.username)

@@ -18,7 +18,7 @@ class AdminDashboardController:
 
     def load_dashboard_data(self):
         try:
-            # Get the fully prepared dataclasses from the logic layer
+            # Get the fully prepared dataclasses from the _logic layer
             kpi_data = self._logic.get_kpi_data()
             orders_data = self._logic.get_attention_queue()
             performers_data = self._logic.get_top_performers_data()

@@ -26,7 +26,7 @@ class DashboardStats:
     most_repeated_document_month: Optional[str] = None
 
     def get_value_by_id(self, stat_id: str) -> str:
-        # This is simple _view-helper logic, so it's acceptable here.
+        # This is simple _view-helper _logic, so it's acceptable here.
         value_map = {
             'total_customers': str(self.total_customers),
             'total_invoices': str(self.total_invoices),

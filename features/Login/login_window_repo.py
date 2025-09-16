@@ -17,7 +17,7 @@ class LoginRepository:
             return user
         except SQLAlchemyError as e:
             print(f"SQLAlchemyError in get_user_by_username: {e}")
-            raise   # Re-raise to allow service/logic to handle transaction rollback
+            raise   # Re-raise to allow service/_logic to handle transaction rollback
         except Exception as e:
             print(f"Unexpected error in get_user_by_username: {e}")
             raise

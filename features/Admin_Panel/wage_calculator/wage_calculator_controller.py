@@ -36,10 +36,10 @@ class WageCalculatorController:
     def _on_run_payroll_requested(self):
         """
         Handles the entire 'Run Payroll' workflow.
-        This is the correct location for this logic.
+        This is the correct location for this _logic.
         """
         try:
-            # 1. Get the full list of employees from the logic layer.
+            # 1. Get the full list of employees from the _logic layer.
             employees = self._logic.get_employee_list()
 
             # 2. Perform validation within the controller.

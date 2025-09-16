@@ -24,7 +24,7 @@ class HomePageView(QWidget):
     """
     Main _view class for the home page dashboard.
     Displays statistics, recent invoices, and provides navigation controls.
-    This is a "Passive View" - it holds no logic.
+    This is a "Passive View" - it holds no _logic.
     """
     # Signals emitted by the _view for the controller to act upon
     refresh_requested = Signal()

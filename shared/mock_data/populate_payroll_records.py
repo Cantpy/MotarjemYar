@@ -23,9 +23,9 @@ def populate_historical_payroll_records(
 
     print("Populating Payroll.db with historical payroll records...")
 
-    # We need a temporary instance of the logic layer to run the calculations
+    # We need a temporary instance of the _logic layer to run the calculations
     temp_repo = WageCalculatorRepository()
-    # Create the logic instance with the factories it needs
+    # Create the _logic instance with the factories it needs
     temp_logic = WageCalculatorLogic(
         repository=temp_repo,
         invoices_session_factory=invoices_session_factory,
@@ -56,7 +56,7 @@ def populate_historical_payroll_records(
 
             mock_overtime = {emp.employee_id: random.randint(0, 20) for emp in employees}
 
-            # Use the application's own logic to create the records
+            # Use the application's own _logic to create the records
             temp_logic.execute_pay_run(year, month, mock_overtime)
         except Exception as e:
             print(

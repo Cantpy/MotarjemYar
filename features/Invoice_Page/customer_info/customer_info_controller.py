@@ -28,7 +28,7 @@ class CustomerInfoController:
         self._view.fetch_customer_details_requested.connect(self._on_fetch_details_requested)
 
     def _populate_view_completer(self):
-        """Fetches completer data from logic and populates the view."""
+        """Fetches completer data from _logic and populates the view."""
         completer_data = self._logic.get_all_customer_and_companion_info()
         self._view.populate_completer(completer_data)
 
@@ -57,7 +57,7 @@ class CustomerInfoController:
         This method orchestrates the validation and saving process.
         """
         try:
-            # The logic layer now handles all validation internally.
+            # The _logic layer now handles all validation internally.
             saved_customer = self._logic.save_customer(raw_data)
             self._state_manager.set_customer(saved_customer)
             self._view.clear_form() # Clear form on success
@@ -73,7 +73,7 @@ class CustomerInfoController:
         except CustomerExistsError as e:
             # If customer exists, ask the user if they want to update.
             def on_confirm_update():
-                # The logic layer will handle the update.
+                # The _logic layer will handle the update.
                 updated_customer = self._logic.update_customer(e.customer)
                 self._state_manager.set_customer(updated_customer)
                 self._view.show_save_success("اطلاعات مشتری با موفقیت بروزرسانی شد!")
@@ -86,7 +86,7 @@ class CustomerInfoController:
             )
 
         except Exception as e:
-            # Catch any other unexpected errors from the logic layer.
+            # Catch any other unexpected errors from the _logic layer.
             self._view.show_error(f"یک خطای پیشبینی نشده رخ داد: {e}")
 
     def get_all_customer_info_for_completer(self) -> List[Dict]:

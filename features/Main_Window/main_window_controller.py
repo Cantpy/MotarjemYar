@@ -10,12 +10,13 @@ from features.Home_Page.home_page_factory import HomePageFactory
 from features.Invoice_Page.wizard_host.invoice_wizard_factory import InvoiceWizardFactory
 from features.Admin_Panel.host_tab.host_tab_factory import AdminPanelFactory
 from features.Invoice_Table.invoice_table_factory import InvoiceTableFactory
+from features.Services.tab_manager.tab_manager_factory import ServicesManagementFactory
 
 
 class MainWindowController(QObject):
     """
     Controller for the main application window.
-    Connects user actions from the _view to the application's business logic.
+    Connects user actions from the _view to the application's business _logic.
     """
 
     def __init__(self, view: "MainWindowView", logic: "MainWindowLogic"):
@@ -78,6 +79,14 @@ class MainWindowController(QObject):
                 self._view
             )
         )
+
+        self.page_manager.register(
+            "services",
+            lambda: ServicesManagementFactory.create(
+                session_provider,
+                self._view
+            )
+        )
         print("Pages registered with PageManager.")
 
     def _connect_signals(self):
@@ -87,6 +96,7 @@ class MainWindowController(QObject):
         self._view.invoice_button.clicked.connect(lambda: self.page_manager.show("invoice"))
         self._view.large_user_pic.clicked.connect(lambda: self.page_manager.show("users"))
         self._view.issued_invoices_button.clicked.connect(lambda: self.page_manager.show('invoice_table'))
+        self._view.documents_button.clicked.connect(lambda: self.page_manager.show('services'))
         self._view.settings_button_clicked.connect(self._on_settings_button_clicked)
 
         # --- Titlebar Click ---

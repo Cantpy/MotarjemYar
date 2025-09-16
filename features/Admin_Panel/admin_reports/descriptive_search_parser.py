@@ -8,7 +8,7 @@ from datetime import date, timedelta
 class DescriptiveSearchParser:
     """
     Parses a Persian natural language query into a structured
-    dictionary for the advanced search logic.
+    dictionary for the advanced search _logic.
     """
 
     def __init__(self):

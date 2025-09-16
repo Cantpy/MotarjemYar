@@ -117,7 +117,7 @@ class AdminDashboardView(QWidget):
             # Payment Status
             if order.payment_status == 0:  # Unpaid
                 remaining_amount = order.total_amount - (
-                            order.final_amount - order.total_amount)  # A bit of logic to get remaining
+                            order.final_amount - order.total_amount)  # A bit of _logic to get remaining
                 details.append(
                     f"<font color='#d9534f'> (پرداخت نشده - {to_persian_numbers(f'{remaining_amount:,.0f}')} تومان)</font>")
             else:

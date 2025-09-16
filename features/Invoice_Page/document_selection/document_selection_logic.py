@@ -22,7 +22,7 @@ class DocumentSelectionLogic:
             # Create a simple map for quick price lookups
             self._fees_map = {fee.name: fee.price for fee in self._calculation_fees}
 
-        # --- This is the state managed by the logic layer ---
+        # --- This is the state managed by the _logic layer ---
         self._current_invoice_items: list[InvoiceItem] = []
 
     # --- Public API for the Controller ---
@@ -79,9 +79,9 @@ class DocumentSelectionLogic:
     def calculate_item_total(self, item: InvoiceItem) -> InvoiceItem:
         """
         A pure Python function to perform price calculations.
-        This is the core business logic, completely decoupled from the UI.
+        This is the core business _logic, completely decoupled from the UI.
         """
-        # This is a simplified example of the calculation logic
+        # This is a simplified example of the calculation _logic
         total = item.service.base_price * item.quantity
         if item.has_judiciary_seal:
             total += self._fees_map.get("MHR_DADGSTRI", 0)

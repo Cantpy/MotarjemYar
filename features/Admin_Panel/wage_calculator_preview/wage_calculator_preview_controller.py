@@ -28,7 +28,7 @@ class WageCalculatorPreviewController:
         Initializes the controller for a new payslip generation session.
 
         Args:
-            logic: A reference to the shared wage calculation logic engine.
+            logic: A reference to the shared wage calculation _logic engine.
             employees: A list of employees to populate the selection dropdown.
         """
         self._logic = logic
@@ -52,10 +52,10 @@ class WageCalculatorPreviewController:
             employee_id = inputs['employee_id']
             start_date = inputs['start_date']
 
-            # The logic needs the Jalali year to fetch the correct labor law constants.
+            # The _logic needs the Jalali year to fetch the correct labor law constants.
             inputs['year'] = jdatetime.date.fromgregorian(date=start_date).year
 
-            # 1. Call the logic layer to perform the complex calculation and save the record.
+            # 1. Call the _logic layer to perform the complex calculation and save the record.
             # This returns the unique ID of the newly created payroll record.
             self._newly_created_payroll_id = self._logic.calculate_and_save_payslip(employee_id, inputs)
 

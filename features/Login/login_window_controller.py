@@ -32,7 +32,7 @@ class LoginController(QObject):
 
     # Handler methods for View's signals (these are the 'slots' for user actions)
     def _handle_login_request(self, username: str, password: str, remember_me: bool):
-        """Receives the login request and passes it to the logic layer."""
+        """Receives the login request and passes it to the _logic layer."""
         if not username or not password:
             show_warning_message_box(self._view, "خطا", "لطفاً نام کاربری و رمز عبور را وارد کنید.")
             return
@@ -42,7 +42,7 @@ class LoginController(QObject):
 
     def _perform_authentication(self, username: str, password: str, remember_me: bool):
         """
-        Creates the DTO and calls the single, powerful logic method.
+        Creates the DTO and calls the single, powerful _logic method.
         """
         login_dto = UserLoginDTO(username=username, password=password, remember_me=remember_me)
         success, message, user_dto = self._logic.login(login_dto)
@@ -74,7 +74,7 @@ class LoginController(QObject):
         Receives the toggle request from the view and instructs the view
         on how to update its UI state.
         """
-        # The controller's logic is simple: tell the view to do the UI work.
+        # The controller's _logic is simple: tell the view to do the UI work.
         self._view.toggle_password_visibility_ui(current_echo_mode)
 
     def _handle_reset_form_request(self) -> None:
@@ -86,7 +86,7 @@ class LoginController(QObject):
         # This makes the controller stateless.
         username_in_field = self._view.username_input.text().strip()
 
-        # Make a single, high-level call to the logic layer.
+        # Make a single, high-level call to the _logic layer.
         self._logic.logout(username_in_field)
 
         # Tell the view to update its UI.

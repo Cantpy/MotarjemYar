@@ -88,7 +88,7 @@ class CustomerInfoFactory:
 def populate_database_for_testing(provider: SessionProvider):
     """
     Helper function to populate the database using the provided session provider.
-    This logic is now outside the factory.
+    This _logic is now outside the factory.
     """
     if not provider.customers:
         print("Cannot populate data: 'customers' session is not available in the provider.")

@@ -15,7 +15,7 @@ class CustomerRepository:
     def save_customer(self, session: Session, customer: Customer) -> None:
         """
         Saves (adds or updates) a customer and their companions in the database.
-        session.merge() handles the logic for insert vs. update.
+        session.merge() handles the _logic for insert vs. update.
         """
         # First, efficiently find and delete existing companions for this customer
         # This prevents orphaned companions if a companion is removed in an update.

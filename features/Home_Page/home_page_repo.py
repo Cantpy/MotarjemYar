@@ -86,7 +86,7 @@ class HomePageRepository:
         if translator is not None:
             invoice_model.translator = translator
 
-        # The logic layer will be responsible for session.commit()
+        # The _logic layer will be responsible for session.commit()
         return True
 
     def get_most_repeated_doc(self, session: Session) -> Optional[Tuple[str, int]]:

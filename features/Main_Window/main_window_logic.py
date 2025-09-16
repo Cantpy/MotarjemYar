@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 class MainWindowLogic:
     """
-    Handles business logic for the main application window.
+    Handles business _logic for the main application window.
     """
 
     def __init__(self, session_provider: SessionProvider, repo: "LoginRepository"):
