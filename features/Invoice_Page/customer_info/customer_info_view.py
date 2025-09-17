@@ -28,8 +28,8 @@ class CustomerInfoWidget(QWidget):
         self.setWindowTitle("فرم اطلاعات مشتریان")
 
         # Set stylesheets
-        self.setStyleSheet(CUSTOMER_INFO_STYLES)
-        self.setFont(QFont("IranSANS", 11))
+        # self.setStyleSheet(CUSTOMER_INFO_STYLES)
+        # self.setFont(QFont("IranSANS", 11))
 
         # To map customer names from the completer back to their national IDs
         self.completer_map = {}

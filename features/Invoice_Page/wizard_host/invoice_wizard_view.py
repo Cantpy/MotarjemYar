@@ -1,7 +1,7 @@
 # features/Invoice_Page/wizard_host/invoice_wizard_view.py
 
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QStackedWidget
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Signal, Qt
 
 
 class InvoiceWizardWidget(QWidget):
@@ -19,6 +19,7 @@ class InvoiceWizardWidget(QWidget):
         super().__init__(parent)
         self.setObjectName("InvoiceWizard")
         self.setWindowTitle("ایجاد فاکتور جدید")
+        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
 
         # --- UI Attributes ---
         self.step_labels = []

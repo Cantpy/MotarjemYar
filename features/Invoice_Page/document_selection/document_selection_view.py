@@ -24,7 +24,7 @@ class DocumentSelectionWidget(QWidget):
         super().__init__()
 
         self.setObjectName("DocumentSelectionWidget")
-        self.setStyleSheet(DOC_SELECTION_STYLES)
+        # self.setStyleSheet(DOC_SELECTION_STYLES)
         self._is_updating_table = False
 
         main_layout = QVBoxLayout(self)

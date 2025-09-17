@@ -17,7 +17,7 @@ def show_message_box(parent, title, message, icon_type, button_text="متوجه 
     Args:
         parent: Parent widget
         title (str): Window title
-        message (str): Message to display
+        message (str): MessageModel to display
         icon_type: QMessageBox.Icon type (Critical, Warning, Information)
         button_text (str): Text for the button
     """

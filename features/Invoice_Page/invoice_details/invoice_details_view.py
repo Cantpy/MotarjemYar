@@ -127,7 +127,7 @@ class InvoiceDetailsWidget(QWidget):
 
         # Apply styling
         from features.Invoice_Page.invoice_details.invoice_details_qss import INVOICE_DETAILS_QSS
-        self.setStyleSheet(INVOICE_DETAILS_QSS)
+        # self.setStyleSheet(INVOICE_DETAILS_QSS)
         self._setup_widgets_properties()
 
     def _create_invoice_group(self) -> QGroupBox:

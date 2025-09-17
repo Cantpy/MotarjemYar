@@ -427,7 +427,7 @@ class NotificationHistoryWidget(QWidget):
             # Phone
             self.sms_table.setItem(row, 1, QTableWidgetItem(sms.recipient_phone))
 
-            # Message (truncated)
+            # MessageModel (truncated)
             message_preview = sms.message[:50] + "..." if len(sms.message) > 50 else sms.message
             self.sms_table.setItem(row, 2, QTableWidgetItem(message_preview))
 
@@ -1116,7 +1116,7 @@ class SMSDetailsDialog(QDialog):
 
         layout.addLayout(details_layout)
 
-        # Message content
+        # MessageModel content
         layout.addWidget(QLabel("متن پیام:"))
         message_edit = QTextEdit()
         message_edit.setPlainText(self.sms.message)
@@ -1191,7 +1191,7 @@ class EmailDetailsDialog(QDialog):
             attachments_list.setMaximumHeight(100)
             layout.addWidget(attachments_list)
 
-        # Message content
+        # MessageModel content
         layout.addWidget(QLabel("متن ایمیل:"))
         message_edit = QTextEdit()
         message_edit.setPlainText(self.email.message)
@@ -1265,7 +1265,7 @@ class NewNotificationDialog(QDialog):
         self.sms_phone_edit.setPlaceholderText("09123456789")
         layout.addWidget(self.sms_phone_edit)
 
-        # Message field
+        # MessageModel field
         layout.addWidget(QLabel("متن پیام:"))
         self.sms_text_edit = QTextEdit()
         self.sms_text_edit.setPlaceholderText("متن پیام خود را اینجا وارد کنید...")
@@ -1296,7 +1296,7 @@ class NewNotificationDialog(QDialog):
         self.email_subject_edit.setPlaceholderText("موضوع ایمیل را وارد کنید...")
         layout.addWidget(self.email_subject_edit)
 
-        # Message field
+        # MessageModel field
         layout.addWidget(QLabel("متن ایمیل:"))
         self.email_text_edit = QTextEdit()
         self.email_text_edit.setPlaceholderText("متن ایمیل خود را اینجا وارد کنید...")

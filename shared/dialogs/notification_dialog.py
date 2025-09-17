@@ -76,7 +76,7 @@ class NotificationDialog(QDialog):
         self.sms_phone_edit.setText(self.customer_data.customer_phone)
         layout.addWidget(self.sms_phone_edit)
 
-        # Message field with rich text editor
+        # MessageModel field with rich text editor
         layout.addWidget(QLabel("متن پیام:"))
         self.sms_text_edit = QTextEdit()
         self.sms_text_edit.setPlainText("متن پیام خود را اینجا وارد کنید...")
@@ -101,7 +101,7 @@ class NotificationDialog(QDialog):
         self.email_address_edit.setText(self.customer_data.customer_email)
         layout.addWidget(self.email_address_edit)
 
-        # Message field with rich text editor
+        # MessageModel field with rich text editor
         layout.addWidget(QLabel("متن ایمیل:"))
         self.email_text_edit = QTextEdit()
         self.email_text_edit.setPlainText("متن ایمیل خود را اینجا وارد کنید...")
