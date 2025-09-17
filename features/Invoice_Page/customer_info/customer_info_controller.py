@@ -18,17 +18,17 @@ class CustomerInfoController:
 
     def get_view(self) -> CustomerInfoWidget:
         """
-        Exposes the view widget for integration into a larger UI.
+        Exposes the _view widget for integration into a larger UI.
         """
         return self._view
 
     def _connect_signals(self):
-        """Connects signals from the view to controller slots."""
+        """Connects signals from the _view to controller slots."""
         self._view.save_requested.connect(self._on_save_requested)
         self._view.fetch_customer_details_requested.connect(self._on_fetch_details_requested)
 
     def _populate_view_completer(self):
-        """Fetches completer data from _logic and populates the view."""
+        """Fetches completer data from _logic and populates the _view."""
         completer_data = self._logic.get_all_customer_and_companion_info()
         self._view.populate_completer(completer_data)
 
@@ -66,7 +66,7 @@ class CustomerInfoController:
             self._view.display_validation_results({}) # Clear all error highlights
 
         except ValidationError as e:
-            # If validation fails, show specific errors on the view.
+            # If validation fails, show specific errors on the _view.
             self._view.display_validation_results(e.errors)
             self._view.show_error("لطفا خطاهای مشخص شده را برطرف کنید.")
 

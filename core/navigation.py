@@ -34,20 +34,20 @@ class PageManager:
         return controller
 
     def show(self, name: str):
-        """Shows a page by getting its controller and asking for its view."""
+        """Shows a page by getting its controller and asking for its _view."""
         # 1. Get the controller for the page
         controller = self.get_controller(name)
 
-        # 2. CRITICAL: Ask the controller for its view
+        # 2. CRITICAL: Ask the controller for its _view
         #    We assume all our page controllers have a get_view() method.
         page_view = controller.get_view()
 
-        # 3. Add the view to the stacked widget if it's not already there
+        # 3. Add the _view to the stacked widget if it's not already there
         #    (This check prevents adding the same widget multiple times)
         if self.stacked_widget.indexOf(page_view) == -1:
             self.stacked_widget.addWidget(page_view)
 
-        # 4. Show the view
+        # 4. Show the _view
         self.stacked_widget.setCurrentWidget(page_view)
 
     def preload(self, name: str, delay_ms: int = 100):
@@ -57,11 +57,11 @@ class PageManager:
     def clear_cache(self):
         """Removes and deletes all cached pages and their controllers."""
         for name, controller in list(self._instances.items()):
-            # Get the view from the controller
+            # Get the _view from the controller
             view = controller.get_view()
             if view:
                 self.stacked_widget.removeWidget(view)
-                view.deleteLater()  # Schedule the view for deletion
+                view.deleteLater()  # Schedule the _view for deletion
 
             # The controller is a QObject, it can also be scheduled for deletion
             # if it has no parent or its parent is being deleted.

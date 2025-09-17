@@ -17,12 +17,12 @@ class InfoPageFactory:
         Creates and wires the complete Info Page module.
 
         This static method follows a clean architecture pattern to instantiate and
-        connect the repository, logic, view, and controller for the info page.
+        connect the repository, _logic, _view, and controller for the info page.
 
         Args:
             session_provider: The application's session provider instance, which
                               is responsible for managing database sessions.
-            parent (QWidget, optional): The parent widget for the view. Defaults to None.
+            parent (QWidget, optional): The parent widget for the _view. Defaults to None.
 
         Returns:
             InfoPageController: The fully wired controller for the info page,
@@ -32,16 +32,16 @@ class InfoPageFactory:
         # 1. Instantiate the stateless repository
         repo = InfoPageRepository()
 
-        # 2. Instantiate the logic, injecting the repository and session provider
+        # 2. Instantiate the _logic, injecting the repository and session provider
         logic = InfoPageLogic(repo, session_provider)
 
-        # 3. Instantiate the view, making it a child of the parent if provided
+        # 3. Instantiate the _view, making it a child of the parent if provided
         view = InfoPageView(parent)
 
-        # 4. Instantiate the controller, injecting the view and logic
+        # 4. Instantiate the controller, injecting the _view and _logic
         controller = InfoPageController(view, logic)
 
-        # 5. Load the initial data from the database into the view
+        # 5. Load the initial data from the database into the _view
         controller.load_initial_data()
 
         # 6. Return the fully constructed and initialized controller
@@ -53,7 +53,7 @@ if __name__ == '__main__':
     from PySide6.QtWidgets import QApplication
     from core.database_init import DatabaseInitializer
     from core.database_seeder import DatabaseSeeder
-    from core.config import DATABASE_PATHS
+    from config.config import DATABASE_PATHS
 
     app = QApplication(sys.argv)
 

@@ -10,12 +10,13 @@ class MainWindowFactory:
     """Creates a fully configured main window MVC stack."""
 
     @staticmethod
-    def create(session_provider: SessionProvider) -> MainWindowController:
+    def create(session_provider: SessionProvider, username: str) -> MainWindowController:
         """
         Creates and wires the main window components.
 
         Args:
             session_provider: The central dependency container for database sessions.
+            username:
 
         Returns:
             The fully configured InvoiceWizardController.
@@ -24,6 +25,6 @@ class MainWindowFactory:
         login_repository = LoginRepository()
         logic = MainWindowLogic(session_provider, login_repository)
         view = MainWindowView()  # The QMainWindow widget
-        controller = MainWindowController(view=view, logic=logic)
+        controller = MainWindowController(view=view, logic=logic, username=username)
 
         return controller

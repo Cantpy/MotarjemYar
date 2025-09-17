@@ -24,11 +24,11 @@ class ServicesManagementController(QObject):
         self._connect_signals()
 
     def get_view(self) -> "ServicesManagementView":
-        """Provides the assembled view, adhering to the application pattern."""
+        """Provides the assembled _view, adhering to the application pattern."""
         return self._view
 
     def _connect_signals(self):
-        """Connects the container view's signals to this controller's slots."""
+        """Connects the container _view's signals to this controller's slots."""
         self._view.refresh_all_requested.connect(self.handle_refresh_all)
 
     def handle_refresh_all(self):

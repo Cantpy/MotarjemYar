@@ -13,7 +13,7 @@ class AdminMainWindowService:
         self._session_provider = session_provider
 
     def create_tabs(self):
-        """Return a list of (view, icon, title) for each tab."""
+        """Return a list of (_view, icon, title) for each tab."""
         dashboard_controller = AdminDashboardFactory.create(self._session_provider)
         wage_controller = WageCalculatorFactory.create(self._session_provider)
         reports_controller = AdminReportsFactory.create(self._session_provider)

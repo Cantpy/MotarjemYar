@@ -18,11 +18,11 @@ class InvoiceDetailsController:
         self._connect_signals()
 
     def get_view(self) -> InvoiceDetailsWidget:
-        """Exposes the view for integration into a larger UI."""
+        """Exposes the _view for integration into a larger UI."""
         return self._view
 
     def _connect_signals(self):
-        """Connect signals from the view to the controller's own slots."""
+        """Connect signals from the _view to the controller's own slots."""
         self._view.percent_changed.connect(self._on_percent_changed)
         self._view.amount_changed.connect(self._on_amount_changed)
         self._view.other_input_changed.connect(self._on_other_input_changed)
@@ -36,7 +36,7 @@ class InvoiceDetailsController:
         # 2. Ask _logic to calculate the initial DTO
         self._current_details = self._logic.create_initial_details(customer, items)
 
-        # 3. Update the view and the global state with the initial DTO
+        # 3. Update the _view and the global state with the initial DTO
         self._process_update(self._current_details)
 
     def _process_update(self, details: InvoiceDetails):

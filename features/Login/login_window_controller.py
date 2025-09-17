@@ -25,7 +25,7 @@ class LoginController(QObject):
         return self._view
 
     def _connect_signals(self):
-        """Connects the view's action signals to the controller's handlers."""
+        """Connects the _view's action signals to the controller's handlers."""
         self._view.login_attempted.connect(self._handle_login_request)
         self._view.password_visibility_toggled.connect(self._handle_password_toggle)
         self._view.reset_form_requested.connect(self._handle_reset_form_request)
@@ -71,10 +71,10 @@ class LoginController(QObject):
     @Slot(int)
     def _handle_password_toggle(self, current_echo_mode: int) -> None:
         """
-        Receives the toggle request from the view and instructs the view
+        Receives the toggle request from the _view and instructs the _view
         on how to update its UI state.
         """
-        # The controller's _logic is simple: tell the view to do the UI work.
+        # The controller's _logic is simple: tell the _view to do the UI work.
         self._view.toggle_password_visibility_ui(current_echo_mode)
 
     def _handle_reset_form_request(self) -> None:
@@ -82,12 +82,12 @@ class LoginController(QObject):
         Handles the user's request to log out and reset the form.
         This is now much simpler.
         """
-        # The controller doesn't need to know the username. It asks the view.
+        # The controller doesn't need to know the username. It asks the _view.
         # This makes the controller stateless.
         username_in_field = self._view.username_input.text().strip()
 
         # Make a single, high-level call to the _logic layer.
         self._logic.logout(username_in_field)
 
-        # Tell the view to update its UI.
+        # Tell the _view to update its UI.
         self._view.reset_form_ui()

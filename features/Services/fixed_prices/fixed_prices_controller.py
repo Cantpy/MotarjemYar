@@ -25,7 +25,7 @@ class FixedPricesController(QObject):
         return self._view
 
     def _connect_signals(self):
-        """Connects view signals to controller slots."""
+        """Connects _view signals to controller slots."""
         self._view.add_requested.connect(self.handle_add)
         self._view.edit_requested.connect(self.handle_edit)
         self._view.delete_requested.connect(self.handle_delete)
@@ -35,7 +35,7 @@ class FixedPricesController(QObject):
         self.data_changed.connect(self._update_view_display)
 
     def load_initial_data(self):
-        """Loads initial data and populates the view."""
+        """Loads initial data and populates the _view."""
         try:
             self._data_cache = self._logic.get_all_fixed_prices()
             self.data_changed.emit()
@@ -93,7 +93,7 @@ class FixedPricesController(QObject):
         )
 
     def handle_search(self, text: str):
-        """Filters the local data cache and updates the view."""
+        """Filters the local data cache and updates the _view."""
         text = text.lower().strip()
         if not text:
             self._update_view_display()  # Show all if search is empty
@@ -103,7 +103,7 @@ class FixedPricesController(QObject):
         self._view.update_display(filtered_data)
 
     def _update_view_display(self):
-        """Pushes the current data cache to the view."""
+        """Pushes the current data cache to the _view."""
         self._view.update_display(self._data_cache)
 
     # --- Private worker methods ---

@@ -21,7 +21,7 @@ class OtherServicesController(QObject):
         self._connect_signals()
 
     def get_view(self) -> OtherServicesView:
-        """Provides access to the view component."""
+        """Provides access to the _view component."""
         return self._view
 
     def _connect_signals(self):
@@ -92,7 +92,7 @@ class OtherServicesController(QObject):
         )
 
     def handle_search(self, text: str):
-        """Filters the local data cache and updates the view."""
+        """Filters the local data cache and updates the _view."""
         text = text.lower().strip()
         if not text:
             self._update_view_display()  # Show all if search is empty

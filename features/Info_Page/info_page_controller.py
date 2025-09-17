@@ -9,18 +9,18 @@ class InfoPageController(QObject):
     """Controller for the info page."""
 
     def __init__(self, view: InfoPageView, logic: InfoPageLogic):
-        """Initializes the controller with a view and logic."""
+        """Initializes the controller with a _view and _logic."""
         super().__init__()
         self._view = view
         self._logic = logic
         self._connect_signals()
 
     def get_view(self) -> InfoPageView:
-        """Returns the view instance, required for the page_manager."""
+        """Returns the _view instance, required for the page_manager."""
         return self._view
 
     def load_initial_data(self):
-        """Fetches and loads all necessary data into the view."""
+        """Fetches and loads all necessary data into the _view."""
         info_data = self._logic.get_info_page_data()
 
         # Populate Version Info
@@ -37,7 +37,7 @@ class InfoPageController(QObject):
         self._view.set_faq(info_data.faq_items)
 
     def _connect_signals(self):
-        """Connect signals from the view to handler methods."""
+        """Connect signals from the _view to handler methods."""
         self._view.feedback_button.clicked.connect(self._handle_feedback_button)
 
     def _handle_feedback_button(self):

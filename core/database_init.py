@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from pathlib import Path
 from shared.session_provider import SessionProvider
-from core.config import DATABASE_BASES
+from config.config import DATABASE_BASES
 
 
 class DatabaseInitializer:

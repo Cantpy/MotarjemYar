@@ -8,13 +8,11 @@ from pathlib import Path
 from core.database_init import DatabaseInitializer
 from core.database_seeder import DatabaseSeeder
 from shared.session_provider import SessionProvider
-from core.config import DATABASE_PATHS
+from config.config import DATABASE_PATHS
 
 # --- 2. Import the FACTORIES for each major feature ---
 from features.Login.login_window_factory import LoginWindowFactory
 from features.Main_Window.main_window_factory import MainWindowFactory
-
-from shared import return_resource
 
 
 class CheckpointTimer:
@@ -119,7 +117,7 @@ class ApplicationManager:
         self.active_controller = LoginWindowFactory.create(self.session_provider)
         self.active_controller.login_successful.connect(self.on_login_successful)
 
-        # Connect the final success signal from the view to our transition method
+        # Connect the final success signal from the _view to our transition method
         login_view = self.active_controller.get_view()
 
         login_view.show()
@@ -140,16 +138,16 @@ class ApplicationManager:
         """Shows a splash screen, then creates and shows the main window feature."""
         splash = self._create_splash_screen()
         splash.show()
-        self.app.processEvents() # Ensure splash is drawn before heavy work
+        self.app.processEvents()  # Ensure splash is drawn before heavy work
         self.timer.checkpoint("Splash screen shown")
 
         # Use the factory to create the entire, fully-wired main window feature
-        self.active_controller = MainWindowFactory.create(self.session_provider)
+        self.active_controller = MainWindowFactory.create(self.session_provider, username)
 
         # Pass the logged-in user's data to the main window for initialization
         self.active_controller.initialize_with_user(username)
 
-        # Get the view from the controller and show it
+        # Get the _view from the controller and show it
         main_view = self.active_controller.get_view()
         splash.close()
         main_view.show()
@@ -160,7 +158,7 @@ class ApplicationManager:
         # This helper method's implementation is good, no changes needed.
         # It's purely UI and self-contained.
         # ... (your splash screen code) ...
-        splash_widget = QWidget() # Placeholder
+        splash_widget = QWidget()  # Placeholder
         splash_widget.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         splash_widget.resize(400, 300)
         return splash_widget

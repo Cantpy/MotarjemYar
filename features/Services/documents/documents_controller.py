@@ -11,7 +11,7 @@ from shared import (show_error_message_box, show_information_message_box, show_q
 
 class ServicesController(QObject):
     """
-    Controller for services management. Orchestrates the view and logic.
+    Controller for services management. Orchestrates the _view and _logic.
     """
     # Signal to notify when the data cache has been updated.
     data_changed = Signal()
@@ -25,12 +25,12 @@ class ServicesController(QObject):
 
     def get_view(self) -> ServicesDocumentsView:
         """
-        Returns the view managed by this controller.
+        Returns the _view managed by this controller.
         """
         return self._view
 
     def _connect_signals(self):
-        """Connect signals from the view to the controller's handler slots."""
+        """Connect signals from the _view to the controller's handler slots."""
         # --- View Signals ---
         self._view.add_requested.connect(self.handle_add)
         self._view.edit_requested.connect(self.handle_edit)
@@ -43,7 +43,7 @@ class ServicesController(QObject):
         self.data_changed.connect(self._update_view_display)
 
     def load_initial_data(self) -> None:
-        """Loads the initial set of data from the logic layer."""
+        """Loads the initial set of data from the _logic layer."""
         try:
             self._data_cache = self._logic.get_all_services()
             self.data_changed.emit()
@@ -51,7 +51,7 @@ class ServicesController(QObject):
             show_error_message_box(self._view, "خطا", f"خطا در بارگذاری مدارک:\n{str(e)}")
 
     def _update_view_display(self):
-        """Pushes the current data cache to the view."""
+        """Pushes the current data cache to the _view."""
         self._view.update_display(self._data_cache)
 
     # --- Handlers for User Actions ---
@@ -96,7 +96,7 @@ class ServicesController(QObject):
         )
 
     def handle_search(self, text: str):
-        """Filters the local data cache and updates the view."""
+        """Filters the local data cache and updates the _view."""
         text = text.lower().strip()
         if not text:
             self._update_view_display()  # Show all if search is empty
@@ -134,7 +134,7 @@ class ServicesController(QObject):
             summary_dialog = ImportSummaryDialog(result, self._view)
             summary_dialog.exec()
 
-            # --- IMPORTANT: Refresh the main view with new data ---
+            # --- IMPORTANT: Refresh the main _view with new data ---
             if result.success_count > 0:
                 self.load_initial_data()
 
@@ -143,7 +143,7 @@ class ServicesController(QObject):
     def _perform_create_service(self, service_data: dict):
         try:
             created_service = self._logic.create_service(service_data)
-            # Optimistic update: modify cache and notify view
+            # Optimistic update: modify cache and notify _view
             self._data_cache.append(created_service)
             self._data_cache.sort(key=lambda s: s.name)  # Keep it sorted
             self.data_changed.emit()
@@ -191,10 +191,10 @@ class ServicesController(QObject):
 #     """Controller for services management"""
 #     data_changed = Signal()
 #
-#     def __init__(self, view: ServicesDocumentsView, logic: ServicesLogic):
+#     def __init__(self, _view: ServicesDocumentsView, _logic: ServicesLogic):
 #         super().__init__()
-#         self._view = view
-#         self._logic = logic
+#         self._view = _view
+#         self._logic = _logic
 #         self._data_cache: list[ServicesDTO] = []
 #         self.connect_signals()
 #
@@ -265,14 +265,14 @@ class ServicesController(QObject):
 #             return False
 #
 #     def handle_add(self):
-#         # All the logic from the old _show_add_dialog moves here
+#         # All the _logic from the old _show_add_dialog moves here
 #         dialog = InputDialog("افزودن مدرک جدید", self._view)
 #         if dialog.exec() == QDialog.Accepted:
 #             values = dialog.get_values()
 #             self.create_service(values)
 #
 #     def handle_edit(self, service_id: int):
-#         """The controller asks the view for the current data to pre-fill the dialog."""
+#         """The controller asks the _view for the current data to pre-fill the dialog."""
 #         # This avoids an unnecessary database call.
 #         current_data = self._view.get_current_service_data_for_edit()
 #         if not current_data:
@@ -286,7 +286,7 @@ class ServicesController(QObject):
 #             self.update_service(service_id, updated_values)
 #
 #     def handle_search(self, text: str) -> None:
-#         """Filters the cached data and updates the view display."""
+#         """Filters the cached data and updates the _view display."""
 #         text = text.lower().strip()
 #         if not text:
 #             # If search is cleared, show all data
@@ -299,7 +299,7 @@ class ServicesController(QObject):
 #             if text in service.name.lower()
 #         ]
 #
-#         # Push the filtered list to the view
+#         # Push the filtered list to the _view
 #         self._view.update_display(filtered_data)
 #
 #     def handle_delete(self, service_id: int):

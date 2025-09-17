@@ -23,6 +23,7 @@ class SessionProvider:
         self.users = self._create_session_maker('users')
         self.expenses = self._create_session_maker('expenses')
         self.info_page = self._create_session_maker('info_page')
+        self.workspace = self._create_session_maker('workspace')
 
     def _create_session_maker(self, name: str) -> sessionmaker:
         """Helper to create a session maker from a stored engine."""

@@ -6,11 +6,11 @@ from shared.session_provider import SessionProvider
 
 
 class InfoPageLogic:
-    """Business logic for the info page."""
+    """Business _logic for the info page."""
 
     def __init__(self, repo: InfoPageRepository, session_provider: "SessionProvider"):
         """
-        Initializes the logic with a repository and session provider.
+        Initializes the _logic with a repository and session provider.
 
         Args:
             repo (InfoPageRepository): The data repository.

@@ -10,7 +10,7 @@ from shared.utils.persian_tools import to_persian_numbers
 
 
 class FixedPricesView(QWidget):
-    """A 'dumb' view for displaying and managing fixed prices."""
+    """A 'dumb' _view for displaying and managing fixed prices."""
 
     # --- Public Signals for the Controller ---
     add_requested = Signal()
@@ -175,7 +175,7 @@ class FixedPricesView(QWidget):
         edit_action.triggered.connect(self._emit_edit_request)
         context_menu.addAction(edit_action)
 
-        # This is a PRESENTATION rule, so it's OK for the view to know it.
+        # This is a PRESENTATION rule, so it's OK for the _view to know it.
         if not cost_dto.is_default:
             delete_action = QAction("🗑️ حذف", self)
             delete_action.triggered.connect(self._emit_delete_request)

@@ -85,5 +85,5 @@ class ServiceRepository:
             session.bulk_save_objects(service_objects)
             return len(service_objects)
         except SQLAlchemyError as e:
-            # The logic layer will catch this and report the error.
+            # The _logic layer will catch this and report the error.
             raise Exception(f"Database bulk insert failed: {e}")

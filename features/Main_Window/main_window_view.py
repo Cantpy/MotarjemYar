@@ -154,7 +154,6 @@ class MainWindowView(QMainWindow):
         page_map = {
             "home": self.page_home,
             "user": self.page_user,
-            # Add other pages here as they are created
         }
         widget_to_show = page_map.get(page_name)
         if widget_to_show:
@@ -186,7 +185,7 @@ class MainWindowView(QMainWindow):
 
         # --- Sidebar ---
         self.sidebar_frame = QFrame()
-        self.large_user_pic = ClickableLabel("?")  # Placeholder text
+        self.large_user_pic = ClickableLabel("?")
         self.user_name_label = ClickableLabel("کاربر میهمان")
         self.user_position_label = ClickableLabel("نقش نامشخص")
         self.separator_line = QFrame()
@@ -198,13 +197,14 @@ class MainWindowView(QMainWindow):
         self.issued_invoices_button, self.issued_invoices_text_button, self.issued_invoices_groupBox = (
             self._create_nav_button("فاکتورها"))
         self.reports_button, self.reports_text_button, self.reports_groupBox = self._create_nav_button("گزارش‌ها")
+        self.workspace_button, self.workspace_text_button, self.workspace_groupbox = self._create_nav_button("میز کار")
         self.help_button, self.help_text_button, self.help_groupBox = self._create_nav_button("راهنما")
         self.settings_button, self.settings_text_button, self.settings_groupBox = self._create_nav_button("تنظیمات")
 
         # --- Main Content Area ---
         self.stackedWidget = QStackedWidget()
-        self.page_home = QWidget()  # Placeholder page
-        self.page_user = QWidget()  # Placeholder page
+        self.page_home = QWidget()
+        self.page_user = QWidget()
 
         # Add a label to the placeholder pages for visual feedback
         home_layout = QVBoxLayout(self.page_home)
@@ -274,6 +274,7 @@ class MainWindowView(QMainWindow):
         sidebar_layout.addWidget(self.documents_groupBox)
         sidebar_layout.addWidget(self.issued_invoices_groupBox)
         sidebar_layout.addWidget(self.reports_groupBox)
+        sidebar_layout.addWidget(self.workspace_groupbox)
         sidebar_layout.addSpacerItem(QSpacerItem(13, 108, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
         sidebar_layout.addWidget(self.help_groupBox)
         sidebar_layout.addWidget(self.settings_groupBox)

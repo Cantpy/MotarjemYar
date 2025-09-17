@@ -428,7 +428,7 @@ class CustomerInfoWidget(QWidget):
     def display_validation_results(self, errors: dict):
         """
         NEW: Public method to display validation feedback.
-        The view doesn't know what the errors mean, it just displays them.
+        The _view doesn't know what the errors mean, it just displays them.
         """
         # Reset all fields to neutral/valid state first
         self._set_field_state(self.name_edit, self.name_error_label, "valid")

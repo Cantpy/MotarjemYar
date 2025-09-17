@@ -1,37 +1,17 @@
 # shared/orm_models/workspace_models.py
 
-import enum
 from datetime import datetime
 from typing import List
 
-from sqlalchemy import (
-    String,
-    DateTime,
-    Enum,
-    ForeignKey,
-    Boolean,
-    Text
-)
+from sqlalchemy import (String, DateTime, Enum, ForeignKey, Boolean, Text, Integer)
 from sqlalchemy.orm import relationship, Mapped, mapped_column, declarative_base
 from sqlalchemy.sql import func
-from shared.orm_models.users_models import UsersModel
+from shared.enums import ChatType, ParticipantRole
 
 
 BaseWorkspace = declarative_base()
 
 
-class ChatType(enum.Enum):
-    ONE_ON_ONE = "one_on_one"
-    GROUP = "group"
-    CHANNEL = "channel"
-
-
-class ParticipantRole(enum.Enum):
-    MEMBER = "member"
-    ADMIN = "admin"
-
-
-# This is our first main table for the feature
 class ChatModel(BaseWorkspace):
     __tablename__ = 'chats'
 
@@ -41,9 +21,7 @@ class ChatModel(BaseWorkspace):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     # --- Relationships ---
-    # A chat has many participants (users)
     participants: Mapped[List["ChatParticipantModel"]] = relationship(back_populates="chat", cascade="all, delete-orphan")
-    # A chat has many messages
     messages: Mapped[List["MessageModel"]] = relationship(back_populates="chat", cascade="all, delete-orphan")
 
 
@@ -52,39 +30,25 @@ class ChatParticipantModel(BaseWorkspace):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     chat_id: Mapped[int] = mapped_column(ForeignKey('chats.id'), nullable=False)
-    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'), nullable=False)
-    role: Mapped[ParticipantRole] = mapped_column(Enum(ParticipantRole), default=ParticipantRole.MEMBER)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    # --- Relationships ---
-    # Connects back to the ChatModel model
+    role: Mapped[ParticipantRole] = mapped_column(Enum(ParticipantRole), default=ParticipantRole.MEMBER)
     chat: Mapped["ChatModel"] = relationship(back_populates="participants")
-    # Connects to your existing User model
-    user: Mapped["UsersModel"] = relationship()
 
 
 class MessageModel(BaseWorkspace):
     __tablename__ = 'messages'
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    content: Mapped[str] = mapped_column(Text, nullable=True)  # The text of the message
+    content: Mapped[str] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     is_pinned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-
-    # --- Foreign Keys ---
     chat_id: Mapped[int] = mapped_column(ForeignKey('chats.id'), nullable=False)
-    sender_id: Mapped[int] = mapped_column(ForeignKey('users.id'), nullable=False)
+    sender_id: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    # --- Relationships ---
-    # Connects back to the ChatModel model
     chat: Mapped["ChatModel"] = relationship(back_populates="messages")
-    # Connects to the User who sent the message
-    sender: Mapped["UsersModel"] = relationship()
-
-    # A message can have multiple attachments
     attachments: Mapped[List["AttachmentModel"]] = relationship(back_populates="message", cascade="all, delete-orphan")
-    # A message has a read status for each user
-    read_receipts: Mapped[List["MessageReadStatusModel"]] = relationship(back_populates="message",
-                                                                         cascade="all, delete-orphan")
+    read_receipts: Mapped[List["MessageReadStatusModel"]] = relationship(back_populates="message", cascade="all, delete-orphan")
 
 
 # This table stores information about attached files
@@ -92,14 +56,13 @@ class AttachmentModel(BaseWorkspace):
     __tablename__ = 'attachments'
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    file_path: Mapped[str] = mapped_column(String(512), nullable=False)  # Path to the file on the network share/server
-    file_type: Mapped[str] = mapped_column(String(50), nullable=True)  # e.g., 'image/jpeg', 'application/pdf'
+    file_path: Mapped[str] = mapped_column(String(512), nullable=False)
+    file_type: Mapped[str] = mapped_column(String(50), nullable=True)
 
     # --- Foreign Key ---
     message_id: Mapped[int] = mapped_column(ForeignKey('messages.id'), nullable=False)
 
     # --- Relationship ---
-    # Connects back to the MessageModel model
     message: Mapped["MessageModel"] = relationship(back_populates="attachments")
 
 
@@ -109,13 +72,7 @@ class MessageReadStatusModel(BaseWorkspace):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     read_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-
-    # --- Foreign Keys ---
     message_id: Mapped[int] = mapped_column(ForeignKey('messages.id'), nullable=False)
-    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'), nullable=False)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    # --- Relationships ---
-    # Connects back to the MessageModel model
     message: Mapped["MessageModel"] = relationship(back_populates="read_receipts")
-    # Connects to the User who read the message
-    reader: Mapped["UsersModel"] = relationship()

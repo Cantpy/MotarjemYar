@@ -15,7 +15,7 @@ from shared.session_provider import SessionProvider
 class ServicesManagementFactory:
     """
     The main factory for creating the entire Services Management module.
-    It builds and returns the main controller, which holds the final view.
+    It builds and returns the main controller, which holds the final _view.
     """
 
     @staticmethod
@@ -23,7 +23,7 @@ class ServicesManagementFactory:
         """
         Builds the complete, interactive Services Management module.
         """
-        # 1. Create the main container view. It's dumb.
+        # 1. Create the main container _view. It's dumb.
         container_view = ServicesManagementView(parent)
 
         # 2. Use the specialized factories to build each sub-module's CONTROLLER.
@@ -36,7 +36,7 @@ class ServicesManagementFactory:
         container_view.add_tab(fixed_prices_controller.get_view(), "هزینه‌های ثابت")
         container_view.add_tab(other_services_controller.get_view(), "خدمات دیگر")
 
-        # 4. Create the main controller, INJECTING the container view AND all the sub-controllers.
+        # 4. Create the main controller, INJECTING the container _view AND all the sub-controllers.
         main_controller = ServicesManagementController(
             view=container_view,
             documents_controller=documents_controller,

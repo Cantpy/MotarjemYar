@@ -38,7 +38,7 @@ class LoginWindowFactory:
             user_session_factory=session_provider.users
         )
 
-        # 3. Create the view and controller
+        # 3. Create the _view and controller
         view = LoginWidget()
         controller = LoginController(view=view, logic=logic)
 

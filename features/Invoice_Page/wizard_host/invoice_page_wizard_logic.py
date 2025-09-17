@@ -74,7 +74,7 @@ class InvoiceWizardLogic:
     #     raw_data = customer_controller.get_view().get_current_data()
     #     status, customer_obj = customer_controller._logic.check_customer_status(raw_data)
     #     if status == CustomerStatus.NEW:
-    #         reply = QMessageBox.question(self.view, "ذخیره مشتری",
+    #         reply = QMessageBox.question(self._view, "ذخیره مشتری",
     #                                      "این مشتری در پایگاه داده وجود ندارد. آیا مایل به ذخیره آن هستید؟",
     #                                      QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel, QMessageBox.Yes)
     #         if reply == QMessageBox.Yes:
@@ -119,12 +119,12 @@ class InvoiceWizardLogic:
     # def _navigate_to_widget(self, widget: QWidget):
     #     index = self.stacked_widget.indexOf(widget)
     #     if index != -1:
-    #         self.view.set_current_step(index)
+    #         self._view.set_current_step(index)
     #
     # def _navigate_by_offset(self, offset: int):
     #     current_index = self.stacked_widget.currentIndex()
     #     new_index = current_index + offset
-    #     self.view.set_current_step(new_index)
+    #     self._view.set_current_step(new_index)
     #
     # def _unpack_invoice_items(self, items: list[InvoiceItem]) -> list[InvoiceItem]:
     #     """

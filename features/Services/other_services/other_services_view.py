@@ -9,7 +9,7 @@ from features.Services.other_services.other_services_models import OtherServiceD
 
 
 class OtherServicesView(QWidget):
-    """A 'dumb' view for displaying and managing other services."""
+    """A 'dumb' _view for displaying and managing other services."""
 
     add_requested = Signal()
     edit_requested = Signal(int)  # service_id

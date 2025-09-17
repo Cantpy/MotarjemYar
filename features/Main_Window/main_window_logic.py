@@ -28,13 +28,6 @@ class MainWindowLogic:
         self.repo = repo
         self.user_session = session_provider.users
 
-    def get_session(self, name: str):
-        """A helper to provide specific session factories to the controller."""
-        session_key = f"{name}_session"
-        if session_key not in self.session_provider:
-            raise ValueError(f"Session factory for '{name}' not found.")
-        return self.session_provider[session_key]
-
     def get_user_profile_for_view(self, username: str) -> Optional[UserProfileDTO]:
         """
         Fetches user data from the repository and builds the UserProfileDTO
@@ -49,6 +42,7 @@ class MainWindowLogic:
 
             # Build the DTO from the database models
             return UserProfileDTO(
+                id=user.id,
                 full_name=user.user_profile.full_name,
                 role_fa=user.user_profile.role_fa,
                 avatar_path=user.user_profile.avatar_path  # Assuming this exists in your model
@@ -56,25 +50,36 @@ class MainWindowLogic:
         finally:
             session.close()
 
-    def get_remembered_user_info(self) -> Optional[UserProfileDTO]:
-        """
-        Checks the login_settings.json file for a remembered user's info.
-        This provides a quick way to display user info on startup without a full DB query,
-        if the design allows it.
-        """
-        try:
-            settings_path = return_resource("databases", "login_settings.json")
-            with open(settings_path, 'r', encoding='utf-8') as f:
-                settings = json.load(f)
+    def get_user_id_for_host(self, username: str):
 
-            # Check if remember_me is true and full_name exists
-            if settings.get('remember_me') and settings.get('full_name'):
-                # We can create a partial DTO. Role_fa might not be in the file.
-                return UserProfileDTO(
-                    full_name=settings.get('full_name'),
-                    role_fa=settings.get('role_fa', 'نقش نامشخص'),  # Provide a default
-                    avatar_path=None  # This info is not typically stored in the json
-                )
-        except (FileNotFoundError, json.JSONDecodeError):
-            return None
-        return None
+        with self.user_session() as session:
+            user = self.repo.get_user_by_username(session, username)
+
+            if not user or not user.id:
+                return None
+
+            return user.id
+
+    # def get_remembered_user_info(self) -> Optional[UserProfileDTO]:
+    #     """
+    #     Checks the login_settings.json file for a remembered user's info.
+    #     This provides a quick way to display user info on startup without a full DB query,
+    #     if the design allows it.
+    #     """
+    #     try:
+    #         settings_path = return_resource("databases", "login_settings.json")
+    #         with open(settings_path, 'r', encoding='utf-8') as f:
+    #             settings = json.load(f)
+    #
+    #         # Check if remember_me is true and full_name exists
+    #         if settings.get('remember_me') and settings.get('full_name'):
+    #             # We can create a partial DTO. Role_fa might not be in the file.
+    #             return UserProfileDTO(
+    #                 id=None,
+    #                 full_name=settings.get('full_name'),
+    #                 role_fa=settings.get('role_fa', 'نقش نامشخص'),  # Provide a default
+    #                 avatar_path=None  # This info is not typically stored in the json
+    #             )
+    #     except (FileNotFoundError, json.JSONDecodeError):
+    #         return None
+    #     return None

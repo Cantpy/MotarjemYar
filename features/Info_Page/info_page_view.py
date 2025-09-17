@@ -8,7 +8,7 @@ from PySide6.QtCore import QUrl
 
 
 class InfoPageView(QWidget):
-    """The main view for the info page. It is a dumb component."""
+    """The main _view for the info page. It is a dumb component."""
 
     # Signal to indicate a link has been clicked
     link_activated = Signal(str)
@@ -21,7 +21,7 @@ class InfoPageView(QWidget):
         self._connect_signals()
 
     def _create_widgets(self):
-        """Create all UI elements for the view."""
+        """Create all UI elements for the _view."""
         # Main container and scroll area
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)

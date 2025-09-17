@@ -5,10 +5,11 @@ from shared.orm_models.services_models import BaseServices
 from shared.orm_models.payroll_models import BasePayroll
 from shared.orm_models.expenses_models import BaseExpenses
 from shared.orm_models.info_page_models import BaseInfoPage
+from shared.orm_models.workspace_models import BaseWorkspace
 
 from shared.assets import (
     CUSTOMERS_DB_URL, INVOICES_DB_URL, SERVICES_DB_URL,
-    EXPENSES_DB_URL, USERS_DB_URL, PAYROLL_DB_URL, INFO_PAGE_DB_URL
+    EXPENSES_DB_URL, USERS_DB_URL, PAYROLL_DB_URL, INFO_PAGE_DB_URL, WORKSPACE_DB_URL
 )
 
 
@@ -19,7 +20,8 @@ DATABASE_BASES = {
     'services': BaseServices,
     'payroll': BasePayroll,
     'expenses': BaseExpenses,
-    'info_page': BaseInfoPage
+    'info_page': BaseInfoPage,
+    'workspace': BaseWorkspace
 }
 
 DATABASE_PATHS = {
@@ -29,5 +31,6 @@ DATABASE_PATHS = {
     'expenses': EXPENSES_DB_URL,
     'users': USERS_DB_URL,
     'payroll': PAYROLL_DB_URL,
-    'info_page': INFO_PAGE_DB_URL
+    'info_page': INFO_PAGE_DB_URL,
+    'workspace': WORKSPACE_DB_URL
 }

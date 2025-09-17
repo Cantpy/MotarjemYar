@@ -19,7 +19,7 @@ def _to_dto(model: "FixedPricesModel") -> FixedPriceDTO:
 
 
 class FixedPricesLogic:
-    """Business logic for managing fixed prices."""
+    """Business _logic for managing fixed prices."""
 
     def __init__(self, repository: FixedPricesRepository, session_provider: SessionProvider):
         self._repo = repository

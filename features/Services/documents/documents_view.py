@@ -10,9 +10,9 @@ from features.Services.documents.documents_models import ServicesDTO
 
 class ServicesDocumentsView(QWidget):
     """
-    A 'dumb' view for displaying and managing services/documents.
+    A 'dumb' _view for displaying and managing services/documents.
     It emits signals for user actions and has public slots for updates.
-    It has no knowledge of controllers or business logic.
+    It has no knowledge of controllers or business _logic.
     """
 
     # --- Public Signals for the Controller ---
@@ -81,7 +81,7 @@ class ServicesDocumentsView(QWidget):
         self.main_layout.addLayout(button_layout)
 
     def _connect_signals(self):
-        """Connect internal widget signals to this view's public signals."""
+        """Connect internal widget signals to this _view's public signals."""
         # --- User Actions ---
         self.add_btn.clicked.connect(self.add_requested)
         self.edit_btn.clicked.connect(self._emit_edit_request)

@@ -23,16 +23,16 @@ class DocumentSelectionController(QObject):
         self._view = view
         self._state_manager = state_manager
 
-        # Initial population of the view
+        # Initial population of the _view
         self._view.populate_completer(self._logic.get_all_service_names())
         self._connect_signals()
 
     def get_view(self) -> DocumentSelectionWidget:
-        """Exposes the view for integration into a larger UI."""
+        """Exposes the _view for integration into a larger UI."""
         return self._view
 
     def _connect_signals(self):
-        """Connect signals from the view to controller slots."""
+        """Connect signals from the _view to controller slots."""
         self._view.add_button_clicked.connect(self._on_add_clicked)
         self._view.edit_button_clicked.connect(self._on_edit_clicked)
         self._view.delete_button_clicked.connect(self._on_delete_clicked)
@@ -40,7 +40,7 @@ class DocumentSelectionController(QObject):
         self._view.manual_item_updated.connect(self._on_manual_update)
 
     def _refresh_view(self):
-        """A helper method to get the latest data and update the view."""
+        """A helper method to get the latest data and update the _view."""
         updated_items = self._logic.get_current_items()
         self._view.update_table_display(updated_items)
 
@@ -67,7 +67,7 @@ class DocumentSelectionController(QObject):
             # The _logic returns the new, complete list
             updated_items = self._logic.add_item(final_item)
 
-            # Refresh the local view AND emit the signal for the outside world
+            # Refresh the local _view AND emit the signal for the outside world
             self._view.update_table_display(updated_items)
             self._view.clear_service_input()
             self.invoice_items_changed.emit(updated_items)

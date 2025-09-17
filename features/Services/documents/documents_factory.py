@@ -28,7 +28,7 @@ class ServicesDocumentFactory:
         """
         Creates, configures, and connects the entire Services/Documents module.
         """
-        # 1. Create the data and logic layers
+        # 1. Create the data and _logic layers
         repository = ServiceRepository()
         logic = ServicesLogic(
             repo=repository,
@@ -38,7 +38,7 @@ class ServicesDocumentFactory:
         # 2. Create the View (it's now dumb)
         view = ServicesDocumentsView(parent=parent)
 
-        # 3. Create the Controller, injecting the view and logic
+        # 3. Create the Controller, injecting the _view and _logic
         controller = ServicesController(
             view=view,
             logic=logic

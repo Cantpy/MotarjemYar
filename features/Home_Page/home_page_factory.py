@@ -23,7 +23,7 @@ class HomePageFactory:
         Creates a fully configured and connected home page module.
 
         Returns:
-            HomePageController: The main controller which holds the view.
+            HomePageController: The main controller which holds the _view.
         """
         # 1. Create Data and Logic components
         repository = HomePageRepository()

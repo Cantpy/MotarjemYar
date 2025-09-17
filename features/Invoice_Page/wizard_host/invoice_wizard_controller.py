@@ -28,11 +28,11 @@ class InvoiceWizardController(QObject):
         self._connect_signals()
         self._populate_view_widgets()
 
-        # Command the view to set its initial state to the first page.
+        # Command the _view to set its initial state to the first page.
         self._view.set_current_step(0)
 
     def get_view(self) -> InvoiceWizardWidget:
-        """Returns the main view widget to be shown by the application."""
+        """Returns the main _view widget to be shown by the application."""
         return self._view
 
     def _connect_signals(self):
@@ -44,7 +44,7 @@ class InvoiceWizardController(QObject):
         doc_select_ctrl.invoice_items_changed.connect(self._state_manager.set_invoice_items)
 
     def _populate_view_widgets(self):
-        """Adds the widgets from the sub-controllers to the stacked view."""
+        """Adds the widgets from the sub-controllers to the stacked _view."""
         self._view.stacked_widget.addWidget(self.sub_controllers['customer'].get_view())
         self._view.stacked_widget.addWidget(self.sub_controllers['documents'].get_view())
         self._view.stacked_widget.addWidget(self.sub_controllers['assignment'])
@@ -78,7 +78,7 @@ class InvoiceWizardController(QObject):
                     self._state_manager.get_customer(), payload['unpacked_items']
                 )
 
-        # 3. Command the view to navigate to the new index
+        # 3. Command the _view to navigate to the new index
         self._view.set_current_step(next_index)
 
     def _on_previous_step(self):

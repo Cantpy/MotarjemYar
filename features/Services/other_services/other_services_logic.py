@@ -12,7 +12,7 @@ def _to_dto(model: "OtherServicesModel") -> OtherServiceDTO:
 
 
 class OtherServicesLogic:
-    """Business logic for managing other services."""
+    """Business _logic for managing other services."""
 
     def __init__(self, repository: OtherServicesRepository, session_provider: "SessionProvider"):
         self._repo = repository

@@ -36,7 +36,7 @@ class ServicesManagementView(QWidget):
         main_layout.addWidget(self.tab_widget)
 
     def _connect_signals(self):
-        """Connect this view's widgets to its public signals."""
+        """Connect this _view's widgets to its public signals."""
         self.refresh_all_btn.clicked.connect(self.refresh_all_requested)
 
     def add_tab(self, widget: QWidget, name: str):

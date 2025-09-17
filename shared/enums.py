@@ -1,5 +1,7 @@
 # shared/enums.py
+
 from enum import IntEnum
+import enum
 
 
 class DeliveryStatus(IntEnum):
@@ -12,3 +14,14 @@ class DeliveryStatus(IntEnum):
     TRANSLATED = 2  # اسناد ترجمه شده، آماده امضا و مهر
     READY = 3       # کاملاً آماده، منتظر دریافت توسط مشتری
     COLLECTED = 4   # توسط مشتری دریافت شده
+
+
+class ChatType(enum.Enum):
+    ONE_ON_ONE = "one_on_one"
+    GROUP = "group"
+    CHANNEL = "channel"
+
+
+class ParticipantRole(enum.Enum):
+    MEMBER = "member"
+    ADMIN = "admin"
