@@ -4,7 +4,7 @@ from PySide6.QtCore import QObject, Signal
 from features.Services.other_services.other_services_models import OtherServiceDTO
 from features.Services.other_services.other_services_logic import OtherServicesLogic
 from features.Services.other_services.other_services_view import OtherServicesView
-from features.Services.documents.documents_dialogs import InputDialog
+from shared.dialogs.import_dialog import GenericInputDialog
 
 from shared import show_error_message_box, show_information_message_box, show_question_message_box
 
@@ -43,7 +43,12 @@ class OtherServicesController(QObject):
         self._view.update_display(self._data_cache)
 
     def handle_add(self):
-        dialog = InputDialog("افزودن مدرک جدید", self._view)
+        form_fields = [
+            # (Label,         Key for dict, Placeholder)
+            ("نام", "name", "مثال: پیک"),
+            ("هزینه", "base_price", "مثال: 10000"),
+        ]
+        dialog = GenericInputDialog("افزودن مدرک جدید", form_fields, self._view)
         if dialog.exec():
             values = dialog.get_values()
             self._perform_create_other_services(values)
@@ -58,13 +63,19 @@ class OtherServicesController(QObject):
             return
 
         # Step 2: Manually create a dictionary from the DTO to pre-fill the dialog.
+        form_fields = [
+            # (Label,         Key for dict, Placeholder)
+            ("نام", "name", "مثال: پیک"),
+            ("هزینه", "base_price", "مثال: 10000"),
+        ]
+
         current_data_for_dialog = {
             'name': cost_to_edit.name,
             'price': str(cost_to_edit.price)
         }
 
         # Step 3: Create and show the dialog.
-        dialog = InputDialog("ویرایش خدمات دیگر", self._view)
+        dialog = GenericInputDialog("ویرایش خدمات دیگر", form_fields, self._view)
         dialog.set_values(current_data_for_dialog)
 
         if dialog.exec():

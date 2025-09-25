@@ -252,9 +252,9 @@ class RepositoryManager:
         self.user_repo = UserRepository()
 
     def get_invoice_repository(self) -> InvoiceRepository:
-        """Get invoice repository instance"""
+        """Get invoice _repository instance"""
         return self.invoice_repo
 
     def get_user_repository(self) -> UserRepository:
-        """Get user repository instance"""
+        """Get user _repository instance"""
         return self.user_repo

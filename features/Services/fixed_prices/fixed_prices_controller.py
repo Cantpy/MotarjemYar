@@ -5,8 +5,9 @@ from PySide6.QtCore import QObject, Signal
 from features.Services.fixed_prices.fixed_prices_models import FixedPriceDTO
 from features.Services.fixed_prices.fixed_prices_logic import FixedPricesLogic
 from features.Services.fixed_prices.fixed_prices_view import FixedPricesView
-from features.Services.documents.documents_dialogs import InputDialog
 from shared import show_error_message_box, show_information_message_box, show_question_message_box
+
+from shared.dialogs.import_dialog import GenericInputDialog
 
 
 class FixedPricesController(QObject):
@@ -44,7 +45,12 @@ class FixedPricesController(QObject):
 
     def handle_add(self):
         """Handles the workflow for adding a new service."""
-        dialog = InputDialog("افزودن هزینه ثابت جدید", self._view)
+        form_fields = [
+            # (Label,         Key for dict, Placeholder)
+            ("نام هزینه ثابت", "name", "مثال: مهر امور خارجه"),
+            ("قیمت", "price", "مثال: 150000")
+        ]
+        dialog = GenericInputDialog("افزودن هزینه ثابت جدید", form_fields, self._view)
         if dialog.exec():
             values = dialog.get_values()
             self._perform_create_fixed_cost(values)
@@ -59,13 +65,19 @@ class FixedPricesController(QObject):
             return
 
         # Step 2: Manually create a dictionary from the DTO to pre-fill the dialog.
+        form_fields = [
+            # (Label,         Key for dict, Placeholder)
+            ("نام هزینه ثابت", "name", "مثال: کپی برابر اصل"),
+            ("قیمت", "price", "مثال: 2250"),
+        ]
+
         current_data_for_dialog = {
             'name': cost_to_edit.name,
             'price': str(cost_to_edit.price)
         }
 
         # Step 3: Create and show the dialog.
-        dialog = InputDialog("ویرایش هزینه ثابت", self._view)
+        dialog = GenericInputDialog("ویرایش هزینه ثابت", form_fields, self._view)
         dialog.set_values(current_data_for_dialog)
 
         if dialog.exec():

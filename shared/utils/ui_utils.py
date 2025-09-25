@@ -2,12 +2,10 @@
 UI-related utility functions for Qt widgets and styling.
 """
 import re
-from PySide6.QtWidgets import (QMessageBox, QLineEdit, QLabel, QFormLayout, QWidget, QVBoxLayout, QDialog, QHBoxLayout,
-                               QPushButton, QFrame, QScrollArea)
+from PySide6.QtWidgets import (QMessageBox, QLineEdit, QLabel, QFormLayout, QTableWidget, QHeaderView)
 from PySide6.QtSvg import QSvgRenderer
-from PySide6.QtCore import Qt, QSize, QPropertyAnimation, QEasingCurve, QTimer, Signal
+from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QPixmap, QPainter, QIcon
-from typing import List
 
 
 def show_message_box(parent, title, message, icon_type, button_text="متوجه شدم"):
@@ -186,3 +184,42 @@ def set_svg_icon(svg_path: str, size: QSize, label: QLabel):
 
     label.setPixmap(pixmap)
     label.setFixedSize(size)  # Optional: fix size to match icon
+
+
+class TableColumnResizer:
+    """Helper to resize QTableWidget columns based on ratios (independent of 100%)."""
+
+    def __init__(self, table: QTableWidget, ratios: list[int | float], scrollbar_margin: int = 0):
+        if not isinstance(table, QTableWidget):
+            raise TypeError("table must be a QTableWidget")
+        if len(ratios) != table.columnCount():
+            raise ValueError("ratios length must match the number of table columns")
+
+        self.table = table
+        self.ratios = ratios
+        self.scrollbar_margin = scrollbar_margin
+
+        # Kill Qt's stretching behavior
+        header = self.table.horizontalHeader()
+        header.setStretchLastSection(False)
+        for i in range(header.count()):
+            header.setSectionResizeMode(i, QHeaderView.Fixed)
+
+        # Hook resize event
+        original_resize_event = self.table.resizeEvent
+
+        def _resize_event(event):
+            self.resize_columns()
+            original_resize_event(event)
+
+        self.table.resizeEvent = _resize_event
+        self.resize_columns()
+
+    def resize_columns(self):
+        """Resize table columns proportionally to ratios."""
+        total_ratio = sum(self.ratios)
+        available_width = self.table.viewport().width() - self.scrollbar_margin
+
+        for i, ratio in enumerate(self.ratios):
+            col_width = int(available_width * (ratio / total_ratio))
+            self.table.setColumnWidth(i, col_width)

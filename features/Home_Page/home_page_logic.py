@@ -2,11 +2,10 @@
 
 import jdatetime
 from datetime import date, timedelta
-from typing import List, Optional, Tuple, Type
-from sqlalchemy.orm import sessionmaker
+from typing import List, Optional, Tuple
 import requests
 
-# Import the stateless repository and the DTOs
+# Import the stateless _repository and the DTOs
 from features.Home_Page.home_page_repo import HomePageRepository
 from features.Home_Page.home_page_models import TimeInfo, DashboardStats, StatusChangeRequest
 from shared.dtos.notification_dialog_dtos import NotificationDataDTO, SmsRequestDTO, EmailRequestDTO
@@ -14,33 +13,35 @@ from shared.dtos.invoice_dtos import IssuedInvoiceDTO
 from shared.orm_models.invoices_models import IssuedInvoiceModel
 from shared.utils.persian_tools import to_persian_numbers
 from shared.enums import DeliveryStatus
-from shared.session_provider import SessionProvider
+from shared.session_provider import ManagedSessionProvider
 
 
 class HomePageLogic:
     """Business _logic for home page operations. Manages units of work."""
 
     def __init__(self, repository: HomePageRepository,
-                 session_provider: SessionProvider):
-        """Initialize with repository class and session makers."""
-        self.repository = repository
-        self.session_provider = session_provider
+                 customer_engine: ManagedSessionProvider,
+                 invoices_engine: ManagedSessionProvider):
+        """Initialize with _repository class and session makers."""
+        self._repository = repository
+        self._customer_session = customer_engine
+        self._invoices_session = invoices_engine
 
     # --- PUBLIC METHODS ---
 
     def get_dashboard_statistics(self) -> DashboardStats:
         """Get all dashboard statistics. This is a read-only unit of work."""
         total_customers = 0
-        with self.session_provider.customers() as customer_session:
-            total_customers = self.repository.get_customer_count(customer_session)
+        with self._customer_session() as customer_session:
+            total_customers = self._repository.get_customer_count(customer_session)
 
         # REFACTORED: Get the session from the provider
-        with self.session_provider.invoices() as invoice_session:
-            total_invoices = self.repository.get_total_invoices_count(invoice_session)
-            today_invoices = self.repository.get_today_invoices_count(invoice_session, date.today())
-            doc_stats = self.repository.get_document_statistics(invoice_session)
-            most_repeated_raw = self.repository.get_most_repeated_doc(invoice_session)
-            most_repeated_month_raw = self.repository.get_most_repeated_doc_month(invoice_session)
+        with self._invoices_session() as invoice_session:
+            total_invoices = self._repository.get_total_invoices_count(invoice_session)
+            today_invoices = self._repository.get_today_invoices_count(invoice_session, date.today())
+            doc_stats = self._repository.get_document_statistics(invoice_session)
+            most_repeated_raw = self._repository.get_most_repeated_doc(invoice_session)
+            most_repeated_month_raw = self._repository.get_most_repeated_doc_month(invoice_session)
             most_repeated_formatted = self._format_most_repeated_doc(most_repeated_raw)
             most_repeated_month_formatted = self._format_most_repeated_doc_month(most_repeated_month_raw)
 
@@ -57,14 +58,14 @@ class HomePageLogic:
     def get_recent_invoices_with_priority(self, days_threshold: int = 7) -> List[Tuple[IssuedInvoiceDTO, str]]:
         """
         Get recent invoices with priority labels.
-        This business _logic does not belong in the repository.
+        This business _logic does not belong in the _repository.
         """
         today = date.today()
         threshold_date = today + timedelta(days=days_threshold)
 
         invoice_priority_list = []
-        with self.session_provider.invoices() as session:
-            invoice_models = self.repository.get_invoices_by_delivery_date_range(
+        with self._invoices_session() as session:
+            invoice_models = self._repository.get_invoices_by_delivery_date_range(
                 session,
                 start_date=today,
                 end_date=threshold_date,
@@ -87,8 +88,8 @@ class HomePageLogic:
         This is a read-only unit of work that may span multiple databases.
         """
         # We need data from two different databases, so we'll use two sessions.
-        with self.session_provider.invoices() as invoice_session:
-            invoice_model = self.repository.get_invoice_by_number(invoice_session, invoice_number)
+        with self._invoices_session() as invoice_session:
+            invoice_model = self._repository.get_invoice_by_number(invoice_session, invoice_number)
 
         if not invoice_model:
             # If the invoice doesn't exist, we can't proceed.
@@ -97,9 +98,9 @@ class HomePageLogic:
         customer_model = None
         if invoice_model.national_id:
             national_id = str(invoice_model.national_id)
-            with self.session_provider.customers() as customer_session:
-                customer_model = self.repository.get_customer_by_national_id(customer_session,
-                                                                             national_id)
+            with self._customer_session() as customer_session:
+                customer_model = self._repository.get_customer_by_national_id(customer_session,
+                                                                              national_id)
 
         # Now, map the data from our ORM models into the clean DTO.
         # Prioritize the data from the official customer record, but fall back
@@ -120,9 +121,9 @@ class HomePageLogic:
         Handles all business _logic for changing an invoice's status.
         This is a single, consolidated transactional unit of work.
         """
-        with self.session_provider.invoices() as session:
+        with self._invoices_session() as session:
             try:
-                invoice = self.repository.get_invoice_by_number(session, request.invoice_number)
+                invoice = self._repository.get_invoice_by_number(session, request.invoice_number)
                 if not invoice:
                     return False, "فاکتور یافت نشد"
 
@@ -136,7 +137,7 @@ class HomePageLogic:
                     return False, "برای این مرحله تعیین مترجم الزامی است."
 
                 # === Update the record ===
-                success = self.repository.update_invoice_status(
+                success = self._repository.update_invoice_status(
                     session, request.invoice_number, request.target_status, request.translator
                 )
 
@@ -152,8 +153,8 @@ class HomePageLogic:
 
     def get_invoice_for_menu(self, invoice_number: int) -> Optional[IssuedInvoiceDTO]:
         """Gets the necessary invoice data (as a DTO) for creating a context menu."""
-        with self.session_provider.invoices() as session:
-            invoice_model = self.repository.get_invoice_by_number(session, invoice_number)
+        with self._invoices_session() as session:
+            invoice_model = self._repository.get_invoice_by_number(session, invoice_number)
             if invoice_model:
                 return self._map_orm_to_invoice_dto(invoice_model)
             return None
@@ -292,8 +293,8 @@ class HomePageLogic:
             A tuple of (next_status_enum, next_step_button_text) if an advance is possible.
             None if the invoice is not found or is already in the final state.
         """
-        with self.session_provider.invoices() as session:
-            invoice = self.repository.get_invoice_by_number(session, invoice_number)
+        with self._invoices_session() as session:
+            invoice = self._repository.get_invoice_by_number(session, invoice_number)
             if not invoice:
                 return None
 
@@ -338,11 +339,11 @@ class HomePageLogic:
         Handles the business _logic of sending an email and updating customer info.
         """
         # Business Rule: Update the customer's email if it has changed.
-        with self.session_provider.customers() as session:
+        with self._customer_session() as session:
             try:
-                customer = self.repository.get_customer_by_national_id(session, national_id)
+                customer = self._repository.get_customer_by_national_id(session, national_id)
                 if customer and customer.email != email_request.recipient_email:
-                    self.repository.update_customer_email(session, national_id, email_request.recipient_email)
+                    self._repository.update_customer_email(session, national_id, email_request.recipient_email)
                     session.commit()
             except Exception as e:
                 session.rollback()

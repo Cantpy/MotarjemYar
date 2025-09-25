@@ -1,4 +1,5 @@
 # shared/widgets/collapsible_box.py
+
 from PySide6.QtWidgets import QWidget, QToolButton, QVBoxLayout, QFrame, QLabel, QHBoxLayout
 from PySide6.QtCore import Qt, QPropertyAnimation, QEasingCurve
 from PySide6.QtGui import QFont

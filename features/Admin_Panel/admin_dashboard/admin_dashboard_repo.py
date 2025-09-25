@@ -11,7 +11,7 @@ import jdatetime  # For Jalali date handling
 
 class AdminDashboardRepository:
     """
-    Stateless repository class for fetching admin dashboard data.
+    Stateless _repository class for fetching admin dashboard data.
     """
     def get_revenue_today(self, session: Session) -> float:
         """

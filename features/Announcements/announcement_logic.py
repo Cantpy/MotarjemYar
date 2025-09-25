@@ -20,17 +20,17 @@ class NotificationService:
     """ServicesModel class for handling SMS and Email notifications."""
 
     def __init__(self, repository: NotificationRepository):
-        """Initialize with repository."""
+        """Initialize with _repository."""
         self.repository = repository
         self.sms_api_config = {
             'url': 'https://console.melipayamak.com/api/send/simple/02518acf41404001be90c2baafb85767',
             'from_number': '50002710094507'
         }
         self.email_config = {
-            'smtp_server': 'smtp.gmail.com',  # Configure based on your provider
+            'smtp_server': 'smtp.gmail.com',
             'smtp_port': 587,
-            'username': '',  # Set from environment or config
-            'password': ''  # Set from environment or config
+            'username': '',
+            'password': ''
         }
 
     # SMS Methods

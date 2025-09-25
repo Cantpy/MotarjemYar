@@ -10,10 +10,10 @@ from shared import return_resource  # Assuming this helper exists
 
 class LoginSettingsRepository:
     """
-    Stateless repository for persisting 'remember me' settings to a JSON file.
+    Stateless _repository for persisting 'remember me' settings to a JSON file.
     """
     def __init__(self):
-        # A config file path is a reasonable thing for a repository to know.
+        # A config file path is a reasonable thing for a _repository to know.
         self.settings_path = Path("config") / "login_settings.json"
         # self.settings_path = return_resource("resources", "login_settings.json", "config")
 

@@ -7,6 +7,8 @@ from PySide6.QtWidgets import (
 )
 from features.Services.other_services.other_services_models import OtherServiceDTO
 
+from shared.utils.ui_utils import TableColumnResizer
+
 
 class OtherServicesView(QWidget):
     """A 'dumb' _view for displaying and managing other services."""
@@ -90,6 +92,8 @@ class OtherServicesView(QWidget):
         self.table.horizontalHeader().setSectionsClickable(True)
 
         self.main_layout.addWidget(self.table)
+
+        TableColumnResizer(self.table, [8, 30, 20])
 
     def _setup_buttons(self):
         """Create and configure action buttons."""

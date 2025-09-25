@@ -50,3 +50,17 @@ class OtherServicesRepository:
             OtherServicesModel.id.in_(service_ids)
         ).delete(synchronize_session=False)
         return deleted_count
+
+    def bulk_create(self, session: Session, prices_data: list[dict]) -> int:
+        """Bulk inserts multiple fixed prices from a list of dictionaries."""
+        if not prices_data:
+            return 0
+
+        try:
+            # Map the dictionaries to your OtherServicesModel ORM objects
+            price_objects = [OtherServicesModel(**data) for data in prices_data]
+            session.bulk_save_objects(price_objects)
+            return len(price_objects)
+        except Exception as e:
+            # The logic layer will catch and handle this
+            raise Exception(f"Database bulk insert failed for Fixed Prices: {e}")

@@ -9,19 +9,23 @@ from features.Admin_Panel.wage_calculator.wage_calculator_models import (Payroll
                                                                          PayrollComponent, EmployeeInfo)
 from features.Admin_Panel.wage_calculator.wage_calculator_repo import WageCalculatorRepository
 from shared.orm_models.payroll_models import PayrollRecordModel, PayrollComponentDetailModel, TaxBracketModel
-from shared.session_provider import SessionProvider
+
+from shared.session_provider import ManagedSessionProvider
 
 getcontext().prec = 18
 
 
 class WageCalculatorLogic:
-    def __init__(self, repository: WageCalculatorRepository, session_provider: SessionProvider):
+    def __init__(self, repository: WageCalculatorRepository,
+                 payroll_engine: ManagedSessionProvider,
+                 invoices_engine: ManagedSessionProvider):
         self._repo = repository
-        self._session_provider = session_provider
+        self._payroll_session = payroll_engine
+        self._invoices_session = invoices_engine
 
     def get_employee_list(self) -> list[EmployeeInfo]:
         """Gets a simple list of employees for the UI to display in a dropdown."""
-        with self._session_provider.payroll() as session:
+        with self._payroll_session() as session:
             employees = self._repo.get_all_active_employees(session)
             return [
                 EmployeeInfo(
@@ -34,7 +38,7 @@ class WageCalculatorLogic:
     def get_payroll_run_summary(self, year: int, month: int) -> list[PayrollRunEmployee]:
         """Fetches the summary of a pay run for the main table."""
         start_date, end_date = self._get_jalali_month_range(year, month)
-        with self._session_provider.payroll() as session:
+        with self._payroll_session() as session:
             records = self._repo.get_payroll_run_for_period(session, start_date, end_date)
             return [
                 PayrollRunEmployee(
@@ -50,7 +54,7 @@ class WageCalculatorLogic:
         Fetches a saved PayrollRecord and converts it into a clean PayslipData DTO
         for the preview dialog to display.
         """
-        with self._session_provider.payroll() as session:
+        with self._payroll_session() as session:
             record = self._repo.get_detailed_payslip_by_id(session, payroll_id)
             if not record:
                 raise ValueError(f"فیش حقوقی با شناسه {payroll_id} یافت نشد.")
@@ -82,7 +86,7 @@ class WageCalculatorLogic:
         """Calculates and saves payroll for ALL employees for the given period."""
         start_date, end_date = self._get_jalali_month_range(year, month)
 
-        with self._session_provider.payroll() as p_session, self._session_provider.invoices() as i_session:
+        with self._payroll_session() as p_session, self._invoices_session() as i_session:
             employees = self._repo.get_all_active_employees(p_session)
             constants = self._repo.get_system_constants(p_session, year)
             tax_brackets = self._repo.get_tax_brackets(p_session, year)

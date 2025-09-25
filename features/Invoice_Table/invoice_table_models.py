@@ -12,17 +12,17 @@ class InvoiceItemData:
     judiciary_seal: int
     foreign_affairs_seal: int
     remarks: Optional[str] = None
-    invoice_number: Optional[str] = None  # Added to match repository usage
+    invoice_number: Optional[str] = None  # Added to match _repository usage
 
     def get_document_count(self) -> int:
-        """Get document count for this item (used by repository)"""
+        """Get document count for this item (used by _repository)"""
         return self.item_qty
 
 
 @dataclass
 class InvoiceData:
     """Data class for invoice information"""
-    invoice_number: str  # Changed from int to str to match repository
+    invoice_number: str  # Changed from int to str to match _repository
     name: str
     national_id: str  # Changed from int to str for better handling
     phone: str
@@ -91,7 +91,7 @@ class UserProfileData:
     id: Optional[int] = None
 
 
-# Export data structures for repository methods
+# Export data structures for _repository methods
 @dataclass
 class ExportInvoiceData:
     """Simplified data class for invoice export"""

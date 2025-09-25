@@ -4,21 +4,28 @@ import pandas as pd
 import jdatetime
 from datetime import date
 from features.Admin_Panel.admin_reports.admin_reports_repo import AdminReportsRepository
-from shared.session_provider import SessionProvider
+from shared.session_provider import ManagedSessionProvider
 
 
 class AdminReportsLogic:
-    def __init__(self, repository: AdminReportsRepository, session_provider: SessionProvider):
+    def __init__(self, repository: AdminReportsRepository,
+                 invoices_engine: ManagedSessionProvider,
+                 services_engine: ManagedSessionProvider,
+                 expenses_engine: ManagedSessionProvider,
+                 customer_engine: ManagedSessionProvider):
         self._repo = repository
-        self._session_provider = session_provider
+        self._invoices_session = invoices_engine
+        self._services_session = services_engine
+        self._expenses_session = expenses_engine
+        self._customers_session = customer_engine
 
     def get_full_report_data(self, year: int) -> dict:
         """
         Generates a complete report including revenue, expenses, and profit for a year.
         """
-        with (self._session_provider.invoices() as inv_sess,
-              self._session_provider.services() as srv_sess,
-              self._session_provider.expenses() as exp_sess):
+        with (self._invoices_session() as inv_sess,
+              self._services_session() as srv_sess,
+              self._expenses_session() as exp_sess):
             rev_by_month_g = self._repo.get_revenue_by_month(inv_sess, year)
             manual_exp_by_month_g = self._repo.get_manual_expenses_by_month(exp_sess, year)
             invoice_exp_by_month_g = self._repo.get_invoice_based_expenses_by_month(inv_sess, srv_sess, year)
@@ -71,9 +78,9 @@ class AdminReportsLogic:
     # --- METHOD FOR EXCEL EXPORT ---
     def export_year_data_to_excel(self, year: int, file_path: str):
         """Fetches detailed data and writes it to a multi-sheet Excel file."""
-        with (self._session_provider.invoices() as inv_sess,
-              self._session_provider.expenses() as exp_sess,
-              self._session_provider.customers() as cust_sess):
+        with (self._invoices_session() as inv_sess,
+              self._expenses_session() as exp_sess,
+              self._customers_session() as cust_sess):
             invoices = self._repo.get_detailed_invoices_for_year(inv_sess, year)
             expenses = self._repo.get_detailed_expenses_for_year(exp_sess, year)
 
@@ -139,19 +146,19 @@ class AdminReportsLogic:
     # --- METHODS FOR ADVANCED SEARCH ---
 
     def find_unpaid_invoices(self, start_date: date, end_date: date) -> list:
-        with self._session_provider.invoices() as session:
+        with self._invoices_session() as session:
             return self._repo.find_unpaid_invoices_in_range(session, start_date, end_date)
 
     def find_invoices_by_document_names(self, doc_names: list[str]) -> list:
-        with self._session_provider.invoices() as session:
+        with self._invoices_session() as session:
             return self._repo.find_invoices_by_document_names(session, doc_names)
 
     def find_frequent_customers(self, min_visits: int, start_date: date = None, end_date: date = None) -> list:
-        with self._session_provider.invoices() as session:
+        with self._invoices_session() as session:
             return self._repo.find_frequent_customers(session, min_visits, start_date, end_date)
 
     def get_all_service_names(self) -> list[str]:
         """Fetches a list of all service names for the auto-completer."""
-        with self._session_provider.services() as session:
-            # The repo method returns tuples, so we unpack them into a list of strings
+        with self._services_session() as session:
+            # The _repo method returns tuples, so we unpack them into a list of strings
             return [name for name, in self._repo.get_all_service_names(session)]

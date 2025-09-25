@@ -1,11 +1,14 @@
 """documents_view.py - Documents management _view using PySide6"""
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QCheckBox, QLabel, QPushButton, QLineEdit, QTableWidget, QTableWidgetItem, QMenu
+    QWidget, QVBoxLayout, QHBoxLayout, QCheckBox, QLabel, QPushButton, QLineEdit, QTableWidget, QTableWidgetItem,
+    QMenu
 )
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtGui import QAction
-from features.Services.documents.documents_models import ServicesDTO
+from features.Services.documents.documents_models import ServicesDTO, ServiceDynamicFeeDTO
+
+from shared.utils.ui_utils import TableColumnResizer
 
 
 class ServicesDocumentsView(QWidget):
@@ -21,7 +24,6 @@ class ServicesDocumentsView(QWidget):
     delete_requested = Signal(int)  # service_id
     bulk_delete_requested = Signal(list)  # list of service_ids
     search_text_changed = Signal(str)
-    import_requested = Signal()
 
     COLUMN_HEADERS = ["انتخاب", "نام مدرک", "هزینه ترجمه", "نام متغیر ۱", "هزینه متغیر ۱",
                       "نام متغیر ۲", "هزینه متغیر ۲"]
@@ -33,7 +35,6 @@ class ServicesDocumentsView(QWidget):
 
         self._setup_ui()
         self._connect_signals()
-        # No more _load_data() or update_display() here.
 
     # --- UI Setup (Largely Unchanged) ---
     def _setup_ui(self):
@@ -66,16 +67,19 @@ class ServicesDocumentsView(QWidget):
         self.table.setHorizontalHeaderLabels(self.COLUMN_HEADERS)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSortingEnabled(True)
+        self.table.stretchLastSection = False
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.main_layout.addWidget(self.table)
 
+        # Apply column resizer (5%, 45%, then 5×10%)
+        TableColumnResizer(self.table, [6, 30, 11, 11, 9, 11, 9])
+
     def _setup_buttons(self):
         button_layout = QHBoxLayout()
-        self.add_by_excel_btn = QPushButton("افزودن با اکسل")
         self.add_btn = QPushButton("➕ اضافه کردن مدرک")
         self.edit_btn = QPushButton("✏️ ویرایش مدرک")
         self.delete_btn = QPushButton("🗑️ حذف مدرک")
-        buttons = [self.add_by_excel_btn, self.add_btn, self.edit_btn, self.delete_btn]
+        buttons = [self.add_btn, self.edit_btn, self.delete_btn]
         for button in buttons:
             button_layout.addWidget(button)
         self.main_layout.addLayout(button_layout)
@@ -87,8 +91,7 @@ class ServicesDocumentsView(QWidget):
         self.edit_btn.clicked.connect(self._emit_edit_request)
         self.delete_btn.clicked.connect(self._emit_delete_request)
         self.bulk_delete_btn.clicked.connect(self._emit_bulk_delete_request)
-        self.add_by_excel_btn.clicked.connect(self.import_requested)
-        self.search_bar.textChanged.connect(self.search_text_changed)
+        self.search_bar.textChanged.connect(self._emit_search_text_changed)
 
         # --- Internal UI Logic ---
         self.table.customContextMenuRequested.connect(self._show_context_menu)
@@ -144,11 +147,21 @@ class ServicesDocumentsView(QWidget):
         checkbox_widget, _ = self._create_checkbox_widget()
         self.table.setCellWidget(row_number, 0, checkbox_widget)
 
-        # Data fields from DTO
         data_fields = [
-            service.name, service.base_price, service.dynamic_price_name_1 or '',
-            service.dynamic_price_1, service.dynamic_price_name_2 or '', service.dynamic_price_2
+            service.name,
+            service.base_price if service.base_price is not None else ''
         ]
+
+        for fee in service.dynamic_fees:
+            data_fields.append(fee.name)
+            data_fields.append(fee.unit_price)
+
+        max_dynamic_slots = 2
+        while len(service.dynamic_fees) < max_dynamic_slots:
+            data_fields.append('')
+            data_fields.append('')
+            service.dynamic_fees.append(ServiceDynamicFeeDTO(id=-1, service_id=service.id, name='', unit_price=0))
+
         for col_idx, data in enumerate(data_fields, start=1):
             item = self._create_table_item(data)
             self.table.setItem(row_number, col_idx, item)
@@ -246,3 +259,9 @@ class ServicesDocumentsView(QWidget):
         if service_ids:
             self.bulk_delete_requested.emit(service_ids)
 
+    def _emit_search_text_changed(self):
+        """
+        Emits the search_text_changed signal when the search bar text changes.
+        """
+        text = self.search_bar.text().strip()
+        self.search_text_changed.emit(text)

@@ -1,5 +1,5 @@
 """
-Database repository using SQLAlchemy ORM for SMS and Email notifications.
+Database _repository using SQLAlchemy ORM for SMS and Email notifications.
 """
 from datetime import datetime
 from typing import List, Optional
@@ -73,7 +73,7 @@ class NotificationRepository:
     """Repository class for managing SMS and Email notifications."""
 
     def __init__(self, database_url: str = f"sqlite:///{announcements_db_path}"):
-        """Initialize repository with database connection."""
+        """Initialize _repository with database connection."""
         self.engine = create_engine(database_url, echo=False)
         Base.metadata.create_all(self.engine)
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)

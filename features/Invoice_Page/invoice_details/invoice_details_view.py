@@ -1,10 +1,8 @@
 # features/Invoice_Page/invoice_details/invoice_details_view.py
 
-import sys
-
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QSizePolicy, QSpacerItem, QGroupBox, QFormLayout, QGridLayout, QFrame,
-    QLabel, QComboBox, QTextEdit
+    QWidget, QVBoxLayout, QHBoxLayout, QSizePolicy, QSpacerItem, QGroupBox, QFormLayout, QGridLayout, QLabel,
+    QComboBox, QTextEdit
 )
 from PySide6.QtCore import Signal, Qt, QTimer
 from features.Invoice_Page.invoice_details.invoice_details_models import InvoiceDetails, Language
@@ -19,8 +17,8 @@ class InvoiceDetailsWidget(QWidget):
     amount_changed = Signal(str, int)  # field_name, amount
     other_input_changed = Signal(dict)
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None):
+        super().__init__(parent)
         self.setObjectName("InvoiceDetailsView")
         self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
 
@@ -91,13 +89,6 @@ class InvoiceDetailsWidget(QWidget):
         layout = QVBoxLayout(self)
         layout.setSpacing(15)
 
-        # Title
-        title = QLabel("مرحله ۴: جزئیات فاکتور")
-        title.setFont(self._set_font(16, bold=True))
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet("color: #495057; margin-bottom: 10px;")
-        layout.addWidget(title)
-
         # Create main layout with four columns
         main_layout = QHBoxLayout()
 
@@ -127,7 +118,7 @@ class InvoiceDetailsWidget(QWidget):
 
         # Apply styling
         from features.Invoice_Page.invoice_details.invoice_details_qss import INVOICE_DETAILS_QSS
-        # self.setStyleSheet(INVOICE_DETAILS_QSS)
+        self.setStyleSheet(INVOICE_DETAILS_QSS)
         self._setup_widgets_properties()
 
     def _create_invoice_group(self) -> QGroupBox:

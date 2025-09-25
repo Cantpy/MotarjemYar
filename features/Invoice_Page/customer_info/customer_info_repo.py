@@ -8,7 +8,7 @@ from shared.orm_models.customer_models import CustomerModel, CompanionModel
 
 class CustomerRepository:
     """
-    Stateless repository for customer info page data operations.
+    Stateless _repository for customer info page data operations.
     Requires a session to be passed into each method.
     """
 

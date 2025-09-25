@@ -8,13 +8,16 @@ import uuid
 @dataclass
 class DynamicPrice:
     """Represents a single selectable price option for a service."""
+    id: int
+    service_id: int
     name: str
-    price: int
+    unit_price: int
 
 
 @dataclass
 class Service:
     """A unified application model representing any billable service."""
+    id: int
     name: str
     type: str
     base_price: int
@@ -24,9 +27,10 @@ class Service:
 @dataclass
 class FixedPrice:
     """Represents a single fixed price item from the database."""
+    id: int
     name: str
-    label_name: str
     price: int
+    is_default: bool
 
 
 @dataclass

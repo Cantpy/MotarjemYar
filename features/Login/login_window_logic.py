@@ -5,12 +5,12 @@ import secrets
 from datetime import datetime, timedelta
 from typing import Optional
 
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
 
 from features.Login.login_window_repo import LoginRepository
 from features.Login.login_settings_repo import LoginSettingsRepository
 from shared.dtos.auth_dtos import RememberSettingsDTO, UserLoginDTO, LoggedInUserDTO
+from shared.session_provider import ManagedSessionProvider
 
 
 class LoginService:
@@ -18,10 +18,10 @@ class LoginService:
     The refactored _logic layer for the login feature.
     """
     def __init__(self, repo: LoginRepository, settings_repo: LoginSettingsRepository,
-                 user_session_factory: sessionmaker):
+                 session_provider: ManagedSessionProvider):
         self.repo = repo
         self.settings_repo = settings_repo
-        self.user_session_factory = user_session_factory
+        self._users_session = session_provider
 
     def login(self, login_dto: UserLoginDTO) -> tuple[bool, str, Optional[LoggedInUserDTO]]:
         """
@@ -56,7 +56,7 @@ class LoginService:
     def authenticate_user(self, login_dto: UserLoginDTO) -> tuple[bool, str, Optional[LoggedInUserDTO]]:
         """Authenticates a user based on provided credentials."""
         # REFACTORED: Simplified session management
-        with self.user_session_factory() as session:
+        with self._users_session() as session:
             try:
                 user = self.repo.get_user_by_username(session, login_dto.username)
 
@@ -83,14 +83,14 @@ class LoginService:
 
     def check_and_auto_login(self) -> tuple[bool, Optional[LoggedInUserDTO]]:
         """Checks for and performs auto-login."""
-        # REFACTORED: Uses the settings repository
+        # REFACTORED: Uses the settings _repository
         settings = self.settings_repo.load()
         if not (settings and settings.remember_me and settings.username and settings.token):
             return False, None
 
         if self._verify_remember_token(settings.username, settings.token):
             # If token is valid, get the full user DTO
-            with self.user_session_factory() as session:
+            with self._users_session() as session:
                 user = self.repo.get_user_by_username(session, settings.username)
                 if user and user.active == 1:
                     profile = user.user_profile
@@ -107,7 +107,7 @@ class LoginService:
 
     def _verify_remember_token(self, username: str, token: str) -> bool:
         """Verifies the remember me token against the database."""
-        with self.user_session_factory() as session:
+        with self._users_session() as session:
             user = self.repo.get_user_by_username(session, username)
             if not (user and user.token_hash and user.expires_at):
                 return False
@@ -125,7 +125,7 @@ class LoginService:
         expires_at = (datetime.now() + timedelta(days=30)).isoformat()
 
         # Orchestrate the two save operations
-        with self.user_session_factory() as session:
+        with self._users_session() as session:
             self.repo.update_user_token(session, username, token_hash, expires_at)
             session.commit()
 
@@ -139,7 +139,7 @@ class LoginService:
 
     def _clear_remember_me(self, username: str):
         """Clears remember-me tokens from the DB and the settings file."""
-        with self.user_session_factory() as session:
+        with self._users_session() as session:
             self.repo.update_user_token(session, username, None, None)
             session.commit()
         self.settings_repo.clear()

@@ -418,8 +418,8 @@ class MainInvoicePreviewWidget(QWidget):
     next_page_clicked = Signal()
     prev_page_clicked = Signal()
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None):
+        super().__init__(parent)
         self.setWindowTitle("پیش نمایش فاکتور")
         self.setStyleSheet(f"background-color: {PRIMARY_BACKGROUND_COLOR};")
 

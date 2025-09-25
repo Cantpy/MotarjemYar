@@ -1,6 +1,6 @@
 # home_page/factory.py
 
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.engine import Engine
 
 from features.Home_Page.home_page_controller import HomePageController
 from features.Home_Page.home_page_view import HomePageView
@@ -8,7 +8,8 @@ from features.Home_Page.home_page_settings.home_page_settings_repo import Homepa
 from features.Home_Page.home_page_settings.home_page_settings_logic import HomepageSettingsLogic
 from features.Home_Page.home_page_logic import HomePageLogic
 from features.Home_Page.home_page_repo import HomePageRepository
-from shared.session_provider import SessionProvider
+
+from shared.session_provider import ManagedSessionProvider
 
 
 class HomePageFactory:
@@ -18,18 +19,28 @@ class HomePageFactory:
     """
 
     @staticmethod
-    def create(session_provider: SessionProvider, parent=None) -> HomePageController:
+    def create(customers_engine: Engine, invoices_engine: Engine, parent=None) -> HomePageController:
         """
-        Creates a fully configured and connected home page module.
+        Creates a fully configured Home Page module.
+
+        Args:
+            customers_engine: The SQLAlchemy engine for the customers database.
+            invoices_engine: The SQLAlchemy engine for the invoices database.
+            parent: The parent widget.
 
         Returns:
-            HomePageController: The main controller which holds the _view.
+            HomePageController: The main controller which holds the view.
         """
+
+        customer_session_provider = ManagedSessionProvider(engine=customers_engine)
+        invoice_session_provider = ManagedSessionProvider(engine=invoices_engine)
+
         # 1. Create Data and Logic components
         repository = HomePageRepository()
         logic = HomePageLogic(
             repository=repository,
-            session_provider=session_provider
+            customer_engine=customer_session_provider,
+            invoices_engine=invoice_session_provider
         )
 
         # 2. Create the UI (View)
@@ -47,3 +58,12 @@ class HomePageFactory:
         )
 
         return controller
+
+
+if __name__ == "__main__":
+    from shared.testing.launch_feature import launch_feature_for_ui_test
+    launch_feature_for_ui_test(
+        factory_class=HomePageFactory,
+        required_engines={'customers': 'customers_engine', 'invoices': 'invoices_engine'},
+        use_memory_db=True
+    )

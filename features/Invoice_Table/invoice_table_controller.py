@@ -5,7 +5,7 @@ from typing import List, Any, Optional, Callable
 
 # Import other components
 from features.Invoice_Table.invoice_table_view import InvoiceTableView, EditInvoiceDialog, SummaryDialog
-from features.Invoice_Table.invoice_table_logic import (InvoiceService, FileService, ValidationService, SortService,
+from features.Invoice_Table.invoice_table_logic import (InvoiceTableService, FileService, ValidationService, SortService,
                                                         SearchService, InvoiceExportService, NumberFormatService,
                                                         BulkOperationService)
 from features.Invoice_Table.invoice_table_repo import RepositoryManager
@@ -23,7 +23,7 @@ class MainController(QObject):
 
     def __init__(self,
                  view: InvoiceTableView,
-                 invoice_service: InvoiceService,
+                 invoice_service: InvoiceTableService,
                  file_service: FileService,
                  validation_service: ValidationService,
                  sort_service: SortService,

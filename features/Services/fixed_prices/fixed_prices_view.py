@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
 )
 from features.Services.fixed_prices.fixed_prices_models import FixedPriceDTO
 from shared.utils.persian_tools import to_persian_numbers
+from shared.utils.ui_utils import TableColumnResizer
 
 
 class FixedPricesView(QWidget):
@@ -84,6 +85,8 @@ class FixedPricesView(QWidget):
         self.table.setSortingEnabled(True)
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.main_layout.addWidget(self.table)
+
+        TableColumnResizer(self.table, [8, 30, 20])
 
         button_layout = QHBoxLayout()
         self.add_btn = QPushButton("➕ اضافه کردن هزینه")

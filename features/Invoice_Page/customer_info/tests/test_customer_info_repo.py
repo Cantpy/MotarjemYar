@@ -6,7 +6,7 @@ from features.Invoice_Page.customer_info.customer_info_models import Customer, C
 
 @pytest.fixture
 def repo():
-    """Creates an in-memory database repository for each test."""
+    """Creates an in-memory database _repository for each test."""
     return CustomerRepository(db_file=":memory:")
 
 

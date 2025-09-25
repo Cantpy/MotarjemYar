@@ -5,16 +5,18 @@ from datetime import datetime, date
 from features.Invoice_Page.invoice_preview.invoice_preview_repo import InvoicePreviewRepository
 from features.Invoice_Page.invoice_preview.invoice_preview_models import Invoice, Customer, PreviewItem
 from features.Invoice_Page.invoice_details.invoice_details_models import InvoiceDetails
-from shared.session_provider import SessionProvider
+
+from shared.session_provider import ManagedSessionProvider
 
 
 class InvoicePreviewLogic:
     """
     Handles business _logic related to invoices, such as pagination and data preparation.
     """
-    def __init__(self, repo: InvoicePreviewRepository, session_provider: SessionProvider):
+    def __init__(self, repo: InvoicePreviewRepository,
+                 invoices_engine: ManagedSessionProvider):
         self._repo = repo
-        self._session_provider = session_provider
+        self._invoices_session = invoices_engine
         self.pagination_config = {
             'one_page_max_rows': 12, 'first_page_max_rows': 24,
             'other_page_max_rows': 28, 'last_page_max_rows': 22
@@ -129,13 +131,13 @@ class InvoicePreviewLogic:
             emergency_cost=details.emergency_cost_amount, remarks=details.remarks
         )
 
-    # --- New methods to handle calls that were previously controller -> repo ---
+    # --- New methods to handle calls that were previously controller -> _repo ---
     def get_invoice_path(self, invoice_number: str) -> str | None:
-        """Manages the session to get the invoice path from the repository."""
-        with self._session_provider.invoices() as session:
+        """Manages the session to get the invoice path from the _repository."""
+        with self._invoices_session() as session:
             return self._repo.get_invoice_path(session, invoice_number)
 
     def update_invoice_path(self, invoice_number: str, file_path: str) -> bool:
-        """Manages the session to update the invoice path in the repository."""
-        with self._session_provider.invoices() as session:
+        """Manages the session to update the invoice path in the _repository."""
+        with self._invoices_session() as session:
             return self._repo.update_invoice_path(session, invoice_number, file_path)

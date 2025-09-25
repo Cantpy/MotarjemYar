@@ -4,7 +4,7 @@ from typing import Any
 from features.Services.fixed_prices.fixed_prices_repo import FixedPricesRepository
 from features.Services.fixed_prices.fixed_prices_models import FixedPriceDTO
 
-from shared.session_provider import SessionProvider
+from shared.session_provider import ManagedSessionProvider
 
 
 def _to_dto(model: "FixedPricesModel") -> FixedPriceDTO:
@@ -14,16 +14,15 @@ def _to_dto(model: "FixedPricesModel") -> FixedPriceDTO:
         name=model.name,
         price=model.price,
         is_default=model.is_default,
-        label_name=model.label_name
     )
 
 
 class FixedPricesLogic:
     """Business _logic for managing fixed prices."""
 
-    def __init__(self, repository: FixedPricesRepository, session_provider: SessionProvider):
+    def __init__(self, repository: FixedPricesRepository, services_engine: ManagedSessionProvider):
         self._repo = repository
-        self._session_provider = session_provider
+        self._services_session = services_engine
 
     def _validate_data(self, data: dict[str, Any]):
         """Validates input data for creation or update."""
@@ -42,14 +41,14 @@ class FixedPricesLogic:
 
     def get_all_fixed_prices(self) -> list[FixedPriceDTO]:
         """Get all fixed prices."""
-        with self._session_provider.services() as session:
+        with self._services_session() as session:
             models = self._repo.get_all(session)
             return [_to_dto(model) for model in models]
 
     def create_fixed_price(self, data: dict[str, Any]) -> FixedPriceDTO:
         """Create a new fixed price after validation."""
         self._validate_data(data)
-        with self._session_provider.services() as session:
+        with self._services_session() as session:
             if self._repo.exists_by_name(session, data['name']):
                 raise ValueError(f"هزینه‌ای با نام '{data['name']}' از قبل وجود دارد.")
 
@@ -59,7 +58,7 @@ class FixedPricesLogic:
     def update_fixed_price(self, cost_id: int, data: dict[str, Any]) -> FixedPriceDTO | None:
         """Update an existing fixed price after validation."""
         self._validate_data(data)
-        with self._session_provider.services() as session:
+        with self._services_session() as session:
             if self._repo.exists_by_name(session, data['name'], exclude_id=cost_id):
                 raise ValueError(f"هزینه‌ای با نام '{data['name']}' از قبل وجود دارد.")
 
@@ -67,11 +66,34 @@ class FixedPricesLogic:
             return _to_dto(updated_model) if updated_model else None
 
     def delete_fixed_price(self, cost_id: int) -> bool:
-        """Delete a single fixed price. The repo handles the 'is_default' rule."""
-        with self._session_provider.services() as session:
+        """Delete a single fixed price. The _repo handles the 'is_default' rule."""
+        with self._services_session() as session:
             return self._repo.delete(session, cost_id)
 
     def delete_multiple_prices(self, cost_ids: list[int]) -> int:
         """Delete multiple fixed prices."""
-        with self._session_provider.services() as session:
+        with self._services_session() as session:
             return self._repo.delete_multiple(session, cost_ids)
+
+    def bulk_create_fixed_prices(self, prices_data: list[dict[str, Any]]) -> int:
+        """
+        Bulk insert multiple fixed prices after validation and duplicate checks.
+        Returns the number of inserted records.
+        """
+        if not prices_data:
+            return 0
+
+        # Validate each record
+        for data in prices_data:
+            self._validate_data(data)
+
+        with self._services_session() as session:
+            # Check for duplicates in the DB
+            for data in prices_data:
+                if self._repo.exists_by_name(session, data['name']):
+                    raise ValueError(f"هزینه‌ای با نام '{data['name']}' از قبل وجود دارد.")
+
+            # Insert via repository
+            inserted_count = self._repo.bulk_create(session, prices_data)
+
+        return inserted_count

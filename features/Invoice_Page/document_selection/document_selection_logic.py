@@ -2,8 +2,7 @@
 
 from features.Invoice_Page.document_selection.document_selection_repo import DocumentSelectionRepository
 from features.Invoice_Page.document_selection.document_selection_models import Service, FixedPrice, InvoiceItem
-from features.Invoice_Page.document_selection.price_calculation_dialog import CalculationDialog
-from shared.session_provider import SessionProvider
+from shared.session_provider import ManagedSessionProvider
 
 
 class DocumentSelectionLogic:
@@ -11,15 +10,15 @@ class DocumentSelectionLogic:
 
     """
 
-    def __init__(self, repo: DocumentSelectionRepository, session_provider: SessionProvider):
+    def __init__(self, repo: DocumentSelectionRepository,
+                 services_engine: ManagedSessionProvider):
         super().__init__()
         self._repo = repo
-        self._session_provider = session_provider
+        self._services_engine = services_engine
 
-        with self._session_provider.services() as session:
+        with self._services_engine() as session:
             self._services_map = {s.name: s for s in self._repo.get_all_services(session)}
             self._calculation_fees = self._repo.get_calculation_fees(session)
-            # Create a simple map for quick price lookups
             self._fees_map = {fee.name: fee.price for fee in self._calculation_fees}
 
         # --- This is the state managed by the _logic layer ---
@@ -84,9 +83,9 @@ class DocumentSelectionLogic:
         # This is a simplified example of the calculation _logic
         total = item.service.base_price * item.quantity
         if item.has_judiciary_seal:
-            total += self._fees_map.get("MHR_DADGSTRI", 0)
+            total += self._fees_map.get("مهر دادگستری", 0)
         if item.has_foreign_affairs_seal:
-            total += self._fees_map.get("MHR_AMORKHARJH", 0)
+            total += self._fees_map.get("مهر امور خارجه", 0)
 
         item.total_price = total
         return item
@@ -107,18 +106,18 @@ class DocumentSelectionLogic:
         for dyn_name, dyn_quantity in item_shell.dynamic_quantities.items():
             dyn_price_obj = next((dp for dp in item_shell.service.dynamic_prices if dp.name == dyn_name), None)
             if dyn_price_obj:
-                translation_price += dyn_quantity * dyn_price_obj.price
+                translation_price += dyn_quantity * dyn_price_obj.unit_price
 
         # Calculate all component prices
         item_shell.translation_price = translation_price * item_shell.quantity
-        item_shell.certified_copy_price = item_shell.page_count * get_fee("certified_copy") * item_shell.quantity
+        item_shell.certified_copy_price = item_shell.page_count * get_fee("کپ برابر اصل") * item_shell.quantity
         item_shell.registration_price = get_fee(
-            "official_translation") * item_shell.quantity if item_shell.is_official else 0
+            "ثبت در سامانه") * item_shell.quantity if item_shell.is_official else 0
         item_shell.judiciary_seal_price = get_fee(
-            "judiciary_seal") * item_shell.quantity if item_shell.has_judiciary_seal else 0
+            "مهر دادگستری") * item_shell.quantity if item_shell.has_judiciary_seal else 0
         item_shell.foreign_affairs_seal_price = get_fee(
-            "foreign_affairs_seal") * item_shell.page_count if item_shell.has_foreign_affairs_seal else 0
-        item_shell.extra_copy_price = item_shell.extra_copies * get_fee("additional_issues")
+            "مهر امور خارجه") * item_shell.page_count if item_shell.has_foreign_affairs_seal else 0
+        item_shell.extra_copy_price = item_shell.extra_copies * get_fee("نسخه اضافی")
 
         # Calculate final total price
         item_shell.total_price = (

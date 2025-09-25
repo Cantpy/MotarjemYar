@@ -20,8 +20,8 @@ class DocumentSelectionWidget(QWidget):
     clear_button_clicked = Signal()
     manual_item_updated = Signal(object, int, str)
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None):
+        super().__init__(parent)
 
         self.setObjectName("DocumentSelectionWidget")
         # self.setStyleSheet(DOC_SELECTION_STYLES)

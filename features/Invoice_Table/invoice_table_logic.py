@@ -8,25 +8,25 @@ from features.Invoice_Table.invoice_table_models import (InvoiceData, InvoiceSum
                                                          ColumnSettings)
 from features.Invoice_Table.invoice_table_repo import RepositoryManager
 from PySide6.QtCore import QSettings
-from shared.session_provider import SessionProvider
+from shared.session_provider import ManagedSessionProvider
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-class InvoiceService:
+class InvoiceTableService:
     """Business _logic for invoice operations"""
 
-    def __init__(self, repo_manager: RepositoryManager, session_provider: SessionProvider):
+    def __init__(self, repo_manager: RepositoryManager, invoices_engine: ManagedSessionProvider):
         self._repo_manager = repo_manager
-        self._session_provider = session_provider
+        self._invoice_session = invoices_engine
         self.filter = InvoiceFilter()
         self.column_settings = ColumnSettings()
         self._document_counts_cache = {}
 
     def get_all_invoices(self) -> list[InvoiceData]:
-        """Load all invoices from repository"""
-        with self._session_provider.invoices() as session:
+        """Load all invoices from _repository"""
+        with self._invoice_session() as session:
             invoices = self._repo_manager.get_invoice_repository().get_all_invoices(session)
             # Update document counts cache
             self._update_document_counts_cache()
@@ -46,34 +46,34 @@ class InvoiceService:
 
     def delete_single_invoice(self, invoice_number: str) -> bool:
         """Delete a single invoice"""
-        with self._session_provider.invoices() as session:
+        with self._invoice_session() as session:
             return self._repo_manager.get_invoice_repository().delete_invoices(session, [invoice_number])
 
     def delete_multiple_invoices(self, invoice_numbers: list[str]) -> bool:
         """Delete multiple invoices"""
         if not invoice_numbers:
             return False
-        with self._session_provider.invoices() as session:
+        with self._invoice_session() as session:
             return self._repo_manager.get_invoice_repository().delete_invoices(session, invoice_numbers)
 
     def update_invoice_data(self, invoice_number: str, updates: dict[str, object]) -> bool:
         """Update invoice data"""
-        with self._session_provider.invoices() as session:
+        with self._invoice_session() as session:
             return self._repo_manager.get_invoice_repository().update_invoice(session, invoice_number, updates)
 
     def update_translator(self, invoice_number: str, translator_name: str) -> bool:
         """Update translator for invoice"""
-        with self._session_provider.invoices() as session:
+        with self._invoice_session() as session:
             return self._repo_manager.get_invoice_repository().update_translator(session, invoice_number,
                                                                                  translator_name)
     def get_invoice_by_number(self, invoice_number: str):
         """"""
-        with self._session_provider.invoices() as session:
+        with self._invoice_session() as session:
             return self._repo_manager.get_invoice_repository().get_invoice_by_number(session, invoice_number)
 
     def get_translator_names(self) -> list[str]:
         """Get list of available translator names"""
-        with self._session_provider.invoices() as session:
+        with self._invoice_session() as session:
             return self._repo_manager.get_user_repository().get_translator_names(session)
 
     def get_document_count(self, invoice_number: str) -> int:
@@ -81,30 +81,30 @@ class InvoiceService:
         if invoice_number in self._document_counts_cache:
             return self._document_counts_cache[invoice_number]
 
-        with self._session_provider.invoices() as session:
+        with self._invoice_session() as session:
             count = self._repo_manager.get_invoice_repository().get_document_count(session, invoice_number)
             self._document_counts_cache[invoice_number] = count
             return count
 
     def get_all_document_counts(self):
         """"""
-        with self._session_provider.invoices() as session:
+        with self._invoice_session() as session:
             return self._repo_manager.get_invoice_repository().get_all_document_counts(session)
 
     def _update_document_counts_cache(self):
         """Update document counts cache for all invoices"""
-        with self._session_provider.invoices() as session:
+        with self._invoice_session() as session:
             self._document_counts_cache = self._repo_manager.get_invoice_repository().get_all_document_counts(session)
 
     def get_invoice_summary(self) -> InvoiceSummary | None:
         """Get invoice summary statistics"""
-        with self._session_provider.invoices() as session:
+        with self._invoice_session() as session:
             return self._repo_manager.get_invoice_repository().get_invoice_summary(session)
 
     def export_invoices_to_csv(self, invoice_numbers: list[str], file_path: str) -> bool:
         """Export selected invoices to CSV file"""
         try:
-            with self._session_provider.invoices() as session:
+            with self._invoice_session() as session:
                 data = self._repo_manager.get_invoice_repository().export_invoices_data(session, invoice_numbers)
 
                 if not data:
@@ -203,7 +203,7 @@ class InvoiceService:
         """
 
         """
-        with self._session_provider.invoices() as session:
+        with self._invoice_session() as session:
             return self._repo_manager.get_invoice_repository().update_pdf_path(session, invoice_number, new_path)
 
 

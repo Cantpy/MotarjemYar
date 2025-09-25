@@ -1,4 +1,4 @@
-# features/home_page/settings/repository.py
+# features/home_page/settings/_repository.py
 
 import json
 import logging
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class HomepageSettingsRepository:
     """
-    Stateless repository for persisting homepage settings to a JSON file.
+    Stateless _repository for persisting homepage settings to a JSON file.
     """
     SETTINGS_FILE = Path("resources") / Path("config") / "homepage_settings.json"
     BACKUP_FILE = Path("resources") / Path("config") / "homepage_settings_backup.json"

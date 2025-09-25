@@ -1,4 +1,4 @@
-# home_page/repository.py
+# home_page/_repository.py
 from typing import List, Optional, Tuple
 from datetime import date
 from sqlalchemy import func, extract, asc
@@ -17,7 +17,7 @@ from shared.dtos.invoice_dtos import InvoiceItemsDTO, IssuedInvoiceDTO
 
 class HomePageRepository:
     """
-    Stateless repository for home page data operations.
+    Stateless _repository for home page data operations.
     Requires a session to be passed into each method.
     """
 

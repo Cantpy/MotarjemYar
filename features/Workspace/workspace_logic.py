@@ -1,25 +1,26 @@
 # features/Workspace/workspace_logic.py
 
 from typing import List, Optional
-from contextlib import contextmanager
 
 from features.Workspace.workspace_repo import ChatRepository, UserRepository
-from shared.session_provider import SessionProvider
 from features.Workspace.workspace_models import ChatDTO, MessageDTO, UserDTO, AttachmentDTO, MessageReadReceiptDTO
 from shared.orm_models.workspace_models import (MessageModel, ChatModel, ChatParticipantModel, ChatType,
                                                 ParticipantRole)
-from shared.orm_models.users_models import UsersModel
 from server.client import ChatClient
+
+from shared.session_provider import ManagedSessionProvider
 
 
 class ChatLogic:
     def __init__(self, user_repository: UserRepository,
                  chat_repository: ChatRepository,
-                 session_provider: SessionProvider,
+                 users_engine: ManagedSessionProvider,
+                 workspace_engine: ManagedSessionProvider,
                  client: ChatClient):
         self._user_repo = user_repository
         self._chat_repo = chat_repository
-        self._session_provider = session_provider
+        self._users_session = users_engine
+        self._workspace_session = workspace_engine
         self._client = client
 
     # --- Data Transformation (Mapping) Methods ---
@@ -28,7 +29,7 @@ class ChatLogic:
         """Fetches user data from the users DB and maps it to DTOs."""
         if not user_ids:
             return {}
-        with self._session_provider.users() as user_session:  # Use the 'users' DB
+        with self._users_session() as user_session:
             users_map = self._user_repo.get_users_by_ids(user_session, user_ids)
             return {
                 user_id: UserDTO(id=user.id, name=user.username)
@@ -65,7 +66,7 @@ class ChatLogic:
     # --- Public Business Logic Methods ---
 
     def get_chats_for_user(self, user_id: int) -> List[ChatDTO]:
-        with self._session_provider.workspace() as chat_session:
+        with self._workspace_session() as chat_session:
             chats = self._chat_repo.get_chats_for_user(chat_session, user_id)
 
             # 1. Collect all participant user IDs from all chats
@@ -90,7 +91,7 @@ class ChatLogic:
             return chat_dtos
 
     def get_chat_history(self, chat_id: int) -> List[MessageDTO]:
-        with self._session_provider.workspace as chat_session:
+        with self._workspace_session as chat_session:
             messages = self._chat_repo.get_messages_for_chat(chat_session, chat_id)
 
             # 1. Collect all sender IDs and reader IDs
@@ -132,7 +133,7 @@ class ChatLogic:
         Validates and saves a new message, then returns its DTO.
         This is where the real-time broadcast would be triggered.
         """
-        with self._session_provider.workspace() as session:
+        with self._workspace_session() as session:
             # Authorization: Check if the user is actually a participant in the chat
             participant = self._chat_repo.get_participant_info(session, user_id=sender_id, chat_id=chat_id)
             if not participant:
@@ -163,7 +164,7 @@ class ChatLogic:
 
     def pin_message(self, user_id: int, message_id: int) -> bool:
         """Pins a message, but only if the user is an admin in that chat."""
-        with self._session_provider.workspace() as session:
+        with self._workspace_session() as session:
             message = session.get(MessageModel, message_id)
             if not message:
                 return False
@@ -179,6 +180,6 @@ class ChatLogic:
 
     def mark_message_as_read(self, user_id: int, message_id: int):
         """Marks a message as read for a user."""
-        with self._session_provider.workspace() as session:
+        with self._workspace_session() as session:
             self._chat_repo.mark_message_as_read(session, message_id, user_id)
             # Here you would trigger a real-time event to update the "seen by" list on other clients' screens

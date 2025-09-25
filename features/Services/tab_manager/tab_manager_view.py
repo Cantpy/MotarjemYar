@@ -9,6 +9,7 @@ class ServicesManagementView(QWidget):
     A 'dumb' container widget that holds the tabbed interface for service management.
     """
     refresh_all_requested = Signal()
+    import_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -24,10 +25,14 @@ class ServicesManagementView(QWidget):
         main_layout = QVBoxLayout(self)
 
         # --- Shared UI Controls ---
-        # Example: A toolbar with a global refresh button
         toolbar_layout = QHBoxLayout()
-        self.refresh_all_btn = QPushButton("🔄 به‌روزرسانی همه")
+
+        self.refresh_all_btn = QPushButton("🔄 به‌روزرسانی")
         toolbar_layout.addWidget(self.refresh_all_btn)
+
+        self.import_btn = QPushButton("📂 بارگذاری از اکسل")
+        toolbar_layout.addWidget(self.import_btn)
+
         toolbar_layout.addStretch()
         main_layout.addLayout(toolbar_layout)
 
@@ -38,6 +43,7 @@ class ServicesManagementView(QWidget):
     def _connect_signals(self):
         """Connect this _view's widgets to its public signals."""
         self.refresh_all_btn.clicked.connect(self.refresh_all_requested)
+        self.import_btn.clicked.connect(self.import_requested)
 
     def add_tab(self, widget: QWidget, name: str):
         """A public method to allow the factory/controller to add fully-built tabs."""
@@ -45,5 +51,4 @@ class ServicesManagementView(QWidget):
 
     def _style_tabs(self):
         """Apply custom styling."""
-        # self.tab_widget.setStyleSheet("""...""")
         self.tab_widget.setTabPosition(QTabWidget.TabPosition.North)

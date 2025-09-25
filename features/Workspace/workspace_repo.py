@@ -13,7 +13,7 @@ from features.Workspace.workspace_models import MessageDTO
 
 
 class UserRepository:
-    """A simple, read-only repository for fetching user data."""
+    """A simple, read-only _repository for fetching user data."""
 
     def get_users_by_ids(self, session: Session, user_ids: List[int]) -> dict[int, UsersModel]:
         """
@@ -31,7 +31,7 @@ class UserRepository:
 
 class ChatRepository:
     """
-    Stateless repository for all chat-related database operations.
+    Stateless _repository for all chat-related database operations.
     """
 
     def get_chats_for_user(self, session: Session, user_id: int) -> List[ChatModel]:

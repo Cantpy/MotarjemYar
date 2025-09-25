@@ -1,12 +1,13 @@
 # features/Services/documents/documents_controller.py
 
 from PySide6.QtCore import QObject, Signal
-from PySide6.QtWidgets import QFileDialog, QInputDialog
-from features.Services.documents.documents_dialogs import InputDialog, ImportSourceDialog, ImportSummaryDialog
+from PySide6.QtWidgets import QFileDialog
 from features.Services.documents.documents_logic import ServicesLogic
 from features.Services.documents.documents_view import ServicesDocumentsView
 from features.Services.documents.documents_models import ServicesDTO
-from shared import (show_error_message_box, show_information_message_box, show_question_message_box)
+from shared import show_error_message_box, show_information_message_box, show_question_message_box
+
+from shared.dialogs.import_dialog import GenericInputDialog, ImportSummaryDialog
 
 
 class ServicesController(QObject):
@@ -36,7 +37,6 @@ class ServicesController(QObject):
         self._view.edit_requested.connect(self.handle_edit)
         self._view.delete_requested.connect(self.handle_delete)
         self._view.bulk_delete_requested.connect(self.handle_bulk_delete)
-        self._view.import_requested.connect(self.handle_import)
         self._view.search_text_changed.connect(self.handle_search)
 
         # --- Internal Controller Signals ---
@@ -48,6 +48,7 @@ class ServicesController(QObject):
             self._data_cache = self._logic.get_all_services()
             self.data_changed.emit()
         except Exception as e:
+            print(f"Error loading services: {e}")
             show_error_message_box(self._view, "خطا", f"خطا در بارگذاری مدارک:\n{str(e)}")
 
     def _update_view_display(self):
@@ -57,23 +58,108 @@ class ServicesController(QObject):
     # --- Handlers for User Actions ---
 
     def handle_add(self):
-        """Handles the workflow for adding a new service."""
-        dialog = InputDialog("افزودن مدرک جدید", self._view)
+        """Handles adding a new service document."""
+        form_fields = [
+            ("نام مدرک", "name", "مثال: شناسنامه"),
+            ("هزینه پایه", "base_price", "مثال: 150000"),
+            ("نام متغیر ۱", "fee_1_name", "مثال: تعداد سطر"),
+            ("هزینه متغیر ۱", "fee_1_price", "مثال: 5000"),
+            ("نام متغیر ۲", "fee_2_name", "مثال: تعداد صفحه"),
+            ("هزینه متغیر ۲", "fee_2_price", "مثال: 25000"),
+        ]
+
+        dialog = GenericInputDialog("افزودن مدرک جدید", fields=form_fields, parent=self._view)
+
         if dialog.exec():
-            values = dialog.get_values()
-            self._perform_create_service(values)
+            dialog_values = dialog.get_values()
+
+            logic_data = {
+                'name': dialog_values.get('name'),
+                'base_price': dialog_values.get('base_price'),
+                'dynamic_fees': []  # <-- Initialize the list
+            }
+
+            # Manually check for and pack the dynamic fees
+            if dialog_values.get('fee_1_name') and dialog_values.get('fee_1_price'):
+                logic_data['dynamic_fees'].append({
+                    'name': dialog_values['fee_1_name'],
+                    'price': dialog_values['fee_1_price']  # Still a string here, logic will normalize
+                })
+
+            if dialog_values.get('fee_2_name') and dialog_values.get('fee_2_price'):
+                logic_data['dynamic_fees'].append({
+                    'name': dialog_values['fee_2_name'],
+                    'price': dialog_values['fee_2_price']
+                })
+
+            # Now, logic_data is the correctly structured, nested dictionary
+            self._perform_create_service(logic_data)
 
     def handle_edit(self, service_id: int):
-        """Handles the workflow for editing an existing service."""
-        current_data = self._view.get_current_service_data_for_edit()
-        if not current_data: return
+        """
 
-        dialog = InputDialog("ویرایش مدرک", self._view)
-        dialog.set_values(current_data)
+        Handles the complete workflow for editing an existing service document.
+        """
+        # --- Step 1: Get the full data object from the controller's cache ---
+        service_to_edit = next((s for s in self._data_cache if s.id == service_id), None)
+        if not service_to_edit:
+            # show_error_message_box(...)
+            return
+
+        # --- Step 2: Define the structure of the edit form ---
+        # This is the same structure as in handle_add, ensuring consistency.
+        form_fields = [
+            # (Label,         Key for dict, Placeholder)
+            ("نام مدرک", "name", "مثال: شناسنامه"),
+            ("هزینه پایه", "base_price", "مثال: 150000"),
+            # For simplicity, let's allow editing the first two dynamic fees.
+            ("نام متغیر ۱", "fee_1_name", "مثال: تعداد سطر"),
+            ("هزینه متغیر ۱", "fee_1_price", "مثال: 5000"),
+            ("نام متغیر ۲", "fee_2_name", "مثال: تعداد صفحه"),
+            ("هزینه متغیر ۲", "fee_2_price", "مثال: 25000"),
+        ]
+
+        # --- Step 3: Translate the DTO into a simple dictionary for the dialog ---
+        # This mapping logic belongs in the controller.
+        dialog_data = {
+            'name': service_to_edit.name,
+            'base_price': str(service_to_edit.base_price)
+        }
+        # Unpack the first two dynamic fees into the dictionary, if they exist
+        if len(service_to_edit.dynamic_fees) > 0:
+            dialog_data['fee_1_name'] = service_to_edit.dynamic_fees[0].name
+            dialog_data['fee_1_price'] = str(service_to_edit.dynamic_fees[0].unit_price)
+        if len(service_to_edit.dynamic_fees) > 1:
+            dialog_data['fee_2_name'] = service_to_edit.dynamic_fees[1].name
+            dialog_data['fee_2_price'] = str(service_to_edit.dynamic_fees[1].unit_price)
+
+        # --- Step 4: Create the dialog, pre-fill it, and show it ---
+        dialog = GenericInputDialog("ویرایش مدرک", fields=form_fields, parent=self._view)
+        dialog.set_values(dialog_data)  # Use the dedicated method to pre-fill the form
 
         if dialog.exec():
-            updated_values = dialog.get_values()
-            self._perform_update_service(service_id, updated_values)
+            # --- Step 5: Translate the dialog's output back into the format the Logic layer needs ---
+            updated_dialog_values = dialog.get_values()
+
+            logic_data = {
+                'name': updated_dialog_values.get('name', ''),
+                'base_price': updated_dialog_values.get('base_price', '0'),
+                'dynamic_fees': []  # We will rebuild the list of fees
+            }
+            # Re-pack the dynamic fees from the flat dictionary
+            if updated_dialog_values.get('fee_1_name') and updated_dialog_values.get('fee_1_price'):
+                logic_data['dynamic_fees'].append({
+                    'name': updated_dialog_values['fee_1_name'],
+                    'price': updated_dialog_values['fee_1_price']
+                })
+            if updated_dialog_values.get('fee_2_name') and updated_dialog_values.get('fee_2_price'):
+                logic_data['dynamic_fees'].append({
+                    'name': updated_dialog_values['fee_2_name'],
+                    'price': updated_dialog_values['fee_2_price']
+                })
+
+            # --- Step 6: Call the worker method to perform the update ---
+            self._perform_update_service(service_id, logic_data)
 
     def handle_delete(self, service_id: int):
         """Handles the workflow for deleting a single service."""
@@ -105,39 +191,6 @@ class ServicesController(QObject):
         filtered_data = [s for s in self._data_cache if text in s.name.lower()]
         self._view.update_display(filtered_data)
 
-    def handle_import(self):
-        """Orchestrates the entire import workflow."""
-        source_dialog = ImportSourceDialog(self._view)
-        if not source_dialog.exec():
-            return  # User cancelled
-
-        result = None
-        if source_dialog.source == "excel":
-            # Open file dialog to get the path
-            file_path, _ = QFileDialog.getOpenFileName(
-                self._view, "انتخاب فایل اکسل", "", "Excel Files (*.xlsx *.xls)"
-            )
-            if file_path:
-                result = self._logic.import_from_excel(file_path)
-
-        elif source_dialog.source == "database":
-            # Open an input dialog to get the connection string
-            # NOTE: In a real app, this should be more secure and user-friendly
-            conn_str, ok = QInputDialog.getText(
-                self._view, "اتصال به پایگاه داده", "رشته اتصال SQLAlchemy را وارد کنید:"
-            )
-            if ok and conn_str:
-                result = self._logic.import_from_database(conn_str)
-
-        # --- Show the summary ---
-        if result:
-            summary_dialog = ImportSummaryDialog(result, self._view)
-            summary_dialog.exec()
-
-            # --- IMPORTANT: Refresh the main _view with new data ---
-            if result.success_count > 0:
-                self.load_initial_data()
-
     # --- Private Worker Methods (Interacting with Logic Layer) ---
 
     def _perform_create_service(self, service_data: dict):
@@ -149,6 +202,7 @@ class ServicesController(QObject):
             self.data_changed.emit()
             show_information_message_box(self._view, "موفق", f"مدرک '{created_service.name}' اضافه شد.")
         except Exception as e:
+            print(f"error adding the service: {e}")
             show_error_message_box(self._view, "خطا در افزودن", str(e))
 
     def _perform_update_service(self, service_id: int, service_data: dict):
@@ -185,198 +239,3 @@ class ServicesController(QObject):
                 show_information_message_box(self._view, "موفق", f"{deleted_count} مدرک حذف شدند.")
         except Exception as e:
             show_error_message_box(self._view, "خطا در حذف گروهی", str(e))
-
-
-# class ServicesController(QObject):
-#     """Controller for services management"""
-#     data_changed = Signal()
-#
-#     def __init__(self, _view: ServicesDocumentsView, _logic: ServicesLogic):
-#         super().__init__()
-#         self._view = _view
-#         self._logic = _logic
-#         self._data_cache: list[ServicesDTO] = []
-#         self.connect_signals()
-#
-#     def get_view(self) -> ServicesDocumentsView:
-#         """
-#
-#         """
-#         return self._view
-#
-#     def connect_signals(self):
-#         """
-#
-#         """
-#         self._view.add_requested.connect(self.handle_add)
-#         self._view.edit_requested.connect(self.handle_edit)
-#         self._view.search_text_changed.connect(self.handle_search)
-#         self.data_changed.connect(self._update_view_display)
-#
-#     def load_services(self) -> list[ServicesDTO]:
-#         """Load all services, update cache, and emit data_changed signal."""
-#         try:
-#             self._data_cache = self._logic.get_all_services()
-#             self.data_changed.emit()
-#         except Exception as e:
-#             show_error_message_box(self._view, "خطا", f"خطا در بارگذاری مدارک:\n{str(e)}")
-#             return []
-#
-#     def get_cached_data(self) -> list[ServicesDTO]:
-#         """Get cached data without database call"""
-#         return self._data_cache
-#
-#     def create_service(self, service_data: dict[str, Any]) -> bool:
-#         """Create new service"""
-#         try:
-#             created_service = self._logic.create_service(service_data)
-#
-#             # --- Optimistic Update ---
-#             self._data_cache.append(created_service)  # Add to the cache
-#             self.data_changed.emit()
-#
-#             show_information_message_box(self._view, "موفق",
-#                                          f"مدرک '{created_service.name}' با موفقیت اضافه شد!")
-#             return True
-#         except ValueError as e:
-#             show_warning_message_box(self._view, "خطا", str(e))
-#             return False
-#         except Exception as e:
-#             show_error_message_box(self._view, "خطا", f"خطا در افزودن مدرک:\n{str(e)}")
-#             return False
-#
-#     def update_service(self, service_id: int, service_data: dict[str, Any]) -> bool:
-#         """Update existing service"""
-#         try:
-#             updated_service = self._logic.update_service(service_id, service_data)
-#             if updated_service:
-#                 self.load_services()  # Refresh data
-#                 show_information_message_box(self._view, "موفق",
-#                                              f"مدرک '{updated_service.name}' با موفقیت ویرایش شد!")
-#                 return True
-#             else:
-#                 show_warning_message_box(self._view, "خطا", "مدرک مورد نظر یافت نشد")
-#                 return False
-#         except ValueError as e:
-#             show_warning_message_box(self._view, "خطا", str(e))
-#             return False
-#         except Exception as e:
-#             show_error_message_box(self._view, "خطا", f"خطا در ویرایش مدرک:\n{str(e)}")
-#             return False
-#
-#     def handle_add(self):
-#         # All the _logic from the old _show_add_dialog moves here
-#         dialog = InputDialog("افزودن مدرک جدید", self._view)
-#         if dialog.exec() == QDialog.Accepted:
-#             values = dialog.get_values()
-#             self.create_service(values)
-#
-#     def handle_edit(self, service_id: int):
-#         """The controller asks the _view for the current data to pre-fill the dialog."""
-#         # This avoids an unnecessary database call.
-#         current_data = self._view.get_current_service_data_for_edit()
-#         if not current_data:
-#             return  # Should not happen if the UI is in a consistent state
-#
-#         dialog = InputDialog("ویرایش مدرک", self._view)
-#         dialog.set_values(current_data)
-#
-#         if dialog.exec() == QDialog.Accepted:
-#             updated_values = dialog.get_values()
-#             self.update_service(service_id, updated_values)
-#
-#     def handle_search(self, text: str) -> None:
-#         """Filters the cached data and updates the _view display."""
-#         text = text.lower().strip()
-#         if not text:
-#             # If search is cleared, show all data
-#             self._update_view_display()
-#             return
-#
-#         # Filter the cache in memory (very fast)
-#         filtered_data = [
-#             service for service in self._data_cache
-#             if text in service.name.lower()
-#         ]
-#
-#         # Push the filtered list to the _view
-#         self._view.update_display(filtered_data)
-#
-#     def handle_delete(self, service_id: int):
-#         # Find the service name from the cache for a better message
-#         service_to_delete = next((s for s in self._data_cache if s.id == service_id), None)
-#         if not service_to_delete: return
-#
-#         # The controller asks for confirmation
-#         show_question_message_box(
-#             parent=self._view, title="حذف",
-#             message=f"آیا مطمئن هستید که می‌خواهید '{service_to_delete.name}' را حذف کنید؟",
-#             button_1="بله", yes_func=lambda: self._perform_delete_service(service_id, service_to_delete.name),
-#             button_2="خیر"
-#         )
-#
-#     def delete_service(self, service_id: int, service_name: str = "") -> bool:
-#         """Delete single service"""
-#         try:
-#             if self._logic.delete_service(service_id):
-#                 self.load_services()  # Refresh data
-#                 show_information_message_box(self._view, "موفق",
-#                                              f"مدرک '{service_name}' با موفقیت حذف شد!")
-#                 return True
-#             else:
-#                 show_warning_message_box(self._view, "خطا", "مدرک مورد نظر یافت نشد")
-#                 return False
-#         except Exception as e:
-#             show_error_message_box(self._view, "خطا", f"خطا در حذف مدرک:\n{str(e)}")
-#             return False
-#
-#     def delete_multiple_services(self, service_ids: list[int]) -> bool:
-#         """Delete multiple services"""
-#         try:
-#             deleted_count = self._logic.delete_multiple_services(service_ids)
-#             if deleted_count > 0:
-#                 self.load_services()  # Refresh data
-#                 show_information_message_box(self._view, "موفق",
-#                                              f"{deleted_count} مدرک با موفقیت حذف شدند!")
-#                 return True
-#             else:
-#                 show_warning_message_box(self._view, "خطا", "هیچ مدرکی حذف نشد")
-#                 return False
-#         except Exception as e:
-#             show_error_message_box(self._view, "خطا", f"خطا در حذف مدارک:\n{str(e)}")
-#             return False
-#
-#     def search_services(self, search_term: str) -> list[ServicesDTO]:
-#         """Search services"""
-#         try:
-#             return self._logic.search_services(search_term)
-#         except Exception as e:
-#             show_error_message_box(self._view, "خطا", f"خطا در جستجو:\n{str(e)}")
-#             return []
-#
-#     def import_from_excel(self, confirmation_callback: Callable = None) -> bool:
-#         """Import services from Excel with confirmation"""
-#         try:
-#             if confirmation_callback and not confirmation_callback():
-#                 return False
-#
-#             imported_count, errors = self._logic.import_from_excel()
-#
-#             if errors:
-#                 error_msg = f"تعداد {imported_count} مدرک وارد شد با خطاهای زیر:\n" + "\n".join(errors[:5])
-#                 if len(errors) > 5:
-#                     error_msg += f"\n... و {len(errors) - 5} خطای دیگر"
-#                 show_warning_message_box(self._view, "هشدار", error_msg)
-#             else:
-#                 show_information_message_box(self._view, "موفق",
-#                                              f"تعداد {imported_count} مدرک با موفقیت از اکسل وارد شد!")
-#
-#             self.load_services()  # Refresh data
-#             return True
-#
-#         except ValueError as e:
-#             show_warning_message_box(self._view, "خطا", str(e))
-#             return False
-#         except Exception as e:
-#             show_error_message_box(self._view, "خطا", f"خطا در بارگذاری از اکسل:\n{str(e)}")
-#             return False

@@ -10,20 +10,23 @@ from features.Admin_Panel.employee_management.employee_management_repo import Em
 from shared.orm_models.payroll_models import EmployeeModel, EmployeePayrollProfileModel
 from shared.orm_models.users_models import UsersModel, UserProfileModel
 
-from shared.session_provider import SessionProvider
+from shared.session_provider import ManagedSessionProvider
 
 
 class UserManagementLogic:
-    def __init__(self, repository: EmployeeManagementRepository, session_provider: SessionProvider):
+    def __init__(self, repository: EmployeeManagementRepository,
+                 payroll_engine: ManagedSessionProvider,
+                 users_engine: ManagedSessionProvider):
         self._repo = repository
-        self._session_provider = session_provider
+        self._payroll_session = payroll_engine
+        self._users_session = users_engine
 
     def get_all_employees_for_display(self) -> list[EmployeeFullData]:
         """
         Fetches all employees and their corresponding user data, combining them
         into a complete DTO for the _view.
         """
-        with self._session_provider.payroll() as p_sess, self._session_provider.users() as u_sess:
+        with self._payroll_session() as p_sess, self._users_session() as u_sess:
             employees = self._repo.get_all_employees_with_details(p_sess)
             national_ids = [emp.national_id for emp in employees if emp.national_id]
             users_map = self._repo.get_users_map(u_sess, national_ids)
@@ -103,12 +106,12 @@ class UserManagementLogic:
             )
         )
 
-        with self._session_provider.payroll() as p_sess, self._session_provider.users() as u_sess:
+        with self._payroll_session() as p_sess, self._users_session() as u_sess:
             self._repo.save_new_employee_and_user(p_sess, u_sess, employee, user, profile)
 
     def _update_existing_employee(self, data: EmployeeFullData):
         """Updates an existing, linked Employee and User record."""
-        # --- Prepare data dictionaries for the repository update method ---
+        # --- Prepare data dictionaries for the _repository update method ---
         employee_changes = {
             'first_name': data.first_name, 'last_name': data.last_name,
             'national_id': data.national_id, 'date_of_birth': data.date_of_birth,
@@ -129,7 +132,7 @@ class UserManagementLogic:
             'children_count': data.children_count
         }
 
-        with self._session_provider.payroll() as p_sess, self._session_provider.users() as u_sess:
+        with self._payroll_session() as p_sess, self._users_session() as u_sess:
             self._repo.update_employee_and_user(payroll_session=p_sess, users_session=u_sess,
                                                 employee_id=data.employee_id, user_id=data.user_id,
                                                 employee_changes=employee_changes, user_changes=user_changes,
@@ -141,6 +144,6 @@ class UserManagementLogic:
         if not employee_id and user_national_id:
             raise ValueError("شناسه کارمند و کد ملی برای حذف ضروری است.")
 
-        with self._session_provider.payroll() as p_sess, self._session_provider.users() as u_sess:
+        with self._payroll_session() as p_sess, self._users_session() as u_sess:
             self._repo.delete_employee_and_user(payroll_session=p_sess, users_session=u_sess,
                                                 employee_id=employee_id, national_id=user_national_id)

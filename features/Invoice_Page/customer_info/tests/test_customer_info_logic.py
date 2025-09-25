@@ -90,9 +90,9 @@ def test_iranian_phone_validator(phone, expected):
 
 @pytest.fixture
 def logic():
-    """Creates a CustomerInfoLogic instance with a mocked repository for each test."""
+    """Creates a CustomerInfoLogic instance with a mocked _repository for each test."""
     logic_instance = CustomerLogic()
-    # Mock the repository to isolate the _logic for testing
+    # Mock the _repository to isolate the _logic for testing
     logic_instance._repo = MagicMock()
     return logic_instance
 
@@ -106,7 +106,7 @@ def test_save_customer_with_valid_real_nid_succeeds(logic):
 
     logic.save_customer(raw_data)
 
-    # Check that the repository's add_customer method was called once
+    # Check that the _repository's add_customer method was called once
     logic._repo.add_customer.assert_called_once()
 
 
@@ -119,7 +119,7 @@ def test_save_customer_with_valid_legal_nid_succeeds(logic):
 
     logic.save_customer(raw_data)
 
-    # Check that the repository's add_customer method was called once
+    # Check that the _repository's add_customer method was called once
     logic._repo.add_customer.assert_called_once()
 
 
@@ -144,10 +144,10 @@ def test_save_existing_customer_raises_custom_error(logic):
 
 
 def test_update_customer_calls_repo(logic):
-    """Tests that the update_customer method calls the repository's add method."""
+    """Tests that the update_customer method calls the _repository's add method."""
     customer_to_update = Customer(name="مشتری آپدیت شده", national_id="0018215441", phone="09111111111")
 
     logic.update_customer(customer_to_update)
 
-    # The add_customer method in the repo uses merge(), so it handles updates.
+    # The add_customer method in the _repo uses merge(), so it handles updates.
     logic._repo.add_customer.assert_called_once_with(customer_to_update)

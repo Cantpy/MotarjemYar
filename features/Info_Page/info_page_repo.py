@@ -7,7 +7,7 @@ from features.Info_Page.info_page_models import VersionInfoDTO, ChangelogEntryDT
 
 
 class InfoPageRepository:
-    """Stateless repository for fetching info page data."""
+    """Stateless _repository for fetching info page data."""
 
     def get_latest_version(self, session: Session) -> VersionInfoDTO:
         """Fetches the most recent version information."""

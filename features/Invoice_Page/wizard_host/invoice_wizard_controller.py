@@ -62,9 +62,9 @@ class InvoiceWizardController(QObject):
         if payload:
             action = payload.get('action')
             if action == 'CHECK_CUSTOMER_STATUS':
-                # This complex UI interaction is now handled in the controller
+
                 if not self._handle_customer_save_confirmation():
-                    return  # Stop navigation if user cancels
+                    return
             elif action == 'PREPARE_DETAILS':
                 self.sub_controllers['details'].prepare_and_display_data(
                     self._state_manager.get_customer(), self._state_manager.get_invoice_items()

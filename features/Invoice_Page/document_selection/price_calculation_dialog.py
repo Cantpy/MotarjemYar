@@ -11,12 +11,12 @@ from typing import Dict, List
 from shared import to_persian_number
 from shared.widgets.persian_tools import PersianSpinBox
 
-CERTIFIED_COPY_KEY = "certified_copy"
-OFFICIAL_TRANSLATION_KEY = "official_translation"
-JUDICIARY_SEAL_KEY = "judiciary_seal"
-FOREIGN_AFFAIRS_SEAL_KEY = "foreign_affairs_seal"
-ADDITIONAL_ISSUES_KEY = "additional_issues"
-SEALS_TOTAL_KEY = "seals_total_price"
+CERTIFIED_COPY_KEY = "کپی برابر اصل"
+OFFICIAL_TRANSLATION_KEY = "ثبت در سامانه"
+JUDICIARY_SEAL_KEY = "مهر دادگستری"
+FOREIGN_AFFAIRS_SEAL_KEY = "مهر امور خارجه"
+ADDITIONAL_ISSUES_KEY = "نسخه اضافی"
+SEALS_TOTAL_KEY = "هزینه تاییدات"
 
 
 class CalculationDialog(QDialog):
@@ -24,6 +24,7 @@ class CalculationDialog(QDialog):
         super().__init__(parent)
         self.setObjectName("CalculationDialog")
         self.setWindowTitle(f"محاسبه قیمت: {service.name}")
+        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         self.setMinimumWidth(700)
         # self.setStyleSheet(DIALOG_STYLESHEET)
         self.setFont(QFont("IranSANS", 11))
@@ -47,15 +48,15 @@ class CalculationDialog(QDialog):
 
         # Add a visual separator
         separator = QFrame()
-        separator.setFrameShape(QFrame.HLine)
-        separator.setFrameShadow(QFrame.Sunken)
+        separator.setFrameShape(QFrame.Shape.HLine)
+        separator.setFrameShadow(QFrame.Shadow.Sunken)
         main_layout.addWidget(separator)
 
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        ok_button = button_box.button(QDialogButtonBox.Ok)
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        ok_button = button_box.button(QDialogButtonBox.StandardButton.Ok)
         ok_button.setText("تایید")
         ok_button.setObjectName("PrimaryButton")
-        cancel_button = button_box.button(QDialogButtonBox.Cancel)
+        cancel_button = button_box.button(QDialogButtonBox.StandardButton.Cancel)
         cancel_button.setText("انصراف")
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
@@ -156,14 +157,14 @@ class CalculationDialog(QDialog):
         def get_cleaned_label(key: str, default_text: str) -> str:
             fee_object = self.fees_map.get(key)
             if fee_object:
-                return fee_object.label_name.split('(')[0].strip()
+                return fee_object.name.split('(')[0].strip()
             return default_text
 
         # This list now controls the UI creation order and uses our constants
         fields_to_display = {
             'translation_price': "قیمت ترجمه",
             CERTIFIED_COPY_KEY: get_cleaned_label(CERTIFIED_COPY_KEY, 'کپی برابر اصل'),
-            OFFICIAL_TRANSLATION_KEY: get_cleaned_label(OFFICIAL_TRANSLATION_KEY, 'ثبت رسمی'),
+            OFFICIAL_TRANSLATION_KEY: get_cleaned_label(OFFICIAL_TRANSLATION_KEY, 'ثبت در سامانه'),
             SEALS_TOTAL_KEY: "هزینه تاییدات",
             ADDITIONAL_ISSUES_KEY: get_cleaned_label(ADDITIONAL_ISSUES_KEY, 'نسخه اضافی'),
             'total_price': "هزینه کل آیتم"
@@ -224,7 +225,7 @@ class CalculationDialog(QDialog):
         translation_price_total = self.service.base_price
         for dyn_name, spinbox in self.dynamic_spinboxes.items():
             dyn_price = next(dp for dp in self.service.dynamic_prices if dp.name == dyn_name)
-            translation_price_total += spinbox.value() * dyn_price.price
+            translation_price_total += spinbox.value() * dyn_price.unit_price
 
         # --- FIX: Use the constants to fetch the correct prices ---
         certified_copy_price = page_count * self._get_fee(CERTIFIED_COPY_KEY)

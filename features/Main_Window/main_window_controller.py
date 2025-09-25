@@ -1,9 +1,7 @@
 # features/Main_Window/main_window_controller.py
 
 from PySide6.QtCore import QObject
-
-import configparser
-import traceback
+from sqlalchemy.engine import Engine
 
 from core.navigation import PageManager
 from config.config_manager import ConfigManager
@@ -27,12 +25,13 @@ class MainWindowController(QObject):
     Connects user actions from the _view to the application's business _logic.
     """
 
-    def __init__(self, view: "MainWindowView", logic: "MainWindowLogic", username: str):
+    def __init__(self, view: "MainWindowView", logic: "MainWindowLogic", username: str, engines: dict[str, Engine]):
         super().__init__()
 
         self._view = view
         self._logic = logic
         self._username = username
+        self._engines = engines
 
         self.page_manager = PageManager(self._view.stackedWidget)
         self._register_pages()
@@ -60,64 +59,72 @@ class MainWindowController(QObject):
         This is where the main controller passes the application's core
         dependencies (like session makers) down to the feature factories.
         """
-        session_provider = self._logic.session_provider
-
-        # --- Home Page Registration ---
+        # --- Home Page: Needs 'customers' and 'invoices' engines ---
         self.page_manager.register(
             "home",
             lambda: HomePageFactory.create(
-                session_provider,
-                self._view
+                customers_engine=self._engines.get('customers'),
+                invoices_engine=self._engines.get('invoices'),
+                parent=self._view
             )
         )
 
-        # --- Invoice Page Registration ---
+        # --- Invoice Wizard: Needs 'customers', 'invoices', 'services', 'users' ---
         self.page_manager.register(
             "invoice",
             lambda: InvoiceWizardFactory.create(
-                session_provider,
-                self._view
+                customer_engine=self._engines.get('customers'),
+                invoices_engine=self._engines.get('invoices'),
+                services_engine=self._engines.get('services'),
+                users_engine=self._engines.get('users'),
+                parent=self._view
             )
         )
 
-        # --- Users Page Registration ---
+        # --- Admin Panel: Needs multiple engines ---
         self.page_manager.register(
             "users",
             lambda: AdminPanelFactory.create(
-                session_provider,
-                self._view
+                users_engine=self._engines.get('users'),
+                payroll_engine=self._engines.get('payroll'),
+                expenses_engine=self._engines.get('expenses'),
+                customers_engine=self._engines.get('customers'),
+                invoices_engine=self._engines.get('invoices'),
+                services_engine=self._engines.get('services'),
+                parent=self._view
             )
         )
 
-        # --- Invoice Table Page Registration ---
+        # --- Invoice Table: Only needs the 'invoices' engine ---
         self.page_manager.register(
             "invoice_table",
             lambda: InvoiceTableFactory.create(
-                session_provider,
-                self._view
+                invoices_engine=self._engines.get('invoices'),
+                parent=self._view
             )
         )
 
         self.page_manager.register(
             "services",
             lambda: ServicesManagementFactory.create(
-                session_provider,
-                self._view
+                services_engine=self._engines.get('services'),
+                parent=self._view
             )
         )
 
         self.page_manager.register(
             'info_page',
             lambda: InfoPageFactory.create(
-                session_provider,
-                self._view
+                info_page_engine=self._engines.get('info_page'),
+                parent=self._view
             )
         )
 
         self.page_manager.register(
             'workspace',
             lambda: WorkspaceFactory.create(
-                session_provider,
+                self._engines.get('users'),
+                self._engines.get('workspace'),
                 self._logic.get_user_profile_for_view(self._username).id,
                 self.broker_host,
                 self._view

@@ -2,8 +2,9 @@
 
 from features.Invoice_Page.customer_info.customer_info_models import Customer, Companion
 from features.Invoice_Page.customer_info.customer_info_repo import CustomerRepository
-from shared.session_provider import SessionProvider
+from shared.session_provider import ManagedSessionProvider
 from enum import Enum, auto
+from shared import to_english_number
 
 from shared.utils.validation_utils import validate_national_id, validate_email, validate_phone_number
 
@@ -29,11 +30,14 @@ class CustomerExistsError(Exception):
 
 
 class CustomerLogic:
-    def __init__(self, repo: CustomerRepository, session_provider: SessionProvider):
+    """
+    Business logic for managing customers and companions.
+    """
+    def __init__(self, repo: CustomerRepository, customer_engine: ManagedSessionProvider):
         self._repo = repo
-        self.session_provider = session_provider
+        self._customer_session = customer_engine
         self._completer_cache: list[dict] | None = None
-        self._loaded_customer_state: Customer | None = None     # Tracks the autofilled customer
+        self._loaded_customer_state: Customer | None = None
 
     def _validate_customer_data(self, customer: Customer) -> dict[str, str]:
         """
@@ -85,7 +89,7 @@ class CustomerLogic:
         if self._completer_cache is not None:
             return self._completer_cache
 
-        with self.session_provider.customers() as session:
+        with self._customer_session() as session:
             customers = self._repo.get_all_customers_for_completer(session)
             companions = self._repo.get_all_companions_for_completer(session)
 
@@ -97,7 +101,7 @@ class CustomerLogic:
             if comp['national_id'] not in unified_map:
                 unified_map[comp['national_id']] = {
                     "name": f"{comp['name']} (همراه)",
-                    "national_id": comp['main_customer_nid']    # IMPORTANT: The ID to fetch is the main customer's
+                    "national_id": comp['main_customer_nid']
                 }
 
         self._completer_cache = list(unified_map.values())
@@ -111,7 +115,7 @@ class CustomerLogic:
         """Fetches and caches customer info for the completer."""
         # In a real app, you might refresh this periodically
         if not self._customers_for_completer:
-            customers = self._repo.get_all_customers(self.session_provider.customers)
+            customers = self._repo.get_all_customers(self._session_provider.customers)
             self._customers_for_completer = [
                 {"name": c.name, "national_id": c.national_id} for c in customers
             ]
@@ -129,13 +133,13 @@ class CustomerLogic:
             raise ValidationError("اطلاعات وارد شده نامعتبر است.", errors=validation_errors)
 
         # Step 2: Check for existence
-        with self.session_provider.customers() as session:
+        with self._customer_session() as session:
             existing_customer = self._repo.get_customer(session, customer.national_id)
             if existing_customer:
                 raise CustomerExistsError("مشتری با این کد ملی قبلا ثبت شده است.", customer)
 
         # Step 3: Save the new customer
-        with self.session_provider.customers() as session:
+        with self._customer_session() as session:
             self._repo.save_customer(session, customer)
 
         self.invalidate_completer_cache()
@@ -145,7 +149,7 @@ class CustomerLogic:
         """
         Updates an existing customer's data. Assumes validation has already passed.
         """
-        with self.session_provider.customers() as session:
+        with self._customer_session() as session:
             self._repo.save_customer(session, customer)
 
         self.invalidate_completer_cache()
@@ -154,9 +158,10 @@ class CustomerLogic:
 
     def get_customer_details(self, national_id: str) -> Customer | None:
         """Gets full details for one customer by their main national ID."""
-        with self.session_provider.customers() as session:
-            customer = self._repo.get_customer(session, national_id)
-        self._loaded_customer_state = customer  # Cache the loaded customer
+        nid_normalized = to_english_number(national_id)
+        with self._customer_session() as session:
+            customer = self._repo.get_customer(session, nid_normalized)
+        self._loaded_customer_state = customer
         return customer
 
     def _compare_customer_data(self, raw_data: dict, existing_customer: Customer) -> bool:
@@ -197,7 +202,7 @@ class CustomerLogic:
         Checks if the data on the form corresponds to a new or existing customer
         and whether it has been modified. This is the core of the smart navigation.
         """
-        nid = raw_data.get('national_id', '').strip()
+        nid = to_english_number(raw_data.get('national_id', '').strip())
         if not nid:
             # If there's no NID, it must be a new customer.
             self._loaded_customer_state = None
@@ -206,24 +211,26 @@ class CustomerLogic:
 
         # Check against the cached customer that was loaded onto the form.
         if self._loaded_customer_state and self._loaded_customer_state.national_id == nid:
-            # The user is working with a customer they just autofilled.
-            # Check if they've changed anything since it was loaded.
             if self._compare_customer_data(raw_data, self._loaded_customer_state):
                 modified_customer = self._build_customer_from_data(raw_data)
                 return CustomerStatus.EXISTING_MODIFIED, modified_customer
             else:
                 return CustomerStatus.EXISTING_UNMODIFIED, self._loaded_customer_state
 
-        # If not from cache, check the database directly. This handles cases where
-        # the user manually types an NID that already exists.
-        db_customer = self._repo.get_customer(self.session_provider.customers, nid)
+        db_customer = None
+        with self._customer_session() as session:
+            db_customer = self._repo.get_customer(session, nid)
+
         if db_customer:
-            # An existing customer was found. Cache it for future checks.
             self._loaded_customer_state = db_customer
-            # We assume it's unmodified since the user just typed the ID and hasn't changed anything yet.
-            return CustomerStatus.EXISTING_UNMODIFIED, db_customer
+            if self._compare_customer_data(raw_data, db_customer):
+                modified_customer = self._build_customer_from_data(raw_data)
+                return CustomerStatus.EXISTING_MODIFIED, modified_customer
+
+            else:
+                return CustomerStatus.EXISTING_UNMODIFIED, db_customer
+
         else:
-            # The NID is not in the DB, so it's a new customer.
             self._loaded_customer_state = None
             form_customer = self._build_customer_from_data(raw_data)
             return CustomerStatus.NEW, form_customer

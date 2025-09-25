@@ -61,17 +61,3 @@ class InvoiceDetailsController:
         if self._current_details is None: return
         new_details = self._logic.update_with_other_changes(self._current_details, other_data)
         self._process_update(new_details)
-    #
-    # def prepare_and_display_data(self, customer: Customer, items: list[InvoiceItem]):
-    #     """Public method called by MainWindow to kick off this step."""
-    #     # Pass data to both the _view (for static display) and the _logic (for calculations)
-    #     self._view.display_static_info(customer, self._logic._repo.get_office_info())
-    #     self._logic.prepare_initial_details(customer, items)
-    #
-    # def _on_logic_updated(self, details):
-    #     """When _logic recalculates, update the _view and the global state."""
-    #     self._view.update_display(details)
-    #     self._state_manager.set_invoice_details(details)
-    #
-    # def get_widget(self) -> InvoiceDetailsWidget:
-    #     return self._view

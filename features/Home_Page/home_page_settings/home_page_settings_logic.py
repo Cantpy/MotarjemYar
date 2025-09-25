@@ -8,7 +8,7 @@ from features.Home_Page.home_page_settings.home_page_settings_repo import Homepa
 class HomepageSettingsLogic(QObject):
     """
     Manages the state of the homepage settings.
-    Orchestrates loading from and saving to the repository.
+    Orchestrates loading from and saving to the _repository.
     """
     settings_changed = Signal(Settings)
 
@@ -28,7 +28,7 @@ class HomepageSettingsLogic(QObject):
         return Settings.default(self._max_cards)
 
     def save_settings(self, settings: Settings) -> bool:
-        """Saves the provided settings via the repository."""
+        """Saves the provided settings via the _repository."""
         success = self._repository.save(settings)
         if success:
             self.current_settings = settings

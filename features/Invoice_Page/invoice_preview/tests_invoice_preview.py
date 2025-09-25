@@ -7,7 +7,7 @@ from InvoicePage import InvoiceItem
 
 @pytest.fixture
 def invoice_service():
-    """Fixture to provide an instance of InvoiceService with mock data."""
+    """Fixture to provide an instance of InvoiceTableService with mock data."""
     invoice = create_mock_invoice()
     return InvoiceService(invoice)
 
@@ -94,7 +94,7 @@ def invoice_repo():
 
 def test_export_to_excel_no_data(invoice_repo, tmp_path):
     """Tests that export returns False when no data is found for the user."""
-    # We use the actual repo, which will create an empty DB
+    # We use the actual _repo, which will create an empty DB
     file_path = tmp_path / "output.xlsx"
     assert not invoice_repo.export_to_excel("non_existent_user", str(file_path))
 
@@ -114,8 +114,8 @@ def test_export_to_excel_with_data(test_db_session, invoice_repo, tmp_path):
     test_db_session.add(test_invoice)
     test_db_session.commit()
 
-    # We would need to inject this session into the repository for the test
-    # This requires refactoring the repo to accept a session, a common practice
+    # We would need to inject this session into the _repository for the test
+    # This requires refactoring the _repo to accept a session, a common practice
     # For now, this test is conceptual to show the intent.
 
     # Act and Assert would go here

@@ -1,40 +1,62 @@
+# core/database_init.py
+
+from sqlalchemy.engine import Engine
 from sqlalchemy import create_engine
 from pathlib import Path
-from shared.session_provider import SessionProvider
 from config.config import DATABASE_BASES
 
 
 class DatabaseInitializer:
-    def setup_file_databases(self, absolute_paths: dict) -> SessionProvider:
-        return self._initialize_databases(absolute_paths, is_memory=False)
+    """
+    Initializes all application databases and returns a dictionary of Engine objects.
+    Supports both file-based databases for production/development and
+    in-memory databases for fast, isolated testing.
+    """
 
-    def setup_memory_databases(self) -> SessionProvider:
+    def setup_file_databases(self, absolute_paths: dict) -> dict[str, Engine]:
+        """
+        Creates SQLite database files, initializes schemas, and returns a
+        dictionary of configured SQLAlchemy Engine objects.
+        """
+        # Create the dictionary of database URLs from the file paths
+        db_urls = {name: f"sqlite:///{path}" for name, path in absolute_paths.items()}
+
+        # Ensure parent directories exist for all file-based databases
+        for path in absolute_paths.values():
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+
+        return self._initialize_engines(db_urls)
+
+    def setup_memory_databases(self) -> dict[str, Engine]:
+        """
+        Creates in-memory SQLite databases and returns a dictionary of
+        configured SQLAlchemy Engine objects. Ideal for testing.
+        """
+        # Create a dictionary of in-memory database URLs
         memory_urls = {name: 'sqlite:///:memory:' for name in DATABASE_BASES.keys()}
-        return self._initialize_databases(memory_urls, is_memory=True)
+        return self._initialize_engines(memory_urls, connect_args={"check_same_thread": False})
 
-    def _initialize_databases(self, db_config: dict, is_memory: bool) -> SessionProvider:
-        engines = {}  # This will store the created ENGINE OBJECTS
+    def _initialize_engines(self, db_urls: dict, connect_args: dict = None) -> dict[str, Engine]:
+        """
+        Private helper that takes database URLs and creates all engines and schemas.
+        """
+        engines: dict[str, Engine] = {}
+        connect_args = connect_args or {}
 
-        for name, base in DATABASE_BASES.items():
-            path_or_url = db_config.get(name)
-            if not path_or_url:
-                raise ValueError(f"Database config for '{name}' not found.")
+        for name, url in db_urls.items():
+            if not url:
+                raise ValueError(f"Database URL for '{name}' not found.")
 
-            db_url = path_or_url if is_memory else f"sqlite:///{path_or_url}"
-
-            if not is_memory:
-                Path(path_or_url).parent.mkdir(parents=True, exist_ok=True)
-
-            connect_args = {"check_same_thread": False} if is_memory else {}
-
-            # Create the engine and STORE THE OBJECT in our dictionary
-            engine = create_engine(db_url, connect_args=connect_args)
+            # Create the SQLAlchemy engine for this specific database
+            engine = create_engine(url, connect_args=connect_args)
             engines[name] = engine
 
-            base.metadata.create_all(engine)
+            # Look up the correct SQLAlchemy Base and create tables
+            base = DATABASE_BASES.get(name)
+            if base:
+                base.metadata.create_all(engine)
+            else:
+                print(f"Warning: No SQLAlchemy Base found for database '{name}'. Schema not created.")
 
-        print("Database engines and schemas initialized successfully.")
-
-        # --- THE FIX ---
-        # Pass the dictionary of fully-formed ENGINE OBJECTS to the provider.
-        return SessionProvider(engines)
+        print(f"{len(engines)} database engines initialized successfully.")
+        return engines

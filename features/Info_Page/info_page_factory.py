@@ -1,27 +1,29 @@
 # features/Info_Page/info_page_factory.py
 
+from sqlalchemy.engine import Engine
+
 from features.Info_Page.info_page_view import InfoPageView
 from features.Info_Page.info_page_controller import InfoPageController
 from features.Info_Page.info_page_logic import InfoPageLogic
 from features.Info_Page.info_page_repo import InfoPageRepository
 
-from shared.session_provider import SessionProvider
+from shared.session_provider import ManagedSessionProvider
 
 
 class InfoPageFactory:
-    """Factory class to create and wire the Info Page module components."""
-
+    """
+    Factory class to create and wire the Info Page module components.
+    """
     @staticmethod
-    def create(session_provider: SessionProvider, parent=None) -> InfoPageController:
+    def create(info_page_engine: Engine, parent=None) -> InfoPageController:
         """
         Creates and wires the complete Info Page module.
 
         This static method follows a clean architecture pattern to instantiate and
-        connect the repository, _logic, _view, and controller for the info page.
+        connect the _repository, _logic, _view, and controller for the info page.
 
         Args:
-            session_provider: The application's session provider instance, which
-                              is responsible for managing database sessions.
+            info_page_engine: The SQLAlchemy engine for the info page database.
             parent (QWidget, optional): The parent widget for the _view. Defaults to None.
 
         Returns:
@@ -29,46 +31,20 @@ class InfoPageFactory:
                                 ready to be integrated into the application's
                                 page manager.
         """
-        # 1. Instantiate the stateless repository
+        info_page_session = ManagedSessionProvider(engine=info_page_engine)
         repo = InfoPageRepository()
-
-        # 2. Instantiate the _logic, injecting the repository and session provider
-        logic = InfoPageLogic(repo, session_provider)
-
-        # 3. Instantiate the _view, making it a child of the parent if provided
+        logic = InfoPageLogic(repo, info_page_session)
         view = InfoPageView(parent)
-
-        # 4. Instantiate the controller, injecting the _view and _logic
         controller = InfoPageController(view, logic)
-
-        # 5. Load the initial data from the database into the _view
         controller.load_initial_data()
 
-        # 6. Return the fully constructed and initialized controller
         return controller
 
 
 if __name__ == '__main__':
-    import sys
-    from PySide6.QtWidgets import QApplication
-    from core.database_init import DatabaseInitializer
-    from core.database_seeder import DatabaseSeeder
-    from config.config import DATABASE_PATHS
-
-    app = QApplication(sys.argv)
-
-    # 1. Initialize databases
-    initializer = DatabaseInitializer()
-    session_provider = initializer.setup_file_databases(DATABASE_PATHS)
-
-    # 2. Seed (optional – dev/test mode)
-    seeder = DatabaseSeeder(session_provider)
-    seeder.seed_initial_data()
-
-    # 3. Use factory
-    controller = InfoPageFactory.create(session_provider=session_provider)
-
-    main_widget = controller.get_view()
-    main_widget.show()
-
-    sys.exit(app.exec())
+    from shared.testing.launch_feature import launch_feature_for_ui_test
+    launch_feature_for_ui_test(
+        factory_class=InfoPageFactory,
+        required_engines={'info_page': 'info_page_engine'},
+        use_memory_db=True
+    )
