@@ -8,25 +8,18 @@ from shared.orm_models.customer_models import CustomerModel, CompanionModel
 
 class CustomerRepository:
     """
-    Stateless _repository for customer info page data operations.
+    Stateless repository for customer data operations.
     Requires a session to be passed into each method.
     """
 
     def save_customer(self, session: Session, customer: Customer) -> None:
-        """
-        Saves (adds or updates) a customer and their companions in the database.
-        session.merge() handles the _logic for insert vs. update.
-        """
-        # First, efficiently find and delete existing companions for this customer
-        # This prevents orphaned companions if a companion is removed in an update.
+        """Saves (adds or updates) a customer and their companions."""
         session.query(CompanionModel).filter_by(customer_national_id=customer.national_id).delete(synchronize_session=False)
 
         customer_model_data = customer.__dict__.copy()
-        customer_model_data.pop('companions', None)  # Remove DTO list for the ORM model
-
+        customer_model_data.pop('companions', None)
         customer_model = CustomerModel(**customer_model_data)
 
-        # Create new ORM models from the companion DTOs
         companion_models = [
             CompanionModel(name=c.name, national_id=c.national_id, customer_national_id=customer.national_id)
             for c in customer.companions
@@ -61,19 +54,14 @@ class CustomerRepository:
     def get_all_customers(self, session: Session) -> list[Customer]:
         """Retrieves all customers from the database."""
         customers_models = session.query(CustomerModel).all()
-        customer_list = [
+        return [
             Customer(
                 national_id=cm.national_id,
                 name=cm.name,
                 phone=cm.phone,
-                telegram_id=cm.telegram_id,
-                email=cm.email,
-                address=cm.address,
-                passport_image=cm.passport_image,
                 companions=[Companion(id=c.id, name=c.name, national_id=c.national_id) for c in cm.companions]
             ) for cm in customers_models
         ]
-        return customer_list
 
     def get_all_customers_for_completer(self, session: Session) -> list[dict]:
         """Fetches just the name and NID of all main customers."""
@@ -81,10 +69,7 @@ class CustomerRepository:
         return [{"name": name, "national_id": nid} for name, nid in results]
 
     def get_all_companions_for_completer(self, session: Session) -> list[dict]:
-        """
-        Fetches the name and NID of all companions, along with their
-        main customer's NID for lookup purposes.
-        """
+        """Fetches name and NID of all companions, plus their main customer's NID."""
         results = session.query(
             CompanionModel.name,
             CompanionModel.national_id,

@@ -33,6 +33,7 @@ class CustomerLogic:
     """
     Business logic for managing customers and companions.
     """
+
     def __init__(self, repo: CustomerRepository, customer_engine: ManagedSessionProvider):
         self._repo = repo
         self._customer_session = customer_engine
@@ -40,10 +41,7 @@ class CustomerLogic:
         self._loaded_customer_state: Customer | None = None
 
     def _validate_customer_data(self, customer: Customer) -> dict[str, str]:
-        """
-        Centralized validation for customer data.
-        Returns a dictionary of errors, empty if valid.
-        """
+        """Centralized validation for customer data."""
         errors = {}
         if len(customer.name) < 3:
             errors['name'] = "نام باید حداقل ۳ حرف باشد"
@@ -54,23 +52,22 @@ class CustomerLogic:
         if customer.email and not validate_email(customer.email):
             errors['email'] = "فرمت ایمیل صحیح نیست"
 
-        # Companion validation
-        companion_errors = []
-        for i, companion in enumerate(customer.companions):
-            if not validate_national_id(companion.national_id):
-                companion_errors.append(f"کد ملی همراه {i + 1} نامعتبر است.")
+        companion_errors = [
+            f"کد ملی همراه {i + 1} نامعتبر است."
+            for i, companion in enumerate(customer.companions)
+            if not validate_national_id(companion.national_id)
+        ]
         if companion_errors:
             errors['companions'] = "\n".join(companion_errors)
 
         return errors
 
     def _build_customer_from_data(self, raw_data: dict) -> Customer:
-        """Helper to construct a Customer DTO from raw form data."""
+        """Constructs a Customer DTO from a raw data dictionary."""
         companions_data = raw_data.get('companions', [])
         companions = [
             Companion(name=comp.get('name', ''), national_id=comp.get('national_id', ''))
-            for comp in companions_data
-            if comp.get('name') and comp.get('national_id')
+            for comp in companions_data if comp.get('name') and comp.get('national_id')
         ]
         return Customer(
             national_id=raw_data.get('national_id', '').strip(),
@@ -81,10 +78,44 @@ class CustomerLogic:
             companions=companions
         )
 
+    def get_all_data_for_completers(self) -> dict:
+        """
+        NEW: Fetches and formats data for name, NID, and phone completers.
+        Returns a dictionary with lists for each completer type.
+        """
+        with self._customer_session() as session:
+            all_customers = self._repo.get_all_customers(session)
+
+        # Prepare the data structures
+        names_data = []
+        nids_data = []
+        phones_data = []
+
+        for customer in all_customers:
+            nid = customer.national_id
+
+            # Data for the name completer
+            if customer.name:
+                names_data.append({"display": customer.name, "lookup_id": nid})
+
+            # Data for the national_id completer
+            if customer.national_id:
+                nids_data.append({"display": customer.national_id, "lookup_id": nid})
+
+            # Data for the phone completer
+            if customer.phone:
+                phones_data.append({"display": customer.phone, "lookup_id": nid})
+
+        return {
+            "names": names_data,
+            "nids": nids_data,
+            "phones": phones_data
+        }
+
     def get_all_customer_and_companion_info(self) -> list[dict]:
         """
-        Fetches all customers AND companions, merges them, and returns a
-        unified list for the completer. This is the single source of truth for the completer.
+        Returns a flat list of dicts for the UI completer.
+        Caches the result for performance.
         """
         if self._completer_cache is not None:
             return self._completer_cache
@@ -93,52 +124,39 @@ class CustomerLogic:
             customers = self._repo.get_all_customers_for_completer(session)
             companions = self._repo.get_all_companions_for_completer(session)
 
-        unified_map = {}
-        for cust in customers:
-            unified_map[cust['national_id']] = cust
+        unified = [
+            {"name": cust["name"], "national_id": cust["national_id"], "type": "main"}
+            for cust in customers
+        ]
+        unified.extend([
+            {
+                "name": f"{comp['name']} (همراه)",
+                "national_id": comp["main_customer_nid"],
+                "type": "companion",
+                "companion_nid": comp["national_id"]
+            }
+            for comp in companions
+        ])
 
-        for comp in companions:
-            if comp['national_id'] not in unified_map:
-                unified_map[comp['national_id']] = {
-                    "name": f"{comp['name']} (همراه)",
-                    "national_id": comp['main_customer_nid']
-                }
-
-        self._completer_cache = list(unified_map.values())
-        return self._completer_cache
+        self._completer_cache = unified
+        return unified
 
     def invalidate_completer_cache(self):
         """Forces the completer data to be re-fetched on the next request."""
         self._completer_cache = None
 
-    def get_all_customer_info_for_completer(self) -> list[dict]:
-        """Fetches and caches customer info for the completer."""
-        # In a real app, you might refresh this periodically
-        if not self._customers_for_completer:
-            customers = self._repo.get_all_customers(self._session_provider.customers)
-            self._customers_for_completer = [
-                {"name": c.name, "national_id": c.national_id} for c in customers
-            ]
-        return self._customers_for_completer
-
     def save_customer(self, raw_data: dict) -> Customer:
-        """
-        Validates and saves a customer. This is the primary entry point for creating a new customer.
-        """
+        """Validates and saves a new customer."""
         customer = self._build_customer_from_data(raw_data)
 
-        # Step 1: Validate the data
         validation_errors = self._validate_customer_data(customer)
         if validation_errors:
             raise ValidationError("اطلاعات وارد شده نامعتبر است.", errors=validation_errors)
 
-        # Step 2: Check for existence
         with self._customer_session() as session:
-            existing_customer = self._repo.get_customer(session, customer.national_id)
-            if existing_customer:
+            if self._repo.get_customer(session, customer.national_id):
                 raise CustomerExistsError("مشتری با این کد ملی قبلا ثبت شده است.", customer)
 
-        # Step 3: Save the new customer
         with self._customer_session() as session:
             self._repo.save_customer(session, customer)
 
@@ -146,23 +164,32 @@ class CustomerLogic:
         return customer
 
     def update_customer(self, customer: Customer) -> Customer:
-        """
-        Updates an existing customer's data. Assumes validation has already passed.
-        """
+        """Updates an existing customer's data."""
         with self._customer_session() as session:
             self._repo.save_customer(session, customer)
-
         self.invalidate_completer_cache()
-        self._loaded_customer_state = customer  # Update the cached state
+        self._loaded_customer_state = customer
         return customer
 
     def get_customer_details(self, national_id: str) -> Customer | None:
-        """Gets full details for one customer by their main national ID."""
+        """Gets full details for one customer."""
         nid_normalized = to_english_number(national_id)
         with self._customer_session() as session:
             customer = self._repo.get_customer(session, nid_normalized)
+            print(f"customer extracted by the logic layer: {customer} with national id: {national_id}")
         self._loaded_customer_state = customer
         return customer
+
+    def get_all_customer_info_for_completer(self) -> list[dict]:
+        """Fetches and caches customer info for the completer."""
+        # In a real app, you might refresh this periodically
+        if not self._completer_cache:
+            with self._customer_session() as session:
+                customers = self._repo.get_all_customers(session)
+                self._customers_for_completer = [
+                    {"name": c.name, "national_id": c.national_id} for c in customers
+                ]
+            return self._customers_for_completer
 
     def _compare_customer_data(self, raw_data: dict, existing_customer: Customer) -> bool:
         """

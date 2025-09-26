@@ -35,7 +35,7 @@ class CustomerInfoFactory:
         view = CustomerInfoWidget(parent=parent)
 
         state_manager = WorkflowStateManager()
-        controller = CustomerInfoController(view, logic, state_manager)
+        controller = CustomerInfoController(logic, view, state_manager)
 
         return controller
 
