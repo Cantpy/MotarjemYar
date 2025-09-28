@@ -13,11 +13,16 @@ from shared.utils.persian_tools import to_persian_numbers
 
 
 class DocumentSelectionWidget(QWidget):
+    """
+    The main widget for document/service selection and invoice item management.
+    """
     # --- The communication signal ---
+    smart_add_triggered = Signal(str)
     add_button_clicked = Signal(str)
     edit_button_clicked = Signal(int)
     delete_button_clicked = Signal(int)
     clear_button_clicked = Signal()
+    settings_button_clicked = Signal()
     manual_item_updated = Signal(object, int, str)
 
     def __init__(self, parent=None):
@@ -32,11 +37,18 @@ class DocumentSelectionWidget(QWidget):
         self._setup_connections()
 
     def _setup_ui(self, main_layout):
+        """
+        Sets up the entire UI layout and components.
+        """
+        self._setup_smart_input(main_layout)
         self._setup_service_input(main_layout)
         self._setup_invoice_table(main_layout)
         self._setup_action_buttons(main_layout)
 
     def _apply_shadow_effect(self, widget: QGroupBox):
+        """
+        Applies a subtle drop shadow effect to the given widget.
+        """
         shadow = QGraphicsDropShadowEffect(self)
         shadow.setBlurRadius(20)
         shadow.setXOffset(0)
@@ -44,7 +56,32 @@ class DocumentSelectionWidget(QWidget):
         shadow.setColor(QColor(0, 0, 0, 25))
         widget.setGraphicsEffect(shadow)
 
+    def _setup_smart_input(self, parent_layout):
+        """
+        Sets up the smart input section with a line edit and a button.
+        """
+        smart_input_group = QGroupBox("افزودن سریع (هوشمند)")
+        layout = QGridLayout(smart_input_group)
+        layout.setSpacing(15)
+
+        self.smart_entry_edit = QLineEdit()
+        self.smart_entry_edit.setPlaceholderText(
+            "مثال: شناسنامه با ۲ واقعه و تاییدات | مثال: سند تک برگ با ۳۰ خط توضیح")
+        self.smart_entry_button = QPushButton("✔️ افزودن سریع")
+        self.smart_entry_button.setObjectName("SmartSearchButton")
+
+        layout.addWidget(QLabel("شرح درخواست:"), 0, 0)
+        layout.addWidget(self.smart_entry_edit, 0, 1)
+        layout.addWidget(self.smart_entry_button, 0, 2)
+        layout.setColumnStretch(1, 1)
+
+        self._apply_shadow_effect(smart_input_group)
+        parent_layout.addWidget(smart_input_group)
+
     def _setup_service_input(self, parent_layout):
+        """
+        Sets up the service selection input with a line edit and an add button.
+        """
         service_input_group = QGroupBox("افزودن خدمات به فاکتور")
         # Use a grid layout for better alignment and control
         layout = QGridLayout(service_input_group)
@@ -66,6 +103,9 @@ class DocumentSelectionWidget(QWidget):
         parent_layout.addWidget(service_input_group)
 
     def _setup_invoice_table(self, parent_layout):
+        """
+        Sets up the invoice items table within a styled group box.
+        """
         invoice_table_group = QGroupBox("لیست خدمات")
         layout = QVBoxLayout(invoice_table_group)
 
@@ -100,6 +140,9 @@ class DocumentSelectionWidget(QWidget):
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
 
     def _setup_action_buttons(self, parent_layout):
+        """
+        Sets up the action buttons below the table: Clear All, Delete Selected, and Edit Selected.
+        """
         buttons_layout = QHBoxLayout()
         self.clear_button = QPushButton("پاک کردن کل لیست")
         self.delete_button = QPushButton("حذف ردیف انتخاب شده")
@@ -108,15 +151,25 @@ class DocumentSelectionWidget(QWidget):
 
         # --- NEW: Edit Button ---
         self.edit_button = QPushButton("ویرایش ردیف انتخاب شده")
+        self.edit_button.setObjectName("EditButton")
         self.edit_button.setEnabled(False)  # Initially disabled
 
+        self.settings_button = QPushButton("⚙️ تنظیمات تعرفه‌ها")
+        self.settings_button.setObjectName("SettingsButton")
         buttons_layout.addStretch()
+        buttons_layout.addWidget(self.settings_button)
         buttons_layout.addWidget(self.delete_button)
         buttons_layout.addWidget(self.edit_button)
         buttons_layout.addWidget(self.clear_button)
         parent_layout.addLayout(buttons_layout)
 
     def _setup_connections(self):
+        """
+        Sets up signal-slot connections for the UI components.
+        """
+        self.smart_entry_button.clicked.connect(self._on_smart_add)
+        self.smart_entry_edit.returnPressed.connect(self._on_smart_add)
+
         self.table.itemSelectionChanged.connect(self._on_selection_changed)
         self.table.itemChanged.connect(self._on_table_item_changed)
         self.table.customContextMenuRequested.connect(self._show_table_context_menu)
@@ -130,7 +183,12 @@ class DocumentSelectionWidget(QWidget):
         self.clear_button.clicked.connect(self.clear_button_clicked.emit)
         self.service_edit.returnPressed.connect(self.add_button.click)
 
+        self.settings_button.clicked.connect(self.settings_button_clicked.emit)
+
     def populate_completer(self, service_names: list):
+        """
+        Populates the service name completer with the provided list of service names.
+        """
         completer = QCompleter(service_names, self)
         completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
         completer.setFilterMode(Qt.MatchFlag.MatchContains)
@@ -142,7 +200,24 @@ class DocumentSelectionWidget(QWidget):
         completer.activated.connect(lambda text: self.add_button.setEnabled(True))
         self.service_edit.textChanged.connect(lambda text: self.add_button.setEnabled(text in service_names))
 
+    def populate_smart_completer(self, history: list[str]):
+        """Creates and attaches a QCompleter to the smart entry line edit."""
+        if not history:  # Don't bother if history is empty
+            return
+
+        completer = QCompleter(history, self)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchFlag.MatchContains)
+
+        # Reuse the same nice popup style
+        completer.popup().setStyleSheet(COMPLETER_POPUP)
+
+        self.smart_entry_edit.setCompleter(completer)
+        
     def update_table_display(self, items: list[InvoiceItem]):
+        """
+        Updates the invoice items table with the provided list of items.
+        """
         self._is_updating_table = True
         self.table.setRowCount(0)
 
@@ -180,6 +255,26 @@ class DocumentSelectionWidget(QWidget):
 
         self.table.resizeRowsToContents()
         self._is_updating_table = False
+
+    def _create_cell(self, text, editable=False, centered=False, right_aligned=False, data=None,
+                     tooltip=None) -> QTableWidgetItem:
+        """
+        Helper to create a table cell with common properties.
+        """
+        item = QTableWidgetItem(text)
+        if not editable:
+            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        if centered:
+            item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        if right_aligned:
+            item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        if data:
+            item.setData(Qt.ItemDataRole.UserRole, data)
+        if tooltip:
+            item.setToolTip(tooltip)
+        return item
+
+    # --- Signal Handlers ---
 
     def _on_table_item_changed(self, item: QTableWidgetItem):
         """
@@ -227,20 +322,10 @@ class DocumentSelectionWidget(QWidget):
             if new_remarks != invoice_item.remarks:
                 self.manual_item_updated.emit(invoice_item, invoice_item.total_price, new_remarks)
 
-    def _create_cell(self, text, editable=False, centered=False, right_aligned=False, data=None,
-                     tooltip=None) -> QTableWidgetItem:
-        item = QTableWidgetItem(text)
-        if not editable:
-            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-        if centered:
-            item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-        if right_aligned:
-            item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        if data:
-            item.setData(Qt.ItemDataRole.UserRole, data)
-        if tooltip:
-            item.setToolTip(tooltip)
-        return item
+    def _on_smart_add(self):
+        text = self.smart_entry_edit.text().strip()
+        if text:
+            self.smart_add_triggered.emit(text)
 
     def _on_selection_changed(self):
         """Enables/disables edit and delete buttons based on row selection."""
@@ -268,6 +353,11 @@ class DocumentSelectionWidget(QWidget):
 
         menu.exec(self.table.viewport().mapToGlobal(position))
 
+    # --- Public Slots ---
+
+    def clear_smart_entry(self):
+        self.smart_entry_edit.clear()
+
     def _delete_selected_row(self):
         """Deletes the currently selected row. More robust now."""
         current_row = self.table.currentRow()
@@ -278,3 +368,8 @@ class DocumentSelectionWidget(QWidget):
         """A public slot to clear the line edit and reset button state."""
         self.service_edit.clear()
         self.add_button.setEnabled(False)
+
+    def show_error(self, message: str):
+        """A public slot to show an error message dialog."""
+        from shared.utils.ui_utils import show_error_message_box
+        show_error_message_box(self, "خطا", message)

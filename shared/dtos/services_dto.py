@@ -21,8 +21,6 @@ class FixedPriceDTO:
     id: int
     name: str
     price: int
-    is_default: bool
-    label_name: str | None
 
 
 @dataclass

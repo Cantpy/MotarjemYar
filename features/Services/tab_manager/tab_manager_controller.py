@@ -16,14 +16,12 @@ class ServicesManagementController(QObject):
                  view: "ServicesManagementView",
                  import_logic: "ExcelImportLogic",
                  documents_controller,
-                 fixed_prices_controller,
                  other_services_controller):
         super().__init__()
         self._view = view
 
         # Store the sub-controllers as dependencies
         self._documents_controller = documents_controller
-        self._fixed_prices_controller = fixed_prices_controller
         self._other_services_controller = other_services_controller
         self._import_logic = import_logic
 
@@ -42,7 +40,6 @@ class ServicesManagementController(QObject):
         """Orchestrates a refresh action across all sub-modules."""
         # This controller tells each sub-controller to reload its data.
         self._documents_controller.load_initial_data()
-        self._fixed_prices_controller.load_initial_data()
         self._other_services_controller.load_initial_data()
 
     def handle_import(self):
@@ -88,10 +85,6 @@ class ServicesManagementController(QObject):
             if results.get('documents') and results['documents'].success_count > 0:
                 print("-> Refreshing Documents tab...")
                 self._documents_controller.load_initial_data()
-
-            if results.get('fixed_prices') and results['fixed_prices'].success_count > 0:
-                print("-> Refreshing Fixed Prices tab...")
-                self._fixed_prices_controller.load_initial_data()
 
             if results.get('other_services') and results['other_services'].success_count > 0:
                 print("-> Refreshing Other Services tab...")

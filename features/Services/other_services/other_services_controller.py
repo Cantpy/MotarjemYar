@@ -46,7 +46,7 @@ class OtherServicesController(QObject):
         form_fields = [
             # (Label,         Key for dict, Placeholder)
             ("نام", "name", "مثال: پیک"),
-            ("هزینه", "base_price", "مثال: 10000"),
+            ("هزینه", "price", "مثال: 10000"),
         ]
         dialog = GenericInputDialog("افزودن مدرک جدید", form_fields, self._view)
         if dialog.exec():
@@ -66,7 +66,7 @@ class OtherServicesController(QObject):
         form_fields = [
             # (Label,         Key for dict, Placeholder)
             ("نام", "name", "مثال: پیک"),
-            ("هزینه", "base_price", "مثال: 10000"),
+            ("هزینه", "price", "مثال: 10000"),
         ]
 
         current_data_for_dialog = {

@@ -1,7 +1,6 @@
 # features/Services/documents/documents_factory.py
 
 from sqlalchemy import Engine
-from PySide6.QtWidgets import QApplication
 
 from features.Services.documents.documents_view import ServicesDocumentsView
 from features.Services.documents.documents_controller import ServicesController

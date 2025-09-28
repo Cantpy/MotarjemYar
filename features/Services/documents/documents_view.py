@@ -9,6 +9,7 @@ from PySide6.QtGui import QAction
 from features.Services.documents.documents_models import ServicesDTO, ServiceDynamicFeeDTO
 
 from shared.utils.ui_utils import TableColumnResizer
+from shared.utils.persian_tools import to_persian_numbers
 
 
 class ServicesDocumentsView(QWidget):
@@ -20,10 +21,11 @@ class ServicesDocumentsView(QWidget):
 
     # --- Public Signals for the Controller ---
     add_requested = Signal()
-    edit_requested = Signal(int)  # service_id
-    delete_requested = Signal(int)  # service_id
-    bulk_delete_requested = Signal(list)  # list of service_ids
+    edit_requested = Signal(int)
+    delete_requested = Signal(int)
+    bulk_delete_requested = Signal(list)
     search_text_changed = Signal(str)
+    aliases_requested = Signal(int)
 
     COLUMN_HEADERS = ["انتخاب", "نام مدرک", "هزینه ترجمه", "نام متغیر ۱", "هزینه متغیر ۱",
                       "نام متغیر ۲", "هزینه متغیر ۲"]
@@ -65,10 +67,10 @@ class ServicesDocumentsView(QWidget):
         self.table = QTableWidget()
         self.table.setColumnCount(len(self.COLUMN_HEADERS))
         self.table.setHorizontalHeaderLabels(self.COLUMN_HEADERS)
-        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.setSortingEnabled(True)
         self.table.stretchLastSection = False
-        self.table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.main_layout.addWidget(self.table)
 
         # Apply column resizer (5%, 45%, then 5×10%)
@@ -79,7 +81,8 @@ class ServicesDocumentsView(QWidget):
         self.add_btn = QPushButton("➕ اضافه کردن مدرک")
         self.edit_btn = QPushButton("✏️ ویرایش مدرک")
         self.delete_btn = QPushButton("🗑️ حذف مدرک")
-        buttons = [self.add_btn, self.edit_btn, self.delete_btn]
+        self.aliases_btn = QPushButton("🏷️ جزئیات و نام‌های مستعار")
+        buttons = [self.add_btn, self.edit_btn, self.delete_btn, self.aliases_btn]
         for button in buttons:
             button_layout.addWidget(button)
         self.main_layout.addLayout(button_layout)
@@ -92,7 +95,8 @@ class ServicesDocumentsView(QWidget):
         self.delete_btn.clicked.connect(self._emit_delete_request)
         self.bulk_delete_btn.clicked.connect(self._emit_bulk_delete_request)
         self.search_bar.textChanged.connect(self._emit_search_text_changed)
-
+        self.aliases_btn.clicked.connect(self._emit_aliases_request)
+        self.table.doubleClicked.connect(self._emit_aliases_request)
         # --- Internal UI Logic ---
         self.table.customContextMenuRequested.connect(self._show_context_menu)
         self.select_all_checkbox.stateChanged.connect(self._toggle_select_all)
@@ -149,18 +153,18 @@ class ServicesDocumentsView(QWidget):
 
         data_fields = [
             service.name,
-            service.base_price if service.base_price is not None else ''
+            to_persian_numbers(f"{service.base_price:,}") if service.base_price is not None else ''
         ]
 
-        for fee in service.dynamic_fees:
+        for fee in service.dynamic_prices:
             data_fields.append(fee.name)
-            data_fields.append(fee.unit_price)
+            data_fields.append(to_persian_numbers(f"{fee.unit_price:,}"))
 
         max_dynamic_slots = 2
-        while len(service.dynamic_fees) < max_dynamic_slots:
+        while len(service.dynamic_prices) < max_dynamic_slots:
             data_fields.append('')
             data_fields.append('')
-            service.dynamic_fees.append(ServiceDynamicFeeDTO(id=-1, service_id=service.id, name='', unit_price=0))
+            service.dynamic_prices.append(ServiceDynamicFeeDTO(id=-1, service_id=service.id, name='', unit_price=0))
 
         for col_idx, data in enumerate(data_fields, start=1):
             item = self._create_table_item(data)
@@ -172,7 +176,7 @@ class ServicesDocumentsView(QWidget):
         widget = QWidget()
         layout = QHBoxLayout(widget)
         layout.addWidget(checkbox)
-        layout.setAlignment(Qt.AlignCenter)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.setContentsMargins(0, 0, 0, 0)
         return widget, checkbox
 
@@ -194,6 +198,8 @@ class ServicesDocumentsView(QWidget):
         if row == -1: return
 
         context_menu = QMenu(self)
+        context_menu.addSeparator()
+
         edit_action = QAction("ویرایش", self)
         edit_action.triggered.connect(self._emit_edit_request)
         context_menu.addAction(edit_action)
@@ -201,6 +207,10 @@ class ServicesDocumentsView(QWidget):
         delete_action = QAction("حذف", self)
         delete_action.triggered.connect(self._emit_delete_request)
         context_menu.addAction(delete_action)
+
+        aliases_action = QAction("جزئیات و نام‌های مستعار", self)
+        aliases_action.triggered.connect(self._emit_aliases_request)
+        context_menu.addAction(aliases_action)
 
         context_menu.exec(self.table.viewport().mapToGlobal(position))
 
@@ -265,3 +275,9 @@ class ServicesDocumentsView(QWidget):
         """
         text = self.search_bar.text().strip()
         self.search_text_changed.emit(text)
+
+    def _emit_aliases_request(self):
+        """Emits a signal to open the alias management dialog."""
+        row = self.table.currentRow()
+        if row != -1 and (service_id := self.row_to_id_mapping.get(row)):
+            self.aliases_requested.emit(service_id)

@@ -3,8 +3,8 @@
 import bcrypt
 from sqlalchemy import Engine
 from sqlalchemy.orm import sessionmaker
-from shared.session_provider import SessionProvider
 from shared.orm_models.users_models import UsersModel, UserProfileModel
+from shared.orm_models.services_models import FixedPricesModel
 
 
 class DatabaseSeeder:
@@ -18,7 +18,48 @@ class DatabaseSeeder:
     def seed_initial_data(self):
         print("Seeding initial application data...")
         self._seed_default_user()
+        self._seed_fixed_prices()
         print("Data seeding complete.")
+
+    def _seed_fixed_prices(self):
+        """Seeds fixed prices into the appropriate database."""
+        services_engine = self.engines.get('services')
+        if not services_engine:
+            print("Warning: 'services' engine not found. Skipping fixed prices seeding.")
+            return
+
+        Session = sessionmaker(bind=services_engine)
+        session = Session()
+
+        fixed_prices = [
+            {"name": "کپی برابر اصل", "price": 5000},
+            {"name": "ثبت در سامانه", "price": 30000},
+            {"name": "مهر دادگستری", "price": 150000},
+            {"name": "مهر امور خارجه", "price": 15000},
+            {"name": "نسخه اضافی", "price": 12000},
+        ]
+
+        try:
+            existing_names = {fp.name for fp in session.query(FixedPricesModel.name).all()}
+            added = 0
+
+            for fp in fixed_prices:
+                if fp["name"] not in existing_names:
+                    new_price = FixedPricesModel(name=fp["name"], price=fp["price"])
+                    session.add(new_price)
+                    added += 1
+
+            if added > 0:
+                session.commit()
+                print(f"{added} fixed prices added successfully.")
+            else:
+                print("No new fixed prices to add (already seeded).")
+
+        except Exception as e:
+            print(f"Error seeding fixed prices: {e}")
+            session.rollback()
+        finally:
+            session.close()
 
     def _seed_default_user(self):
         """Creates a default 'testuser' for development and testing."""

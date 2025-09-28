@@ -1,8 +1,10 @@
 # features/Invoice_Page/document_selection/document_selection_models.py
 
+from __future__ import annotations
 from dataclasses import dataclass, field
 import copy
 import uuid
+from shared.orm_models.services_models import ServicesModel
 
 
 @dataclass
@@ -12,6 +14,7 @@ class DynamicPrice:
     service_id: int
     name: str
     unit_price: int
+    aliases: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -22,6 +25,20 @@ class Service:
     type: str
     base_price: int
     dynamic_prices: list[DynamicPrice] = field(default_factory=list)
+    default_page_count: int = 1
+    aliases: list[str] = field(default_factory=list)
+
+    @classmethod
+    def to_dto(cls, service: ServicesModel) -> "Service":
+        return cls(
+            id=service.id,
+            name=service.name,
+            type=service.type,
+            base_price=service.base_price or 0,
+            default_page_count=service.default_page_count,
+            aliases=[alias.alias for alias in service.aliases],
+            dynamic_prices=[fee.to_dto() for fee in service.dynamic_prices],
+        )
 
 
 @dataclass
@@ -30,7 +47,6 @@ class FixedPrice:
     id: int
     name: str
     price: int
-    is_default: bool
 
 
 @dataclass

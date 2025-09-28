@@ -1,6 +1,5 @@
 # features/Services/documents/documents_logic.py
 
-import pandas as pd
 from typing import Any
 
 from features.Services.documents.documents_repo import ServiceRepository
@@ -14,14 +13,17 @@ def _to_dto(model: ServicesModel) -> ServicesDTO:
         id=model.id,
         name=model.name,
         base_price=model.base_price,
-        dynamic_fees=[
+        default_page_count=model.default_page_count,
+        aliases=[alias.alias for alias in model.aliases],
+        dynamic_prices=[
             ServiceDynamicFeeDTO(
                 id=df.id,
                 service_id=df.service_id,
                 name=df.name if df.name else "",
                 unit_price=df.unit_price,
+                aliases=[alias.alias for alias in df.aliases]
             )
-            for df in model.dynamic_fees
+            for df in model.dynamic_prices
         ]
     )
 
@@ -41,6 +43,23 @@ class ServicesLogic:
             service_models = self._repo.get_all(session)
             return [_to_dto(model) for model in service_models]
 
+    def get_service_with_aliases(self, service_id: int) -> ServicesDTO | None:
+        """Fetches a single service with all its related aliases."""
+        with self._services_session() as session:
+            service_model = self._repo.get_by_id_with_aliases(session, service_id)
+            return _to_dto(service_model) if service_model else None
+
+    def update_aliases(self, service_id: int, aliases_data: dict) -> bool:
+        """Updates the aliases for a service and its dynamic prices."""
+        with self._services_session() as session:
+            return self._repo.update_aliases(session, service_id, aliases_data)
+
+    def update_service_properties(self, service_id: int, properties_data: dict) -> ServicesDTO | None:
+        """Updates the properties for a service (aliases, page count, etc.)."""
+        with self._services_session() as session:
+            updated_model = self._repo.update_service_properties(session, service_id, properties_data)
+            return _to_dto(updated_model) if updated_model else None
+
     def create_service(self, service_data: dict[str, Any]) -> ServicesDTO:
         """Create a new service. The input dict is now correctly structured."""
         normalized_data = self._normalize_service_data(service_data)
@@ -50,7 +69,7 @@ class ServicesLogic:
             if self._repo.exists_by_name(session, normalized_data['name']):
                 raise ValueError(f"مدرکی با نام '{normalized_data['name']}' از قبل وجود دارد.")
 
-            new_model = self._repo.create_service_with_fees(session, normalized_data)
+            new_model = self._repo.create_service_with_prices(session, normalized_data)
             return _to_dto(new_model)
 
     def update_service(self, service_id: int, service_data: dict[str, Any]) -> ServicesDTO | None:
@@ -78,13 +97,13 @@ class ServicesLogic:
             raise ValueError("نام سرویس نمی‌تواند خالی باشد.")
         if data.get('base_price') is None or not isinstance(data.get('base_price'), int):
             raise ValueError("هزینه پایه باید یک عدد معتبر باشد.")
-        for fee in data.get('dynamic_fees', []):
+        for fee in data.get('dynamic_prices', []):
             if not fee['name'] or not isinstance(fee['unit_price'], int):
                 raise ValueError(f"تعرفه پویا نامعتبر: {fee}")
 
     def _normalize_service_data(self, data: dict[str, Any]) -> dict[str, Any]:
         """
-        Takes a structured dictionary and cleans/converts all its values, including the nested dynamic fees.
+        Takes a structured dictionary and cleans/converts all its values, including the nested dynamic prices.
         """
         normalized = {}
         normalized['name'] = str(normalized.get('name', '')).strip()
@@ -97,9 +116,9 @@ class ServicesLogic:
         except (ValueError, TypeError):
             raise ValueError(f"مقدار نامعتبر برای هزینه پایه: '{data.get('base_price')}'")
 
-        # Normalize the Nested Dynamic Fees
-        normalized['dynamic_fees'] = []
-        for fee_data in data.get('dynamic_fees', []):
+        # Normalize the Nested Dynamic Prices
+        normalized['dynamic_prices'] = []
+        for fee_data in data.get('dynamic_prices', []):
             try:
                 name = str(fee_data.get('name', '')).strip()
                 price_str = str(fee_data.get('price', '0')).strip()
@@ -108,7 +127,7 @@ class ServicesLogic:
                 if not name or not price_str:
                     continue  # Skip incomplete fee entries silently
 
-                normalized['dynamic_fees'].append({
+                normalized['dynamic_prices'].append({
                     'name': name,
                     'unit_price': int(price_str)  # Convert to int
                 })
@@ -124,7 +143,7 @@ class ServicesLogic:
 
     def bulk_create_services(self, services_data: list[dict[str, Any]]) -> int:
         """
-        Bulk create multiple services with their dynamic fees.
+        Bulk create multiple services with their dynamic prices.
         Returns the number of successfully created services.
         """
         if not services_data:

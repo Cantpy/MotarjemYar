@@ -1,4 +1,5 @@
 # document_selection/price_calculation_dialog.py
+
 from PySide6.QtWidgets import (
     QDialog, QDialogButtonBox, QVBoxLayout, QGroupBox, QGridLayout, QLabel, QGraphicsDropShadowEffect, QHBoxLayout,
     QCheckBox, QTextEdit, QFrame
@@ -23,13 +24,15 @@ class CalculationDialog(QDialog):
     def __init__(self, service: Service, fees: List[FixedPrice], item_to_edit: InvoiceItem = None, parent=None):
         super().__init__(parent)
         self.setObjectName("CalculationDialog")
+
         self.setWindowTitle(f"محاسبه قیمت: {service.name}")
         self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         self.setMinimumWidth(700)
-        # self.setStyleSheet(DIALOG_STYLESHEET)
+        self.setStyleSheet(DIALOG_STYLESHEET)
         self.setFont(QFont("IranSANS", 11))
 
         self.service = service
+        self.fees = fees
         self.fees_map: Dict[str, FixedPrice] = {fee.name: fee for fee in fees}
         self.result_item = None
         self.calculated_prices: Dict[str, int] = {}
@@ -124,7 +127,7 @@ class CalculationDialog(QDialog):
 
         self.page_count_spin = PersianSpinBox(suffix="صفحه")
         self.page_count_spin.setMinimum(1)
-        self.page_count_spin.setValue(1)
+        self.page_count_spin.setValue(self.service.default_page_count)
 
         self.extra_copies_spin = PersianSpinBox(suffix="نسخه")
 
@@ -154,31 +157,34 @@ class CalculationDialog(QDialog):
         grid.setSpacing(15)
         self.price_displays: Dict[str, QLabel] = {}
 
-        def get_cleaned_label(key: str, default_text: str) -> str:
-            fee_object = self.fees_map.get(key)
-            if fee_object:
-                return fee_object.name.split('(')[0].strip()
-            return default_text
-
-        # This list now controls the UI creation order and uses our constants
+        # --- DYNAMIC UI CREATION ---
+        # Start with the non-default fields
         fields_to_display = {
             'translation_price': "قیمت ترجمه",
-            CERTIFIED_COPY_KEY: get_cleaned_label(CERTIFIED_COPY_KEY, 'کپی برابر اصل'),
-            OFFICIAL_TRANSLATION_KEY: get_cleaned_label(OFFICIAL_TRANSLATION_KEY, 'ثبت در سامانه'),
-            SEALS_TOTAL_KEY: "هزینه تاییدات",
-            ADDITIONAL_ISSUES_KEY: get_cleaned_label(ADDITIONAL_ISSUES_KEY, 'نسخه اضافی'),
-            'total_price': "هزینه کل آیتم"
+            SEALS_TOTAL_KEY: "هزینه تاییدات"  # This is a calculated total, not a direct fee
         }
+
+        # Now, add fields dynamically from the database defaults
+        for fee in self.fees:
+            # The key will be the fee's name (e.g., "کپی برابر اصل")
+            # The value will be the display name (e.g., "کپی برابر اصل")
+            cleaned_label = fee.name.split('(')[0].strip()
+            fields_to_display[fee.name] = cleaned_label
+
+        # Add the final total field at the end
+        fields_to_display['total_price'] = "هزینه کل آیتم"
+        # --- END DYNAMIC UI CREATION ---
 
         i = 0
         for key, label_text in fields_to_display.items():
+            # Skip creating UI for individual seals as we show a combined total
+            if key in [JUDICIARY_SEAL_KEY, FOREIGN_AFFAIRS_SEAL_KEY]:
+                continue
+
             field_label = QLabel(f"{label_text}:")
-
-            # --- FIX: Use QLabel for price display ---
             price_display_label = QLabel("0")
-            self.price_displays[key] = price_display_label
+            self.price_displays[key] = price_display_label  # Use the fee name as the key
 
-            # Apply styling
             if key == 'total_price':
                 self._style_cost_label(price_display_label)
             else:
@@ -208,7 +214,6 @@ class CalculationDialog(QDialog):
         self.extra_copies_spin.valueChanged.connect(self._update_totals)
         self.is_official_check.stateChanged.connect(self._update_totals)
 
-        # --- FIX: Connect the two separate checkboxes ---
         self.jud_seal_check.stateChanged.connect(self._update_totals)
         self.fa_seal_check.stateChanged.connect(self._update_totals)
 
@@ -394,7 +399,7 @@ class CalculationDialog(QDialog):
             has_judiciary_seal=self.jud_seal_check.isChecked(),
             has_foreign_affairs_seal=self.fa_seal_check.isChecked(),
             dynamic_quantities=dynamic_quantities,
-            remarks=final_remarks,  # Use the new structured remarks
+            remarks=final_remarks,
 
             # Pre-calculated Prices
             translation_price=self.calculated_prices.get('translation_price', 0),

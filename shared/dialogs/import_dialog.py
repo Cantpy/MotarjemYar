@@ -60,10 +60,6 @@ class ImportSummaryDialog(QDialog):
             # Add it as a new tab
             self.tab_widget.addTab(summary_widget, sheet_name.replace('_', ' ').title())
 
-        # --- Add a final "Guide" tab ---
-        guide_widget = self._create_guide_widget()
-        self.tab_widget.addTab(guide_widget, "راهنما")
-
         self.ok_button = QPushButton("باشه")
         self.ok_button.clicked.connect(self.accept)
         self.layout.addWidget(self.ok_button)
@@ -99,47 +95,6 @@ class ImportSummaryDialog(QDialog):
             layout.addWidget(error_box)
 
         return widget
-
-    def _create_guide_widget(self) -> QWidget:
-        """Helper to create the instructional guide tab."""
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        guide_box = QTextEdit()
-        guide_box.setReadOnly(True)
-        guide_box.setMarkdown(self._get_guide_text())
-        layout.addWidget(guide_box)
-        return widget
-
-    def _get_guide_text(self) -> str:
-        """
-        Returns the instructional guide text in Markdown format.
-        """
-        return """
-        ### راهنمای فایل اکسل
-
-        فایل اکسل شما باید شامل شیت‌های زیر با نام‌های دقیق انگلیسی باشد:
-
-        ---
-        #### شیت: `Documents`
-        برای ثبت مدارک و هزینه‌های متغیر آن‌ها.
-        - **ستون‌ها:** `Name`, `Base Price`, `Fee 1 Name`, `Fee 1 Price`, `Fee 2 Name`, `Fee 2 Price`, ...
-        - **نکته:** می‌توانید هر تعداد زوج ستون `Fee X Name` و `Fee X Price` که نیاز دارید اضافه کنید.
-
-        ---
-        #### شیت: `Fixed Prices`
-        برای ثبت هزینه‌های ثابت برنامه.
-        - **ستون‌ها:** `name`, `price`, `is_default` (اختیاری، `true`/`false`), `label_name` (اختیاری).
-
-        ---
-        #### شیت: `Other Services`
-        برای ثبت سایر خدمات متفرقه.
-        - **ستون‌ها:** `name`, `price`.
-
-        ---
-        **قوانین کلی:**
-        - ردیف‌هایی که ستون‌های اجباری آن‌ها (مانند `name` و `price`) خالی باشد، نادیده گرفته می‌شوند.
-        - مقادیر پولی باید فقط شامل عدد باشند (بدون جداکننده یا واحد پول).
-        """
 
 
 class GenericInputDialog(QDialog):

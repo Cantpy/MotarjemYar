@@ -7,7 +7,6 @@ from features.Services.tab_manager.tab_manager_controller import ServicesManagem
 from features.Services.tab_manager.tab_manager_logic import ExcelImportLogic
 
 from features.Services.documents.documents_factory import ServicesDocumentFactory
-from features.Services.fixed_prices.fixed_prices_factory import FixedPricesFactory
 from features.Services.other_services.other_services_factory import OtherServicesFactory
 
 
@@ -25,17 +24,14 @@ class ServicesManagementFactory:
         container_view = ServicesManagementView(parent)
 
         documents_controller = ServicesDocumentFactory.create(services_engine, container_view)
-        fixed_prices_controller = FixedPricesFactory.create(services_engine, container_view)
         other_services_controller = OtherServicesFactory.create(services_engine, container_view)
 
         # 3. Get the VIEW from each sub-controller and add it to the container's tab widget.
         container_view.add_tab(documents_controller.get_view(), "مدارک")
-        container_view.add_tab(fixed_prices_controller.get_view(), "هزینه‌های ثابت")
         container_view.add_tab(other_services_controller.get_view(), "خدمات دیگر")
 
         import_logic = ExcelImportLogic(
             services_logic=documents_controller._logic,
-            fixed_prices_logic=fixed_prices_controller._logic,
             other_services_logic=other_services_controller._logic,
         )
 
@@ -44,7 +40,6 @@ class ServicesManagementFactory:
             view=container_view,
             import_logic=import_logic,
             documents_controller=documents_controller,
-            fixed_prices_controller=fixed_prices_controller,
             other_services_controller=other_services_controller
         )
 

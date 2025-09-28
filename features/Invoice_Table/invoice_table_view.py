@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QTa
 from PySide6.QtCore import Qt, Signal, QPoint, QUrl
 from PySide6.QtGui import QDesktopServices, QAction
 from functools import partial
-from typing import List, Any
+from typing import List
 from features.Invoice_Table.invoice_table_models import InvoiceData, InvoiceSummary
 
 

@@ -10,6 +10,7 @@ class ServiceDynamicFeeDTO:
     service_id: int
     name: str
     unit_price: int
+    aliases: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -18,4 +19,6 @@ class ServicesDTO:
     id: int
     name: str
     base_price: int
-    dynamic_fees: list[ServiceDynamicFeeDTO] = field(default_factory=list)
+    default_page_count: int
+    aliases: list[str] = field(default_factory=list)
+    dynamic_prices: list[ServiceDynamicFeeDTO] = field(default_factory=list)
