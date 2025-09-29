@@ -1,7 +1,7 @@
 # Login/login_window_repo.py
 
 from sqlalchemy.orm import joinedload
-from shared.orm_models.users_models import BaseUsers, UsersModel, UserProfileModel
+from shared.orm_models.users_models import UsersModel
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 

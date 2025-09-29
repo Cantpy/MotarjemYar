@@ -5,12 +5,16 @@ from PySide6.QtCore import Qt
 import re
 from shared.utils.validation_utils import validate_national_id
 
-PERSIAN_TO_ENGLISH = str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789")
+WESTERN_DIGITS = "0123456789.,"
+PERSIAN_DIGITS = "۰۱۲۳۴۵۶۷۸۹٬٫" # Note: Using Persian comma and decimal point
+
+TO_WESTERN_TABLE = str.maketrans(PERSIAN_DIGITS, WESTERN_DIGITS)
+TO_PERSIAN_TABLE = str.maketrans(WESTERN_DIGITS, PERSIAN_DIGITS)
 
 
 class PersianNIDValidator(QValidator):
     def validate(self, input_text: str, pos: int):
-        normalized = input_text.translate(PERSIAN_TO_ENGLISH)
+        normalized = input_text.translate(TO_WESTERN_TABLE)
 
         if normalized == "":
             return QValidator.Intermediate, input_text, pos
@@ -33,7 +37,7 @@ class PersianNIDValidator(QValidator):
         return QValidator.Intermediate, input_text, pos
 
     def fixup(self, input_text: str) -> str:
-        return "".join(ch for ch in input_text.translate(PERSIAN_TO_ENGLISH) if ch.isdigit())[:10]
+        return "".join(ch for ch in input_text.translate(TO_WESTERN_TABLE) if ch.isdigit())[:10]
 
 
 class PersianNIDEdit(QLineEdit):
@@ -44,16 +48,16 @@ class PersianNIDEdit(QLineEdit):
         self.setPlaceholderText("کد ملی ۱۰ رقمی")
 
     def text(self) -> str:
-        return super().text().translate(PERSIAN_TO_ENGLISH)
+        return super().text().translate(TO_WESTERN_TABLE)
 
     def strip(self) -> str:
-        return super().text().strip().translate(PERSIAN_TO_ENGLISH)
+        return super().text().strip().translate(TO_WESTERN_TABLE)
 
 
 class PhoneValidator(QValidator):
     def validate(self, input_text: str, pos: int):
         # Normalize Persian digits to English before checking
-        normalized = input_text.translate(PERSIAN_TO_ENGLISH)
+        normalized = input_text.translate(TO_WESTERN_TABLE)
 
         if normalized == "":
             return QValidator.Intermediate, input_text, pos
@@ -65,7 +69,7 @@ class PhoneValidator(QValidator):
         return QValidator.Invalid, input_text, pos
 
     def fixup(self, input_text: str) -> str:
-        text = input_text.translate(PERSIAN_TO_ENGLISH)
+        text = input_text.translate(TO_WESTERN_TABLE)
         if text.startswith("+"):
             return "+" + "".join(ch for ch in text[1:] if ch.isdigit())
         return "".join(ch for ch in text if ch.isdigit())
@@ -80,10 +84,10 @@ class PhoneLineEdit(QLineEdit):
 
     def text(self) -> str:
         # Always return normalized English digits
-        return super().text().translate(PERSIAN_TO_ENGLISH)
+        return super().text().translate(TO_WESTERN_TABLE)
 
     def strip(self) -> str:
-        return super().text().strip().translate(PERSIAN_TO_ENGLISH)
+        return super().text().strip().translate(TO_WESTERN_TABLE)
 
 
 # ---------------- Email Validator ---------------- #
@@ -137,10 +141,60 @@ class PersianVerticalHeader(QHeaderView):
         self.setFont(QFont("Tahoma", 10, QFont.Bold))
         self.western_to_persian = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
 
-    def headerData(self, section, orientation, role):
+    def header_data(self, section, orientation, role):
         if role == Qt.DisplayRole and orientation == Qt.Vertical:
             return str(section + 1).translate(str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹"))
         return super().headerData(section, orientation, role)
+
+
+class PersianSpinBoxMixin:
+    """
+    A mixin to provide robust Persian localization for QSpinBox and QDoubleSpinBox.
+    It correctly handles group separators, suffixes, and user input.
+    """
+    def textFromValue(self, value):
+        """
+        Called by the spinbox to get the display text for a given number.
+        1. Get the standard formatted text from the base class (e.g., "1,234.50 %").
+        2. Translate the entire result to Persian.
+        """
+        # Let the original C++ implementation do the hard work of formatting
+        standard_text = super().textFromValue(value)
+        return standard_text.translate(TO_PERSIAN_TABLE)
+
+    def valueFromText(self, text: str):
+        """
+        Called by the spinbox to parse the user's input text into a number.
+        1. Translate the user's text to a standard Western format.
+        2. Remove suffixes and group separators.
+        3. Convert the cleaned text to a number (int or float).
+        """
+        # Convert all Persian characters (digits, comma, decimal) to Western
+        western_text = text.translate(TO_WESTERN_TABLE)
+
+        # Remove the suffix (e.g., " %" or " تومان") for clean parsing
+        suffix = self.suffix()
+        if suffix:
+            western_text = western_text.replace(suffix, "").strip()
+
+        # Remove the group separator (comma) that prevents conversion to a number
+        cleaned_text = western_text.replace(",", "")
+
+        # Handle the case of an empty string
+        if not cleaned_text:
+            return 0
+
+        # Let the base class handle the final conversion (int or float)
+        return super().valueFromText(cleaned_text)
+
+    def validate(self, text: str, pos: int):
+        """
+        We DO NOT override validate(). The base QSpinBox validator is complex and
+        works correctly with a proper valueFromText implementation. Overriding it
+        is fragile and was the source of many of the original bugs. The spinbox
+        will call valueFromText, and if that works, the input is considered valid.
+        """
+        return super().validate(text, pos)
 
 
 class PersianSpinBox(QSpinBox):
@@ -205,38 +259,87 @@ class PersianSpinBox(QSpinBox):
             self.error_label.hide()
 
 
-class PersianDoubleSpinBox(QDoubleSpinBox):
+class PlainSpinBox(QSpinBox):
+    """A simple QSpinBox that accepts both English and Persian digits but has no formatting."""
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-        self.setSingleStep(0.5)
-        self.setDecimals(2)
-        self.setButtonSymbols(QDoubleSpinBox.ButtonSymbols.NoButtons)
-        self.setSuffix("%")
-        self.setGroupSeparatorShown(True)
-
-    def textFromValue(self, value: float) -> str:
-        formatted = f"{value}"
-        return formatted.translate(str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹"))
-
-
-class NormalSpinBox(QSpinBox):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-        self.setMaximum(999_999_999)
-        self.setMinimum(0)
-        self.setSingleStep(1000)
         self.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
-        self.setSuffix(" تومان")
-        self.setGroupSeparatorShown(True)
+        self.setGroupSeparatorShown(False) # No commas
+        self.setRange(0, 999_999_999)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-    def textFromValue(self, value: int) -> str:
-        # Just override the display, not parsing or validation
-        formatted = f"{value:,}"
-        return formatted.translate(str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹"))
+    def valueFromText(self, text: str) -> int:
+        """Converts text (potentially with Persian digits) to a standard integer."""
+        cleaned = text.strip().translate(TO_WESTERN_TABLE)
+        if not cleaned:
+            return 0
+        try:
+            return int(cleaned)
+        except ValueError:
+            return 0
+
+    def validate(self, text: str, pos: int) -> QValidator.State:
+        """Allow only English or Persian digits."""
+        if all(c in "۰۱۲۳۴۵۶۷۸۹0123456789" for c in text.strip()):
+            return QValidator.State.Acceptable
+        if text == "":
+            return QValidator.State.Intermediate
+        return QValidator.State.Invalid
+
+    # We no longer need textFromValue because we want the display to be plain.
+
+class PlainDoubleSpinBox(QDoubleSpinBox):
+    """A simple QDoubleSpinBox that accepts English/Persian digits for percentages."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setButtonSymbols(QDoubleSpinBox.ButtonSymbols.NoButtons)
+        self.setGroupSeparatorShown(False)
+        self.setDecimals(2)
+        self.setRange(0.0, 100.0)
+        self.setSingleStep(0.5)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+    def valueFromText(self, text: str) -> float:
+        """Converts text (potentially with Persian digits) to a standard float."""
+        cleaned = text.strip().replace("٪", "").translate(TO_WESTERN_TABLE)
+        if not cleaned:
+            return 0.0
+        try:
+            return float(cleaned)
+        except ValueError:
+            return 0.0
+
+    def validate(self, text: str, pos: int) -> QValidator.State:
+        """Allow digits, one decimal point, and the percent sign."""
+        # This is a bit more complex for floats, so we'll rely on the base validator
+        # after converting the text to a parsable format.
+        cleaned = text.strip().translate(TO_WESTERN_TABLE)
+        return super().validate(cleaned, pos)
+
+
+class PersianDoubleSpinBox(PersianSpinBoxMixin, QDoubleSpinBox):
+    """A double spinbox for displaying Persian percentages."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setButtonSymbols(QDoubleSpinBox.ButtonSymbols.NoButtons)
+        self.setGroupSeparatorShown(True)
+        self.setDecimals(2)
+        self.setRange(0.0, 100.0)
+        self.setSingleStep(0.5)
+        self.setSuffix(" ٪")
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+
+class NormalSpinBox(PersianSpinBoxMixin, QSpinBox):
+    """A spinbox for displaying Persian currency amounts."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
+        self.setGroupSeparatorShown(True)
+        self.setRange(0, 999_999_999)
+        self.setSingleStep(1000)
+        self.setSuffix(" تومان")
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
 
 class PriceInputWidget(QWidget):

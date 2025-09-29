@@ -11,10 +11,10 @@ class CollapsibleBox(QWidget):
 
         self.toggle_button = QToolButton()
         self.toggle_button.setCheckable(True)
-        self.toggle_button.setChecked(True)
-        self.toggle_button.setStyleSheet("QToolButton { border: none; }")  # Button is now just a trigger
-        self.toggle_button.setToolButtonStyle(Qt.ToolButtonIconOnly)  # No text on the button itself
-        self.toggle_button.setArrowType(Qt.RightArrow)
+        self.toggle_button.setChecked(False)
+        self.toggle_button.setStyleSheet("QToolButton { border: none; }")
+        self.toggle_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        self.toggle_button.setArrowType(Qt.ArrowType.RightArrow)
 
         self.title_label = QLabel(title)
         self.title_label.setFont(QFont("IranSANS", 10, QFont.Bold))
@@ -24,18 +24,18 @@ class CollapsibleBox(QWidget):
         header_layout.setContentsMargins(5, 5, 5, 5)
         header_layout.setSpacing(5)
         header_layout.addWidget(self.title_label)
-        header_layout.addStretch()  # This pushes the arrow to the far side
+        header_layout.addStretch()
         header_layout.addWidget(self.toggle_button)
 
         self.content_area = QWidget()
         self.content_area.setMaximumHeight(0)
         self.content_area.setMinimumHeight(0)
-        self.content_area.setLayout(QVBoxLayout())  # It needs a layout from the start
+        self.content_area.setLayout(QVBoxLayout())
 
         # Add a separator line for better visual distinction
         separator = QFrame()
-        separator.setFrameShape(QFrame.HLine)
-        separator.setFrameShadow(QFrame.Sunken)
+        separator.setFrameShape(QFrame.Shape.HLine)
+        separator.setFrameShadow(QFrame.Shadow.Sunken)
 
         main_layout = QVBoxLayout(self)
         main_layout.setSpacing(0)

@@ -5,13 +5,13 @@ from PySide6.QtCore import Qt, Signal
 
 # Assume your existing validation functions are in a shared utils file
 from shared.utils.validation_utils import validate_national_id, validate_legal_national_id
-from shared.widgets.persian_tools import PERSIAN_TO_ENGLISH
+from shared.widgets.persian_tools import TO_WESTERN_TABLE
 
 
 # --- The Enhanced Validator ---
 class PersianNIDValidator(QValidator):
     def validate(self, input_text: str, pos: int):
-        normalized = input_text.translate(PERSIAN_TO_ENGLISH)
+        normalized = input_text.translate(TO_WESTERN_TABLE)
 
         # --- Rule 1: Check for fundamentally unrecoverable errors first ---
 
@@ -56,7 +56,7 @@ class PersianNIDEdit(QLineEdit):
         state, _, _ = self.validator().validate(text, 0)
         entity_type = 'none'
         if state == QValidator.Acceptable:
-            normalized_len = len(text.translate(PERSIAN_TO_ENGLISH))
+            normalized_len = len(text.translate(TO_WESTERN_TABLE))
             if normalized_len == 10:
                 entity_type = 'real'
             elif normalized_len == 11:
@@ -64,7 +64,7 @@ class PersianNIDEdit(QLineEdit):
         self.validation_changed.emit(state, entity_type)
 
     def text(self) -> str:
-        return super().text().translate(PERSIAN_TO_ENGLISH)
+        return super().text().translate(TO_WESTERN_TABLE)
 
     def strip(self) -> str:
-        return super().text().strip().translate(PERSIAN_TO_ENGLISH)
+        return super().text().strip().translate(TO_WESTERN_TABLE)

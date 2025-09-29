@@ -1,18 +1,23 @@
 # features/Invoice_Page/invoice_details/invoice_page_controller.py
 
+from PySide6.QtWidgets import QDialog
 from features.Invoice_Page.invoice_details.invoice_details_logic import InvoiceDetailsLogic
 from features.Invoice_Page.invoice_details.invoice_details_view import InvoiceDetailsWidget
 from features.Invoice_Page.customer_info.customer_info_models import Customer
 from features.Invoice_Page.document_selection.document_selection_models import InvoiceItem
 from features.Invoice_Page.invoice_details.invoice_details_models import InvoiceDetails
 from features.Invoice_Page.invoice_page_state_manager import WorkflowStateManager
+from features.Invoice_Page.invoice_details.invoice_details_settings_dialog import SettingsManager, SettingsDialog
 
 
 class InvoiceDetailsController:
-    def __init__(self, view: InvoiceDetailsWidget, logic: InvoiceDetailsLogic, state_manager: WorkflowStateManager):
+    def __init__(self, view: InvoiceDetailsWidget, logic: InvoiceDetailsLogic,
+                 state_manager: WorkflowStateManager,
+                 settings_manager: SettingsManager):
         self._view = view
         self._logic = logic
         self._state_manager = state_manager
+        self._settings_manager = settings_manager
 
         self._current_details: InvoiceDetails = None
         self._connect_signals()
@@ -23,9 +28,9 @@ class InvoiceDetailsController:
 
     def _connect_signals(self):
         """Connect signals from the _view to the controller's own slots."""
-        self._view.percent_changed.connect(self._on_percent_changed)
-        self._view.amount_changed.connect(self._on_amount_changed)
+        self._view.financial_input_changed.connect(self._on_financial_input_changed)
         self._view.other_input_changed.connect(self._on_other_input_changed)
+        self._view.settings_requested.connect(self._on_settings_requested)
 
     def prepare_and_display_data(self, customer: Customer, items: list[InvoiceItem]):
         """Public method called by MainWindow to kick off this step."""
@@ -47,17 +52,44 @@ class InvoiceDetailsController:
 
     # --- Controller Slots ---
 
-    def _on_percent_changed(self, field: str, percent: float):
-        if self._current_details is None: return
-        new_details = self._logic.update_with_percent_change(self._current_details, field, percent)
-        self._process_update(new_details)
+    def _on_financial_input_changed(self, field: str, value: float, mode: str):
+        """
+        Handles input from the toggled spinboxes and calls the appropriate logic.
+        """
+        if self._current_details is None:
+            return
 
-    def _on_amount_changed(self, field: str, amount: int):
-        if self._current_details is None: return
-        new_details = self._logic.update_with_amount_change(self._current_details, field, amount)
+        if mode == 'percent':
+            new_details = self._logic.update_with_percent_change(self._current_details, field, value)
+        else:  # mode == 'amount'
+            new_details = self._logic.update_with_amount_change(self._current_details, field, int(value))
+
         self._process_update(new_details)
 
     def _on_other_input_changed(self, other_data: dict):
         if self._current_details is None: return
         new_details = self._logic.update_with_other_changes(self._current_details, other_data)
         self._process_update(new_details)
+
+    def _on_settings_requested(self):
+        """
+        Handles the request to open the settings dialog. Manages the dialog's
+        lifecycle and triggers updates if settings are changed.
+        """
+        # The Controller creates and shows the dialog
+        dialog = SettingsDialog(self._settings_manager, self._view)  # Parent to the view for proper positioning
+
+        # If the user clicks "Save" (dialog is accepted)
+        if dialog.exec() == QDialog.Accepted:
+            # Command the View to update its appearance
+            self._view.apply_settings()
+
+            # Trigger a full recalculation of the invoice details to ensure
+            # any logic changes (like the emergency cost basis) are applied.
+            if self._current_details:
+                # A simple way to force a recalculation is to re-run an update
+                # with the existing data. The logic layer will use the new settings.
+                new_details = self._logic.update_with_percent_change(
+                    self._current_details, 'discount', self._current_details.discount_percent
+                )
+                self._process_update(new_details)

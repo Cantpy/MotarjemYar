@@ -2,32 +2,31 @@
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSizePolicy, QSpacerItem, QGroupBox, QFormLayout, QGridLayout, QLabel,
-    QComboBox, QTextEdit
+    QComboBox, QTextEdit, QPushButton
 )
-from PySide6.QtCore import Signal, Qt, QTimer
+from PySide6.QtCore import Signal, Qt
 from features.Invoice_Page.invoice_details.invoice_details_models import InvoiceDetails, Language
-from shared import to_persian_number
-from shared.widgets.collapsable_box import CollapsibleBox
+from shared.utils.persian_tools import to_persian_numbers
+from shared.widgets.persian_tools import PlainDoubleSpinBox
+from shared.utils.text_utils import amount_to_persian_words
 
 
 class InvoiceDetailsWidget(QWidget):
-
-    user_input_changed = Signal(dict)
-    percent_changed = Signal(str, float)  # field_name, percentage
-    amount_changed = Signal(str, int)  # field_name, amount
+    """
+    The main widget for displaying and editing invoice details. It includes sections for invoice info,
+    customer info, financial details, translation office info, and remarks.
+    """
+    settings_requested = Signal()
+    financial_input_changed = Signal(str, float, str)
     other_input_changed = Signal(dict)
 
-    def __init__(self, parent=None):
+    def __init__(self, settings_manager: "SettingsManager", parent=None):
         super().__init__(parent)
         self.setObjectName("InvoiceDetailsView")
         self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self.settings_manager = settings_manager
 
         self._is_programmatically_updating = False
-
-        # Update timer to prevent too frequent updates
-        self._update_timer = QTimer()
-        self._update_timer.timeout.connect(self._emit_changes)
-        self._update_timer.setSingleShot(True)
 
         self._init_widgets()
         self._setup_ui()
@@ -35,13 +34,14 @@ class InvoiceDetailsWidget(QWidget):
 
     def _init_widgets(self):
         """Initialize all widgets."""
-        # Invoice group widgets (labels instead of line edits)
+        self.settings_button = QPushButton("تنظیمات")
+
         self.invoice_number_label = QLabel('نامشخص')
         self.total_documents = QLabel("۰")
         self.issue_date_label = QLabel('نامشخص')
         self.user_label = QLabel("نامشخص")
-        from shared.widgets.persian_calendar import DataDatePicker
-        self.delivery_date_edit = DataDatePicker()
+        from shared.widgets.persian_calendar import InvoiceDatePicker
+        self.delivery_date_edit = InvoiceDatePicker()
         self.source_language = QComboBox()
         self.target_language = QComboBox()
         self.translation_direction_label = QLabel()
@@ -53,15 +53,17 @@ class InvoiceDetailsWidget(QWidget):
         self.office_affairs_cost_label = QLabel('۰ تومان')
         self.copy_cert_cost_label = QLabel('۰ تومان')
 
-        from shared.widgets.persian_tools import NormalSpinBox, PersianDoubleSpinBox
-        self.emergency_percent = PersianDoubleSpinBox()
-        self.emergency_amount = NormalSpinBox()
+        self.emergency_input = PlainDoubleSpinBox()
+        self.emergency_toggle = QPushButton("٪")
+        self.emergency_display_label = QLabel()
 
-        self.discount_percent = PersianDoubleSpinBox()
-        self.discount_amount = NormalSpinBox()
+        self.discount_input = PlainDoubleSpinBox()
+        self.discount_toggle = QPushButton("٪")
+        self.discount_display_label = QLabel()
 
-        self.advance_payment_percent = PersianDoubleSpinBox()
-        self.advance_payment_amount = NormalSpinBox()
+        self.advance_input = PlainDoubleSpinBox()
+        self.advance_toggle = QPushButton("٪")
+        self.advance_display_label = QLabel()
 
         self.final_amount = QLabel("۰ تومان")
 
@@ -89,25 +91,30 @@ class InvoiceDetailsWidget(QWidget):
         layout = QVBoxLayout(self)
         layout.setSpacing(15)
 
+        top_bar_layout = QHBoxLayout()
+        top_bar_layout.addStretch()
+        top_bar_layout.addWidget(self.settings_button)
+        layout.addLayout(top_bar_layout)
+
         # Create main layout with four columns
         main_layout = QHBoxLayout()
 
         # First column - Invoice details
-        invoice_group = self._create_invoice_group()
+        self.invoice_group = self._create_invoice_group()
 
         # Second column - CustomerModel information
-        customer_group = self._create_customer_group()
+        self.customer_group = self._create_customer_group()
 
         # Third column - Financial details
-        financial_group = self._create_financial_group()
+        self.financial_group = self._create_financial_group()
 
         # Fourth column - Translation office info
-        office_group = self._create_office_group()
+        self.office_group = self._create_office_group()
 
-        main_layout.addWidget(invoice_group, stretch=1)
-        main_layout.addWidget(customer_group, stretch=1)
-        main_layout.addWidget(financial_group, stretch=1)
-        main_layout.addWidget(office_group, stretch=1)
+        main_layout.addWidget(self.invoice_group, stretch=1)
+        main_layout.addWidget(self.customer_group, stretch=1)
+        main_layout.addWidget(self.financial_group, stretch=1)
+        main_layout.addWidget(self.office_group, stretch=1)
         layout.addLayout(main_layout)
 
         # Remarks section (full width)
@@ -159,6 +166,20 @@ class InvoiceDetailsWidget(QWidget):
 
         return group
 
+    def apply_settings(self):
+        """Applies settings from the manager to the UI (visibility, default text)."""
+        # Apply visibility
+        visibility = self.settings_manager.get("group_box_visibility")
+        self.invoice_group.setVisible(visibility.get("invoice", True))
+        self.customer_group.setVisible(visibility.get("customer", True))
+        self.financial_group.setVisible(visibility.get("financial", True))
+        self.office_group.setVisible(visibility.get("office", True))
+
+        # Apply default remarks only if the field is currently empty
+        # if not self.remarks_text.toPlainText().strip():
+        default_remarks = self.settings_manager.get("default_remarks")
+        self.remarks_text.setPlainText(default_remarks)
+
     def _create_customer_group(self) -> QGroupBox:
         """Create customer information group."""
         group = QGroupBox("اطلاعات مشتری")
@@ -185,23 +206,20 @@ class InvoiceDetailsWidget(QWidget):
 
     def _create_financial_group(self) -> QGroupBox:
         """
-        Creates the financial details group with a balanced, two-column layout.
+        Creates the financial details group with the new input/display design.
         """
         group = QGroupBox("اطلاعات مالی")
-        # The main layout for this group is a vertical box
         main_v_layout = QVBoxLayout(group)
         main_v_layout.setSpacing(15)
 
-        # --- 1. Summary Section ---
+        # --- Summary Section (same as before) ---
         summary_layout = QFormLayout()
-
         self._style_cost_label(self.total_before_discount_label)
-        self._style_cost_label(self.final_amount)
-
         summary_layout.addRow("<b>جمع کل هزینه‌ها:</b>", self.total_before_discount_label)
         main_v_layout.addLayout(summary_layout)
 
-        # --- 2. Collapsible Details Section ---
+        # --- Collapsible Details Section (same as before) ---
+        from shared.widgets.collapsable_box import CollapsibleBox
         self.details_box = CollapsibleBox("نمایش ریز هزینه‌ها")
         details_layout = QFormLayout()
         details_layout.setContentsMargins(20, 5, 5, 5)  # Indent the details
@@ -215,42 +233,52 @@ class InvoiceDetailsWidget(QWidget):
         self.details_box.setContentLayout(details_layout)
         main_v_layout.addWidget(self.details_box)
 
-        # --- 3. User Input Section (Horizontal) ---
-        input_group = QGroupBox("تنظیمات پرداخت")   
+        # --- 4. REBUILT User Input Section with the new design ---
+        input_group = QGroupBox("تنظیمات پرداخت")
         input_group.setStyleSheet("QGroupBox { border: none; margin-top: 0; }")
         input_layout = QGridLayout(input_group)
+        input_layout.setColumnStretch(1, 1)  # Give stretch to the input column
 
-        # Make the input columns stretch horizontally
-        input_layout.setColumnStretch(1, 1)
-        input_layout.setColumnStretch(2, 1)
+        # --- Style the new display labels ---
+        for label in [self.emergency_display_label, self.discount_display_label, self.advance_display_label]:
+            label.setStyleSheet("color: #2b6cb0; font-size: 10px; padding-right: 5px;")
+            label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
-        # Row 0: Emergency
-        input_layout.addWidget(QLabel("هزینه فوریت:"), 0, 0)
-        input_layout.addWidget(self.emergency_percent, 0, 1)
-        input_layout.addWidget(self.emergency_amount, 0, 2)
+        # Setup and style the rows
+        self._setup_financial_row(
+            input_layout, 0, "فوریت:", self.emergency_input, self.emergency_toggle, self.emergency_display_label
+        )
+        self._setup_financial_row(
+            input_layout, 2, "تخفیف:", self.discount_input, self.discount_toggle, self.discount_display_label
+        )
+        self._setup_financial_row(
+            input_layout, 4, "پیش‌پرداخت:", self.advance_input, self.advance_toggle, self.advance_display_label
+        )
 
-        # Row 1: Discount
-        input_layout.addWidget(QLabel("تخفیف:"), 1, 0)
-        input_layout.addWidget(self.discount_percent, 1, 1)
-        input_layout.addWidget(self.discount_amount, 1, 2)
+        input_layout.setRowStretch(6, 1)  # Spacer
 
-        # Row 2: Advance Payment
-        input_layout.addWidget(QLabel("پیش‌پرداخت:"), 2, 0)
-        input_layout.addWidget(self.advance_payment_percent, 2, 1)
-        input_layout.addWidget(self.advance_payment_amount, 2, 2)
-
-        # Add a stretchable empty row (row 3) BEFORE the final amount.
-        # This will absorb all extra vertical space and push the final row down.
-        input_layout.setRowStretch(3, 1)
-
-        # Row 4: Final Amount
+        # Final Amount Row
         final_amount_title_label = QLabel("<b>مبلغ نهایی:</b>")
-        input_layout.addWidget(final_amount_title_label, 4, 0, 1, 1)
-        input_layout.addWidget(self.final_amount, 4, 1, 1, 2)  # Span 2 columns
+        self._style_cost_label(self.final_amount)
+        input_layout.addWidget(final_amount_title_label, 7, 0)
+        input_layout.addWidget(self.final_amount, 7, 1, 1, 2)  # Span 2 columns
 
         main_v_layout.addWidget(input_group)
-
         return group
+
+    def _setup_financial_row(self, layout: QGridLayout, row: int, title: str,
+                             spinbox: PlainDoubleSpinBox, button: QPushButton, display_label: QLabel):
+        """Helper function to create one compact row in the financial grid."""
+        layout.addWidget(QLabel(title), row, 0)
+        layout.addWidget(spinbox, row, 1)
+        layout.addWidget(button, row, 2)
+        layout.addWidget(display_label, row + 1, 1, 1, 2)  # Display label on next row, spanning 2 columns
+
+        button.setFixedSize(40, spinbox.sizeHint().height())
+        button.setObjectName("modeToggleButton")  # For styling
+
+        display_label.setStyleSheet("color: #2b6cb0; font-size: 10px; padding-right: 5px;")
+        display_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
     def _create_office_group(self) -> QGroupBox:
         """Create translation office information group."""
@@ -280,6 +308,8 @@ class InvoiceDetailsWidget(QWidget):
         group = QGroupBox("توضیحات فاکتور")
         layout = QVBoxLayout(group)
 
+        self.remarks_text.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+
         self.remarks_text.setPlaceholderText("توضیحات و یادداشت‌های اینجا در فاکتور نشان داده می‌شود...")
         self.remarks_text.setMaximumHeight(100)
         layout.addWidget(self.remarks_text)
@@ -288,7 +318,6 @@ class InvoiceDetailsWidget(QWidget):
 
     def _setup_widgets_properties(self):
         """Setup widget properties and initial values."""
-        # Set object names for styling
         self.invoice_number_label.setObjectName("invoice_number_label")
         self.total_documents.setObjectName("total_documents")
         self.issue_date_label.setObjectName("receive_date_label")
@@ -296,9 +325,6 @@ class InvoiceDetailsWidget(QWidget):
         self.delivery_date_edit.setObjectName("delivery_date")
         self.source_language.setObjectName("source_language")
         self.target_language.setObjectName("target_language")
-        self.emergency_amount.setObjectName("emergency_cost_amount")
-        self.discount_amount.setObjectName("discount_amount")
-        self.advance_payment_amount.setObjectName("advance_payment_amount")
         self.final_amount.setObjectName("final_amount")
         self.remarks_text.setObjectName("remarks_text")
 
@@ -339,22 +365,44 @@ class InvoiceDetailsWidget(QWidget):
         self.source_language.currentTextChanged.connect(self._emit_other_changes_if_user)
         self.target_language.currentTextChanged.connect(self._emit_other_changes_if_user)
         self.remarks_text.textChanged.connect(self._emit_other_changes_if_user)
+        self.settings_button.clicked.connect(self.settings_requested.emit)
 
-        # Two-way bound inputs
-        self.discount_percent.valueChanged.connect(
-            lambda val: self._emit_if_user('percent_changed', 'discount', val))
-        self.discount_amount.valueChanged.connect(
-            lambda val: self._emit_if_user('amount_changed', 'discount', val))
+        def connect_row(field_name: str, spinbox: PlainDoubleSpinBox, button: QPushButton):
+            # When the spinbox value changes, emit the main signal
+            spinbox.valueChanged.connect(lambda value: self._emit_if_user(
+                'financial_input_changed',
+                field_name,
+                value,
+                'percent' if button.text() == '٪' else 'amount'
+            ))
+            # When the button is clicked, toggle the mode
+            button.clicked.connect(lambda: self._toggle_input_mode(spinbox, button))
 
-        self.emergency_percent.valueChanged.connect(
-            lambda val: self._emit_if_user('percent_changed', 'emergency', val))
-        self.emergency_amount.valueChanged.connect(
-            lambda val: self._emit_if_user('amount_changed', 'emergency', val))
+        connect_row('emergency', self.emergency_input, self.emergency_toggle)
+        connect_row('discount', self.discount_input, self.discount_toggle)
+        connect_row('advance', self.advance_input, self.advance_toggle)
 
-        self.advance_payment_percent.valueChanged.connect(
-            lambda val: self._emit_if_user('percent_changed', 'advance', val))
-        self.advance_payment_amount.valueChanged.connect(
-            lambda val: self._emit_if_user('amount_changed', 'advance', val))
+    def _toggle_input_mode(self, spinbox: PlainDoubleSpinBox, button: QPushButton):
+        """Toggles a spinbox between percentage and currency amount mode."""
+        self._is_programmatically_updating = True
+        try:
+            if button.text() == '٪':
+                # Switch to Amount mode
+                button.setText("تومان")
+                spinbox.setDecimals(0)
+                spinbox.setRange(0, 999_999_999)
+                spinbox.setSingleStep(1000)
+            else:
+                # Switch to Percent mode
+                button.setText("٪")
+                spinbox.setDecimals(2)
+                spinbox.setRange(0.0, 100.0)
+                spinbox.setSingleStep(0.5)
+            spinbox.setValue(0)  # Reset value to prevent confusion
+        finally:
+            self._is_programmatically_updating = False
+        # Manually trigger a signal emission with the new mode and a value of 0
+        spinbox.valueChanged.emit(0)
 
     def _update_translation_direction(self):
         """Update the translation direction label."""
@@ -372,12 +420,8 @@ class InvoiceDetailsWidget(QWidget):
             }
         """)
 
-    def _schedule_update(self):
-        """Schedules the _emit_changes call to avoid rapid firing."""
-        self._update_timer.start(200)  # 200ms delay
-
     def _emit_if_user(self, signal_name, *args):
-        """A helper that checks the flag before emitting a signal for two-way binding."""
+        """A helper that checks the flag before emitting a signal."""
         if not self._is_programmatically_updating:
             getattr(self, signal_name).emit(*args)
 
@@ -397,25 +441,6 @@ class InvoiceDetailsWidget(QWidget):
         }
         self.other_input_changed.emit(data)
 
-    def _emit_changes(self):
-        """Gathers raw data from all user-editable UI fields and emits the signal."""
-        if self._is_programmatically_updating:
-            return
-
-        raw_data = {
-            "delivery_date": self.delivery_date_edit.text(),
-            "src_lng": self.source_language.currentText(),
-            "trgt_lng": self.target_language.currentText(),
-            "remarks": self.remarks_text.toPlainText(),
-            "discount_percent": self.discount_percent.value(),
-            "discount_amount": self.discount_amount.value(),
-            "emergency_percent": self.emergency_percent.value(),
-            "emergency_amount": self.emergency_amount.value(),
-            "advance_percent": self.advance_payment_percent.value(),
-            "advance_amount": self.advance_payment_amount.value(),
-        }
-        self.user_input_changed.emit(raw_data)
-
     def display_static_info(self, customer, office_info):
         """Populates the non-editable fields once at the beginning."""
         # Invoice Info
@@ -423,11 +448,11 @@ class InvoiceDetailsWidget(QWidget):
 
         # Customer Info
         self.customer_name.setText(customer.name)
-        self.customer_national_id.setText(customer.national_id)
+        self.customer_national_id.setText(str(customer.national_id))
         self.customer_phone.setText(customer.phone)
         self.customer_email.setText(customer.email)
         self.customer_address.setText(customer.address)
-        self.companions_num.setText(to_persian_number(len(customer.companions)))
+        self.companions_num.setText(to_persian_numbers(len(customer.companions)))
 
         # Office Info
         self.office_name.setText(office_info.name)
@@ -441,47 +466,59 @@ class InvoiceDetailsWidget(QWidget):
         """Public slot to update all data display, both static and calculated."""
         self._is_programmatically_updating = True
 
-        for w in [self.discount_percent, self.discount_amount,
-                  self.emergency_percent, self.emergency_amount,
-                  self.advance_payment_percent, self.advance_payment_amount]:
+        # Use the correct new widget names
+        for w in [self.discount_input, self.emergency_input, self.advance_input]:
             w.blockSignals(True)
 
         try:
             # Invoice Info
-            self.invoice_number_label.setText(to_persian_number(details.invoice_number))
-            self.total_documents.setText(to_persian_number(details.docu_num))
+            self.invoice_number_label.setText(to_persian_numbers(details.invoice_number))
+            self.total_documents.setText(to_persian_numbers(details.docu_num))
             self.issue_date_label.setText(details.issue_date)
-            self.remarks_text.setPlainText(details.remarks)
+            # Prevent cursor jump by only updating if text is different
+            if self.remarks_text.toPlainText() != details.remarks:
+                self.remarks_text.setPlainText(details.remarks)
 
-            # Financial Info (both calculated and user-input)
-            self.total_before_discount_label.setText(to_persian_number(f"{details.total_before_discount:,} تومان"))
-            self.translation_cost_label.setText(to_persian_number(f"{details.translation_cost:,} تومان"))
-            self.confirmation_cost_label.setText(to_persian_number(f"{details.confirmation_cost:,} تومان"))
-            self.copy_cert_cost_label.setText(to_persian_number(f"{details.certified_copy_costs:,} تومان"))
-            self.office_affairs_cost_label.setText(to_persian_number(f"{details.office_costs:,} تومان"))
+            # Financial Info (calculated labels)
+            self.total_before_discount_label.setText(to_persian_numbers(f"{details.total_before_discount:,} تومان"))
+            self.translation_cost_label.setText(to_persian_numbers(f"{details.translation_cost:,} تومان"))
+            self.confirmation_cost_label.setText(to_persian_numbers(f"{details.confirmation_cost:,} تومان"))
+            self.copy_cert_cost_label.setText(to_persian_numbers(f"{details.certified_copy_costs:,} تومان"))
+            self.office_affairs_cost_label.setText(to_persian_numbers(f"{details.office_costs:,} تومان"))
 
-            # Set values for the two-way bound fields
-            self.discount_percent.setValue(details.discount_percent)
-            self.discount_amount.setValue(details.discount_amount)
+            # --- FIX: REMOVED ALL setValue calls to the old, non-existent widgets ---
+            # The new design only updates the display labels, not the input fields themselves.
 
-            self.emergency_percent.setValue(details.emergency_cost_percent)
-            self.emergency_amount.setValue(details.emergency_cost_amount)
+            # Update the display labels with word-based amounts
+            discount_words = amount_to_persian_words(details.discount_amount)
+            if discount_words:
+                formatted_percent = to_persian_numbers(f"{details.discount_percent:.2f}")
+                self.discount_display_label.setText(f"{discount_words} تومان ({formatted_percent}٪)")
+            else:
+                self.discount_display_label.clear()
 
-            self.advance_payment_percent.setValue(details.advance_payment_percent)
-            self.advance_payment_amount.setValue(details.advance_payment_amount)
+            emergency_words = amount_to_persian_words(details.emergency_cost_amount)
+            if emergency_words:
+                formatted_percent = to_persian_numbers(f"{details.emergency_cost_percent:.2f}")
+                self.emergency_display_label.setText(f"{emergency_words} تومان ({formatted_percent}٪)")
+            else:
+                self.emergency_display_label.clear()
 
-            self.final_amount.setText(to_persian_number(f"{details.final_amount:,} تومان"))
+            advance_words = amount_to_persian_words(details.advance_payment_amount)
+            if advance_words:
+                formatted_percent = to_persian_numbers(f"{details.advance_payment_percent:.2f}")
+                self.advance_display_label.setText(f"{advance_words} تومان ({formatted_percent}٪)")
+            else:
+                self.advance_display_label.clear()
+
+            self.final_amount.setText(to_persian_numbers(f"{details.final_amount:,} تومان"))
 
         finally:
             self._is_programmatically_updating = False
-
-        self._update_translation_direction()
-
-        # Unblock signals
-        for w in [self.discount_percent, self.discount_amount,
-                  self.emergency_percent, self.emergency_amount,
-                  self.advance_payment_percent, self.advance_payment_amount]:
-            w.blockSignals(False)
+            self._update_translation_direction()
+            # Unblock signals for the correct new widgets
+            for w in [self.discount_input, self.emergency_input, self.advance_input]:
+                w.blockSignals(False)
 
     @staticmethod
     def _set_font(size=10, bold=False):

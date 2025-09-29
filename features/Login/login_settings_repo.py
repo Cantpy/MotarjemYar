@@ -15,7 +15,6 @@ class LoginSettingsRepository:
     def __init__(self):
         # A config file path is a reasonable thing for a _repository to know.
         self.settings_path = Path("config") / "login_settings.json"
-        # self.settings_path = return_resource("resources", "login_settings.json", "config")
 
     def load(self) -> Optional[RememberSettingsDTO]:
         """Loads remember me settings from the JSON file."""

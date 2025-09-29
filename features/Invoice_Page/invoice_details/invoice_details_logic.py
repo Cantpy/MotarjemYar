@@ -4,6 +4,7 @@ from features.Invoice_Page.invoice_details.invoice_details_repo import InvoiceDe
 from features.Invoice_Page.customer_info.customer_info_models import Customer
 from features.Invoice_Page.document_selection.document_selection_models import InvoiceItem
 from features.Invoice_Page.invoice_details.invoice_details_models import OfficeInfo, InvoiceDetails
+from features.Invoice_Page.invoice_details.invoice_details_settings_dialog import SettingsManager
 
 from shared.utils.date_utils import get_persian_date
 from shared.session_provider import ManagedSessionProvider
@@ -13,12 +14,14 @@ class InvoiceDetailsLogic:
     """The pure Python 'brain' for the invoice details step."""
     def __init__(self, repo: InvoiceDetailsRepository,
                  users_engine: ManagedSessionProvider,
-                 invoices_engine: ManagedSessionProvider
+                 invoices_engine: ManagedSessionProvider,
+                 settings_manager: SettingsManager
                  ):
         super().__init__()
         self._repo = repo
         self._users_session = users_engine
         self._invoices_session = invoices_engine
+        self._settings_manager = settings_manager
         with self._users_session() as session:
             self._office_info = self._repo.get_office_info(session)
 
@@ -49,18 +52,24 @@ class InvoiceDetailsLogic:
 
     def update_with_percent_change(self, details: InvoiceDetails, field: str, percent: float) -> InvoiceDetails:
         """Returns a new DTO recalculated based on a percentage change."""
-        base = details.translation_cost + details.confirmation_cost + details.office_costs + details.certified_copy_costs
-        amount = int(base * (percent / 100.0))
 
         if field == 'discount':
+            base = details.translation_cost + details.confirmation_cost + details.office_costs + details.certified_copy_costs
+            amount = int(base * (percent / 100.0))
             details.discount_percent = percent
             details.discount_amount = amount
         elif field == 'emergency':
+            basis_setting = self._settings_manager.get("emergency_basis")
+            base = details.translation_cost + details.confirmation_cost + details.office_costs + details.certified_copy_costs
+            emergency_base = details.translation_cost if basis_setting == "translation_cost" else base
+            amount = int(emergency_base * (percent / 100.0))
             details.emergency_cost_percent = percent
             details.emergency_cost_amount = amount
         elif field == 'advance':
-            payable = (base + details.emergency_cost_amount - details.discount_amount)
-            amount = int(payable * (percent / 100.0))
+            base_for_advance = (details.translation_cost + details.confirmation_cost +
+                                details.office_costs + details.certified_copy_costs +
+                                details.emergency_cost_amount - details.discount_amount)
+            amount = int(base_for_advance * (percent / 100.0))
             details.advance_payment_percent = percent
             details.advance_payment_amount = amount
 
@@ -76,7 +85,15 @@ class InvoiceDetailsLogic:
             details.discount_amount = amount
             details.discount_percent = percent
         elif field == 'emergency':
-            if base > 0: percent = (amount / base) * 100.0
+            basis_setting = self._settings_manager.get("emergency_basis")
+            base = details.translation_cost + details.confirmation_cost + details.office_costs + details.certified_copy_costs
+
+            emergency_base = details.translation_cost if basis_setting == "translation_cost" else base
+
+            if emergency_base > 0:
+                percent = (amount / emergency_base) * 100.0
+            else:
+                percent = 0.0
             details.emergency_cost_amount = amount
             details.emergency_cost_percent = percent
         elif field == 'advance':
@@ -103,8 +120,9 @@ class InvoiceDetailsLogic:
     def _recalculate_totals(self, details: InvoiceDetails) -> InvoiceDetails:
         """Private helper. The single source of truth for all financial calculations."""
         base = details.translation_cost + details.confirmation_cost + details.office_costs + details.certified_copy_costs
-        details.total_before_discount = base + details.emergency_cost_amount
-        details.total_after_discount = details.total_before_discount - details.discount_amount
+        details.total_before_discount = base
+        payable_before_advance = (base + details.emergency_cost_amount) - details.discount_amount
+        details.total_after_discount = payable_before_advance
 
         # Business rule: Advance payment cannot be more than the amount owed
         if details.advance_payment_amount > details.total_after_discount:

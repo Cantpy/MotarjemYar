@@ -9,9 +9,12 @@ PERSIAN_TO_ENGLISH_MAP = str.maketrans('۰۱۲۳۴۵۶۷۸۹', '0123456789')
 ENGLISH_TO_PERSIAN_MAP = str.maketrans('0123456789', '۰۱۲۳۴۵۶۷۸۹')
 
 
-def to_persian_numbers(text: str | int) -> str:
-    """Converts a string or integer containing English numbers to Persian numbers."""
-    return str(text).translate(ENGLISH_TO_PERSIAN_MAP)
+def to_persian_numbers(value: str | int | float) -> str:
+    """
+    Converts English digits (and decimal dot) to Persian.
+    Handles int, float, and str inputs.
+    """
+    return str(value).translate(ENGLISH_TO_PERSIAN_MAP)
 
 
 def to_english_numbers(text: str) -> str:
