@@ -1,15 +1,15 @@
 # features/Main_Window/main_window_assets.py
 
-from shared import return_resource
+from shared import get_resource_path
 
 
-minimize_icon = return_resource("resources", "minimize.svg", "icons")
-maximize_icon = return_resource("resources", "maximize.svg", "icons")
-close_icon = return_resource("resources", "close.svg", "icons")
-documents_icon = return_resource("resources", "documents.svg", "icons")
-help_icon = return_resource("resources", "help.svg", "icons")
-home_icon = return_resource("resources", "home.svg", "icons")
-invoice_icon = return_resource("resources", "invoice.svg", "icons")
-invoice_table = return_resource("resources", "invoices.svg", "icons")
-settings_icon = return_resource("resources", "settings.svg", "icons")
-user_icon = return_resource("resources", "user.svg", "icons")
+minimize_icon = get_resource_path("resources", 'icons', "minimize.svg")
+maximize_icon = get_resource_path("resources", 'icons', "maximize.svg")
+close_icon = get_resource_path("resources", 'icons', "close.svg")
+documents_icon = get_resource_path("resources", 'icons', "documents.svg")
+help_icon = get_resource_path("resources", 'icons', "help.svg")
+home_icon = get_resource_path("resources", 'icons', "home.svg")
+invoice_icon = get_resource_path("resources", 'icons', "invoice.svg")
+invoice_table = get_resource_path("resources", 'icons', "invoices.svg")
+settings_icon = get_resource_path("resources", 'icons', "settings.svg")
+user_icon = get_resource_path("resources", 'icons', "user.svg")

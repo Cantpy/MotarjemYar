@@ -295,9 +295,9 @@ class MainWindowView(QMainWindow):
 
     def _set_icons(self):
         """Sets SVG icons for the relevant buttons in the UI."""
-        self.minimize_button.setIcon(QIcon(icons.minimize_icon))
-        self.maximize_button.setIcon(QIcon(icons.maximize_icon))
-        self.x_button.setIcon(QIcon(icons.close_icon))
+        self.minimize_button.setIcon(QIcon(str(icons.minimize_icon)))
+        self.maximize_button.setIcon(QIcon(str(icons.maximize_icon)))
+        self.x_button.setIcon(QIcon(str(icons.close_icon)))
 
         # Get the theme's highlight color for active icons
         base_color = self.palette().color(QPalette.ColorRole.Highlight).name()
@@ -320,7 +320,7 @@ class MainWindowView(QMainWindow):
         set_nav_icon(self.settings_button, icons.settings_icon)
 
         # --- 4. Set the Icon for the Toggle Button ---
-        self.sidebar_toggle_button.setIcon(QIcon(icons.help_icon))
+        self.sidebar_toggle_button.setIcon(QIcon(str(icons.help_icon)))
         self.sidebar_toggle_button.setIconSize(QSize(24, 24))
         self.sidebar_toggle_button.setFixedSize(QSize(40, 40))
         self.sidebar_toggle_button.setStyleSheet("border: none;")

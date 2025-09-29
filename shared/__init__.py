@@ -15,7 +15,7 @@ from shared.utils.number_utils import (
     clean_number_string
 )
 from shared.utils.path_utils import (
-    return_resource,
+    get_resource_path,
     get_remembered_user_info,
     open_file
 )
@@ -64,7 +64,7 @@ __all__ = [
     "persian_to_english_number", "to_english_number", "to_persian_number",
     "format_number_with_separators", "clean_number_string",
     # path_utils
-    "return_resource", "get_remembered_user_info", "open_file",
+    "get_resource_path", "get_remembered_user_info", "open_file",
     # theme_utils
     "is_dark_theme",
     # ui_utils

@@ -5,10 +5,10 @@ Stores the file paths for SVG icons.
 This allows for easy management and modification of icons without changing the application code.
 """
 
-from shared import return_resource
+from shared import get_resource_path
 
 # Icon Paths
-PRINT_ICON_PATH = return_resource('resources', 'print_invoice.svg', 'icons')
-PDF_ICON_PATH = return_resource('resources', 'invoice_to_png.svg', 'icons')
-PNG_ICON_PATH = return_resource('resources', 'invoice_to_pdf.svg', 'icons')
-SHARE_ICON_PATH = return_resource('resources', 'share_invoice.svg', 'icons')
+PRINT_ICON_PATH = get_resource_path('resources', 'icons', 'print_invoice.svg')
+PDF_ICON_PATH = get_resource_path('resources', 'icons', 'invoice_to_png.svg')
+PNG_ICON_PATH = get_resource_path('resources', 'icons', 'invoice_to_pdf.svg')
+SHARE_ICON_PATH = get_resource_path('resources', 'icons', 'share_invoice.svg')

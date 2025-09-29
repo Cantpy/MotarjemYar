@@ -47,24 +47,31 @@ class InvoiceDetailsLogic:
             office_info=self._office_info
         )
 
+        default_remarks = self._settings_manager.get("default_remarks", "")
+        details.remarks = default_remarks
+
         # The initial calculation is performed on the new DTO
         return self._recalculate_totals(details)
 
     def update_with_percent_change(self, details: InvoiceDetails, field: str, percent: float) -> InvoiceDetails:
         """Returns a new DTO recalculated based on a percentage change."""
-
-        if field == 'discount':
-            base = details.translation_cost + details.confirmation_cost + details.office_costs + details.certified_copy_costs
-            amount = int(base * (percent / 100.0))
-            details.discount_percent = percent
-            details.discount_amount = amount
-        elif field == 'emergency':
+        if field == 'emergency':
             basis_setting = self._settings_manager.get("emergency_basis")
             base = details.translation_cost + details.confirmation_cost + details.office_costs + details.certified_copy_costs
             emergency_base = details.translation_cost if basis_setting == "translation_cost" else base
             amount = int(emergency_base * (percent / 100.0))
             details.emergency_cost_percent = percent
             details.emergency_cost_amount = amount
+
+        elif field == 'discount':
+            # --- RULE 2 CHANGE: The base for discount now includes the emergency cost ---
+            base_for_discount = (details.translation_cost + details.confirmation_cost +
+                                 details.office_costs + details.certified_copy_costs +
+                                 details.emergency_cost_amount)
+            amount = int(base_for_discount * (percent / 100.0))
+            details.discount_percent = percent
+            details.discount_amount = amount
+
         elif field == 'advance':
             base_for_advance = (details.translation_cost + details.confirmation_cost +
                                 details.office_costs + details.certified_copy_costs +
@@ -77,28 +84,29 @@ class InvoiceDetailsLogic:
 
     def update_with_amount_change(self, details: InvoiceDetails, field: str, amount: int) -> InvoiceDetails:
         """Returns a new DTO recalculated based on an amount change."""
-        base = details.translation_cost + details.confirmation_cost + details.office_costs + details.certified_copy_costs
         percent = 0.0
-
-        if field == 'discount':
-            if base > 0: percent = (amount / base) * 100.0
-            details.discount_amount = amount
-            details.discount_percent = percent
-        elif field == 'emergency':
+        if field == 'emergency':
             basis_setting = self._settings_manager.get("emergency_basis")
             base = details.translation_cost + details.confirmation_cost + details.office_costs + details.certified_copy_costs
-
             emergency_base = details.translation_cost if basis_setting == "translation_cost" else base
-
-            if emergency_base > 0:
-                percent = (amount / emergency_base) * 100.0
-            else:
-                percent = 0.0
+            if emergency_base > 0: percent = (amount / emergency_base) * 100.0
             details.emergency_cost_amount = amount
             details.emergency_cost_percent = percent
+
+        elif field == 'discount':
+            # --- RULE 2 CHANGE: The base for discount now includes the emergency cost ---
+            base_for_discount = (details.translation_cost + details.confirmation_cost +
+                                 details.office_costs + details.certified_copy_costs +
+                                 details.emergency_cost_amount)
+            if base_for_discount > 0: percent = (amount / base_for_discount) * 100.0
+            details.discount_amount = amount
+            details.discount_percent = percent
+
         elif field == 'advance':
-            payable = (base + details.emergency_cost_amount - details.discount_amount)
-            if payable > 0: percent = (amount / payable) * 100.0
+            base_for_advance = (details.translation_cost + details.confirmation_cost +
+                                details.office_costs + details.certified_copy_costs +
+                                details.emergency_cost_amount - details.discount_amount)
+            if base_for_advance > 0: percent = (amount / base_for_advance) * 100.0
             details.advance_payment_amount = amount
             details.advance_payment_percent = percent
 
@@ -121,12 +129,35 @@ class InvoiceDetailsLogic:
         """Private helper. The single source of truth for all financial calculations."""
         base = details.translation_cost + details.confirmation_cost + details.office_costs + details.certified_copy_costs
         details.total_before_discount = base
-        payable_before_advance = (base + details.emergency_cost_amount) - details.discount_amount
-        details.total_after_discount = payable_before_advance
 
-        # Business rule: Advance payment cannot be more than the amount owed
+        # The total billable amount is the base services plus the emergency fee.
+        total_billable = base + details.emergency_cost_amount
+        # Business rule: Discount cannot be more than the total billable amount.
+        if details.discount_amount > total_billable:
+            details.discount_amount = total_billable
+
+        details.total_after_discount = total_billable - details.discount_amount
+
+        # Rule 1 (Advance Payment Cap) is still in place and correct
         if details.advance_payment_amount > details.total_after_discount:
             details.advance_payment_amount = details.total_after_discount
 
         details.final_amount = details.total_after_discount - details.advance_payment_amount
+        return details
+
+    def recalculate_all_variables(self, details: InvoiceDetails) -> InvoiceDetails:
+        """
+        Re-evaluates emergency, discount, and advance payments based on their
+        currently stored percentages and the latest settings.
+        This is used after a settings change that affects calculation logic.
+        """
+        # Re-apply the emergency calculation
+        details = self.update_with_percent_change(details, 'emergency', details.emergency_cost_percent)
+
+        # Re-apply the discount calculation
+        details = self.update_with_percent_change(details, 'discount', details.discount_percent)
+
+        # Re-apply the advance payment calculation
+        details = self.update_with_percent_change(details, 'advance', details.advance_payment_percent)
+
         return details

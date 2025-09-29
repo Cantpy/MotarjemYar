@@ -38,10 +38,10 @@ class InvoiceDetailsController:
         office_info = self._logic.get_static_office_info()
         self._view.display_static_info(customer, office_info)
 
-        # 2. Ask _logic to calculate the initial DTO
+        # 2. Ask logic to calculate the initial DTO (this now applies default remarks)
         self._current_details = self._logic.create_initial_details(customer, items)
 
-        # 3. Update the _view and the global state with the initial DTO
+        # 3. Update the view and the global state with the initial DTO
         self._process_update(self._current_details)
 
     def _process_update(self, details: InvoiceDetails):
@@ -73,23 +73,14 @@ class InvoiceDetailsController:
 
     def _on_settings_requested(self):
         """
-        Handles the request to open the settings dialog. Manages the dialog's
-        lifecycle and triggers updates if settings are changed.
+        Handles the request to open the settings dialog and triggers all necessary updates.
         """
-        # The Controller creates and shows the dialog
-        dialog = SettingsDialog(self._settings_manager, self._view)  # Parent to the view for proper positioning
+        dialog = SettingsDialog(self._settings_manager, self._view)
 
-        # If the user clicks "Save" (dialog is accepted)
         if dialog.exec() == QDialog.Accepted:
-            # Command the View to update its appearance
             self._view.apply_settings()
 
-            # Trigger a full recalculation of the invoice details to ensure
-            # any logic changes (like the emergency cost basis) are applied.
             if self._current_details:
-                # A simple way to force a recalculation is to re-run an update
-                # with the existing data. The logic layer will use the new settings.
-                new_details = self._logic.update_with_percent_change(
-                    self._current_details, 'discount', self._current_details.discount_percent
-                )
+                new_details = self._logic.recalculate_all_variables(self._current_details)
+
                 self._process_update(new_details)

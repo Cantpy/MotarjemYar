@@ -368,7 +368,7 @@ class ActionPanel(QWidget):
         button.setFixedSize(90, 80)
         button.setIconSize(QSize(32, 32))
         button.setFont(QFont(FONT_FAMILY, 10))
-        button.setIcon(QIcon(icon_path))
+        button.setIcon(QIcon(str(icon_path)))
         button.setStyleSheet("""...""")  # Stylesheet remains the same
         return button
 

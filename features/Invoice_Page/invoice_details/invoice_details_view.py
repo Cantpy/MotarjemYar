@@ -32,6 +32,8 @@ class InvoiceDetailsWidget(QWidget):
         self._setup_ui()
         self._connect_signals()
 
+        self.apply_settings()
+
     def _init_widgets(self):
         """Initialize all widgets."""
         self.settings_button = QPushButton("تنظیمات")
@@ -174,9 +176,6 @@ class InvoiceDetailsWidget(QWidget):
         self.customer_group.setVisible(visibility.get("customer", True))
         self.financial_group.setVisible(visibility.get("financial", True))
         self.office_group.setVisible(visibility.get("office", True))
-
-        # Apply default remarks only if the field is currently empty
-        # if not self.remarks_text.toPlainText().strip():
         default_remarks = self.settings_manager.get("default_remarks")
         self.remarks_text.setPlainText(default_remarks)
 
@@ -275,10 +274,11 @@ class InvoiceDetailsWidget(QWidget):
         layout.addWidget(display_label, row + 1, 1, 1, 2)  # Display label on next row, spanning 2 columns
 
         button.setFixedSize(40, spinbox.sizeHint().height())
-        button.setObjectName("modeToggleButton")  # For styling
+        button.setObjectName("modeToggleButton")
 
         display_label.setStyleSheet("color: #2b6cb0; font-size: 10px; padding-right: 5px;")
         display_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        display_label.setWordWrap(True)
 
     def _create_office_group(self) -> QGroupBox:
         """Create translation office information group."""
@@ -513,12 +513,33 @@ class InvoiceDetailsWidget(QWidget):
 
             self.final_amount.setText(to_persian_numbers(f"{details.final_amount:,} تومان"))
 
+            self.update_financial_limits(details)
+
         finally:
             self._is_programmatically_updating = False
             self._update_translation_direction()
             # Unblock signals for the correct new widgets
             for w in [self.discount_input, self.emergency_input, self.advance_input]:
                 w.blockSignals(False)
+
+    def update_financial_limits(self, details: InvoiceDetails):
+        """
+        Sets the maximum values for the financial spinboxes based on the current
+        invoice state and the input mode (percent vs. amount).
+        """
+        # --- 1. Update Discount Spinbox Maximum ---
+        if self.discount_toggle.text() == '٪':
+            self.discount_input.setMaximum(100.0)
+        else:  # Mode is 'Toman'
+            total_billable = details.total_before_discount + details.emergency_cost_amount
+            self.discount_input.setMaximum(total_billable)
+
+        # --- 2. Update Emergency Spinbox Maximum ---
+        if self.advance_toggle.text() == '٪':
+            self.advance_input.setMaximum(100.0)
+        else:  # Mode is 'Toman'
+            # The maximum advance payment is the final payable amount
+            self.advance_input.setMaximum(details.total_after_discount)
 
     @staticmethod
     def _set_font(size=10, bold=False):

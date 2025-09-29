@@ -1,11 +1,11 @@
 import os
 import pandas as pd
-from shared import return_resource, to_persian_number
+from shared import get_resource_path, to_persian_number
 import sqlite3
 
 
-DB_PATH = return_resource('databases', 'services.db')
-EXCEL_FILE_PATH = return_resource('databases', 'services_data.xlsx')
+DB_PATH = get_resource_path('databases', 'services.db')
+EXCEL_FILE_PATH = get_resource_path('databases', 'services_data.xlsx')
 
 
 def import_excel_to_services():

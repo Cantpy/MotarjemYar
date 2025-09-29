@@ -3,20 +3,19 @@
 import json
 import os
 import copy
-from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QGroupBox, QFormLayout, QTextEdit, QComboBox,
     QCheckBox, QDialogButtonBox
 )
+from shared.utils.path_utils import get_user_data_path
 
 
 class SettingsManager:
     """Handles loading and saving of application settings to a JSON file."""
+
     def __init__(self):
-        base_dir = Path(__file__).resolve().parent / "config"
-        base_dir.mkdir(exist_ok=True)
-        self.filepath = base_dir / "invoice_details_settings.json"
+        self.filepath = get_user_data_path('config', 'invoice_details_settings.json')
 
         self._defaults = {
             "default_remarks": "کلیه هزینه‌های مربوط به تاییدات دادگستری و وزارت امور خارجه بر عهده مشتری می‌باشد.",

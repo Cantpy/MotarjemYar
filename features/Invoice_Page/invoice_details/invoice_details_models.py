@@ -45,7 +45,7 @@ class InvoiceDetails:
     advance_payment_percent: float = 0.0
     advance_payment_amount: int = 0
 
-    remarks: str = "..."
+    remarks: str = ""
 
     # --- Calculated Financials ---
     total_before_discount: int = 0

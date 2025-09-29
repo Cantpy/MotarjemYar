@@ -1,10 +1,10 @@
 import configparser
 import traceback
-from shared.utils.path_utils import return_resource
+from shared.utils.path_utils import get_resource_path
 
 
 class ConfigManager:
-    def __init__(self, filepath=return_resource('config', 'config.ini')):
+    def __init__(self, filepath=get_resource_path('config', 'config.ini')):
         self.config = configparser.ConfigParser()
         # read() returns the list of files successfully read. If empty, the file was not found.
         if not self.config.read(filepath):

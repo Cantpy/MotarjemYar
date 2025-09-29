@@ -16,7 +16,7 @@ from features.Services.tab_manager.tab_manager_factory import ServicesManagement
 from features.Info_Page.info_page_factory import InfoPageFactory
 from features.Workspace.workspace_factory import WorkspaceFactory
 
-from shared import show_error_message_box, return_resource
+from shared import show_error_message_box, get_resource_path
 
 
 class MainWindowController(QObject):
@@ -37,7 +37,7 @@ class MainWindowController(QObject):
         self._register_pages()
 
         try:
-            self.config = ConfigManager(return_resource('config', 'config.ini'))
+            self.config = ConfigManager(get_resource_path('config', 'config.ini'))
             # Store the broker host as an instance attribute for easy access
             self.broker_host = self.config.get_broker_host()
         except FileNotFoundError:

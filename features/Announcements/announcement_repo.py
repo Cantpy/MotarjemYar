@@ -9,9 +9,9 @@ from sqlalchemy.orm import sessionmaker, relationship, Session
 from sqlalchemy.sql import and_, or_
 from features.Announcements.announcement_models import (SMSNotification, EmailNotification, EmailAttachment,
                                                         NotificationStatus, NotificationFilter)
-from shared.utils.path_utils import return_resource
+from shared.utils.path_utils import get_resource_path
 
-announcements_db_path = return_resource("databases", "announcements.db")
+announcements_db_path = get_resource_path("databases", "announcements.db")
 
 Base = declarative_base()
 

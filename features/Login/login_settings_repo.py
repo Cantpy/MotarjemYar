@@ -1,11 +1,10 @@
-import os
+# features/Login/login_settings_repo.py
+
 import json
-from pathlib import Path
 from typing import Optional
 
-# You will need to define this DTO, perhaps in a new shared/dtos/auth_dtos.py
 from shared.dtos.auth_dtos import RememberSettingsDTO
-from shared import return_resource  # Assuming this helper exists
+from shared.utils.path_utils import get_user_data_path
 
 
 class LoginSettingsRepository:
@@ -14,7 +13,7 @@ class LoginSettingsRepository:
     """
     def __init__(self):
         # A config file path is a reasonable thing for a _repository to know.
-        self.settings_path = Path("config") / "login_settings.json"
+        self.settings_path = get_user_data_path("config", "login_settings.json")
 
     def load(self) -> Optional[RememberSettingsDTO]:
         """Loads remember me settings from the JSON file."""
@@ -32,7 +31,6 @@ class LoginSettingsRepository:
         try:
             self.settings_path.parent.mkdir(parents=True, exist_ok=True)
             with open(self.settings_path, 'w', encoding='utf-8') as f:
-                # Use dataclasses.asdict for clean serialization
                 import dataclasses
                 json.dump(dataclasses.asdict(settings_dto), f, ensure_ascii=False, indent=2)
         except Exception as e:

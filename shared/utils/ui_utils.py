@@ -173,7 +173,7 @@ def set_svg_icon(svg_path: str, size: QSize, label: QLabel):
         size (QSize): Size for the icon
         label (QLabel): Label widget to set icon on
     """
-    renderer = QSvgRenderer(svg_path)
+    renderer = QSvgRenderer(str(svg_path))
 
     pixmap = QPixmap(size)
     pixmap.fill(Qt.transparent)  # Transparent background
