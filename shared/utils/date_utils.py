@@ -1,9 +1,25 @@
-"""
-Date and time utilities for Persian calendar support.
-"""
+# shared/utils/date_utils.py
+
 import jdatetime
 import re
 from shared.utils.number_utils import to_persian_number
+
+
+def sanitize_date_string(persian_date_str: str) -> str:
+    """
+    Converts any Persian numerals within a date-time string to their
+    English equivalents, preserving the entire string structure.
+    """
+    if not persian_date_str:
+        return ""
+
+    # Dictionary for converting Persian numerals to English
+    persian_to_english = str.maketrans('۰۱۲۳۴۵۶۷۸۹', '0123456789')
+    english_num_str = persian_date_str.translate(persian_to_english)
+
+    # --- FIX: The line that removed the time has been deleted. ---
+    # We now return the full string with converted numerals.
+    return english_num_str
 
 
 def get_persian_date():

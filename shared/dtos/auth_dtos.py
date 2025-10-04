@@ -5,11 +5,12 @@ from typing import Optional
 # DTO for data persisted to the login_settings.json file
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class RememberSettingsDTO:
     """
     Represents the data saved to disk for the 'Remember Me' feature.
-    This is the data contract for the LoginSettingsRepository.
+    This is the data contract for the AuthFileRepository.
     """
     remember_me: bool         # Flag indicating if auto-login is enabled.
     username: str             # The username to attempt auto-login with.
@@ -41,4 +42,19 @@ class LoggedInUserDTO:
     role: str
     full_name: Optional[str]
     role_fa: Optional[str]
-    is_remembered: bool = False # Was this login from a 'remember me' token?
+    is_remembered: bool = False
+
+
+@dataclass
+class SessionDataDTO:
+    """
+    Represents the data for the currently active user session,
+    persisted to a JSON file.
+    """
+    user_id: int
+    username: str
+    role: str
+    full_name: Optional[str]
+    role_fa: Optional[str]
+    login_time: str
+    log_id: int

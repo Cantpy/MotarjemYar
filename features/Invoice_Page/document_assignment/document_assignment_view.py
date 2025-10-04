@@ -67,7 +67,12 @@ class TargetListWidget(QListWidget):
 # The Main Assignment Widget
 # ----------------------------------------------------------------------
 class AssignmentWidget(QWidget):
-
+    """
+    The main widget for assigning documents to people. It contains:
+    - A source list of unassigned documents on the left.
+    - Multiple target lists for each person on the right.
+    It communicates changes to a central state manager.
+    """
     def __init__(self, state_manager: WorkflowStateManager):
         super().__init__()
         self.state_manager = state_manager
@@ -178,3 +183,7 @@ class AssignmentWidget(QWidget):
                 widget = item.widget()
                 if widget is not None:
                     widget.deleteLater()
+
+    def reset_view(self):
+        """Clears all fields in the invoice details view."""
+        self._clear_layout(self.people_layout)

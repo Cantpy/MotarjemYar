@@ -70,19 +70,23 @@ class ExcelImportLogic:
 
                 service_data = {
                     'name': name,
-                    'base_price': base_price if base_price >= 0 else 0,
-                    'default_page_count': default_page_count, # New field added
+                    'base_price': base_price if base_price >= 0 else "",
+                    'default_page_count': default_page_count,
                     'dynamic_prices': []
                 }
 
                 # --- Parse dynamic fees ---
                 i = 1
                 while f'Fee {i} Name' in row:
-                    fee_name = str(row.get(f'Fee {i} Name', '')).strip()
-                    fee_price = self._safe_to_int(row.get(f'Fee {i} Price'), default=0)
+                    fee_name_val = row.get(f'Fee {i} Name')
+                    fee_price_val = row.get(f'Fee {i} Price')
+
+                    # Check for NaN before converting to string
+                    fee_name = '' if pd.isna(fee_name_val) else str(fee_name_val).strip()
+                    fee_price = self._safe_to_int(fee_price_val, default=0)
 
                     if fee_name:
-                        service_data['dynamic_prices'].append({'name': fee_name or '', 'price': fee_price or ''})
+                        service_data['dynamic_prices'].append({'name': fee_name, 'unit_price': fee_price})
                     i += 1
 
                 services_to_create.append(service_data)

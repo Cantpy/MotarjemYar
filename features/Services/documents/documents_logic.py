@@ -103,33 +103,42 @@ class ServicesLogic:
 
     def _normalize_service_data(self, data: dict[str, Any]) -> dict[str, Any]:
         """
-        Takes a structured dictionary and cleans/converts all its values, including the nested dynamic prices.
+        Takes a structured dictionary and cleans/converts all its values,
+        including the new 'default_page_count' field.
         """
         normalized = {}
-        normalized['name'] = str(normalized.get('name', '')).strip()
 
         # --- Normalize Parent Fields ---
         normalized['name'] = str(data.get('name', '')).strip()
+
         try:
             base_price_str = str(data.get('base_price', '0')).strip()
-            normalized['base_price'] = int(base_price_str) if base_price_str else 0
+            normalized['base_price'] = int(float(base_price_str)) if base_price_str else ""
         except (ValueError, TypeError):
             raise ValueError(f"مقدار نامعتبر برای هزینه پایه: '{data.get('base_price')}'")
 
-        # Normalize the Nested Dynamic Prices
+        # --- FIX: Add the default_page_count ---
+        try:
+            page_count_str = str(data.get('default_page_count', '1')).strip()
+            page_count = int(float(page_count_str)) if page_count_str else 1
+            # Ensure the page count is at least 1, as per your model's logic.
+            normalized['default_page_count'] = page_count if page_count > 0 else 1
+        except (ValueError, TypeError):
+            raise ValueError(f"مقدار نامعتبر برای تعداد صفحات پیشفرض: '{data.get('default_page_count')}'")
+
+        # --- Normalize Nested Dynamic Prices ---
         normalized['dynamic_prices'] = []
         for fee_data in data.get('dynamic_prices', []):
             try:
                 name = str(fee_data.get('name', '')).strip()
-                price_str = str(fee_data.get('price', '0')).strip()
+                price_str = str(fee_data.get('unit_price', '0')).strip()
 
-                # Basic validation for the nested fee
-                if not name or not price_str:
-                    continue  # Skip incomplete fee entries silently
+                if not name:
+                    continue
 
                 normalized['dynamic_prices'].append({
                     'name': name,
-                    'unit_price': int(price_str)  # Convert to int
+                    'unit_price': int(float(price_str))
                 })
             except (ValueError, TypeError):
                 raise ValueError(f"مقدار نامعتبر برای هزینه متغیر: '{fee_data.get('price')}'")

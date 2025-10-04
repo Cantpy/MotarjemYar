@@ -6,7 +6,7 @@ from features.Login.login_window_view import LoginWidget
 from features.Login.login_window_controller import LoginController
 from features.Login.login_window_logic import LoginService
 from features.Login.login_window_repo import LoginRepository
-from features.Login.login_settings_repo import LoginSettingsRepository
+from features.Login.auth_file_repo import AuthFileRepository
 
 from shared.session_provider import ManagedSessionProvider
 
@@ -27,15 +27,15 @@ class LoginWindowFactory:
         Returns:
             The fully configured LoginController, which is the entry point to the login feature.
         """
-        session_provider = ManagedSessionProvider(engine=engine)
+        user_engine = ManagedSessionProvider(engine=engine)
 
         login_repo = LoginRepository()
-        settings_repo = LoginSettingsRepository()
+        auth_file_repo = AuthFileRepository()
 
         logic = LoginService(
             repo=login_repo,
-            settings_repo=settings_repo,
-            session_provider=session_provider
+            auth_file_repo=auth_file_repo,
+            user_engine=user_engine
             )
 
         view = LoginWidget()

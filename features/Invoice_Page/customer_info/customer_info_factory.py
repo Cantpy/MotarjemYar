@@ -17,12 +17,15 @@ class CustomerInfoFactory:
     It follows the clean pattern of receiving its dependencies.
     """
     @staticmethod
-    def create(customer_engine: Engine, parent=None) -> CustomerInfoController:
+    def create(customer_engine: Engine,
+               state_manager: WorkflowStateManager,
+               parent=None) -> CustomerInfoController:
         """
         Creates a fully configured CustomerInfo module by assembling its components.
 
         Args:
             customer_engine: The SQLAlchemy engine for the customers database.
+            state_manager: The shared state manager for the entire invoice workflow.
             parent: The parent QWidget for the view.
 
         Returns:
@@ -34,7 +37,6 @@ class CustomerInfoFactory:
         logic = CustomerLogic(repo=repo, customer_engine=customer_session)
         view = CustomerInfoWidget(parent=parent)
 
-        state_manager = WorkflowStateManager()
         controller = CustomerInfoController(logic, view, state_manager)
 
         return controller

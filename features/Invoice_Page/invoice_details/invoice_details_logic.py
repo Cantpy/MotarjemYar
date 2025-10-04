@@ -3,11 +3,12 @@
 from features.Invoice_Page.invoice_details.invoice_details_repo import InvoiceDetailsRepository
 from features.Invoice_Page.customer_info.customer_info_models import Customer
 from features.Invoice_Page.document_selection.document_selection_models import InvoiceItem
-from features.Invoice_Page.invoice_details.invoice_details_models import OfficeInfo, InvoiceDetails
+from features.Invoice_Page.invoice_details.invoice_details_models import InvoiceDetails, UserInfo
 from features.Invoice_Page.invoice_details.invoice_details_settings_dialog import SettingsManager
+from features.Invoice_Page.invoice_preview.invoice_preview_models import PreviewOfficeInfo
 
 from shared.utils.date_utils import get_persian_date
-from shared.session_provider import ManagedSessionProvider
+from shared.session_provider import ManagedSessionProvider, SessionManager
 
 
 class InvoiceDetailsLogic:
@@ -121,7 +122,18 @@ class InvoiceDetailsLogic:
         # No recalculation needed for these fields, so we just return the modified object
         return details
 
-    def get_static_office_info(self) -> OfficeInfo:
+    def get_static_user_info(self) -> UserInfo:
+        """Provides static user info to the controller."""
+        session_data = SessionManager().get_session()
+        if session_data:
+            return UserInfo(
+                    full_name=session_data.full_name,
+                    role=session_data.role,
+                    role_fa=session_data.role_fa,
+                    username=session_data.username
+                )
+
+    def get_static_office_info(self) -> PreviewOfficeInfo:
         """Provides the cached office info to the controller."""
         return self._office_info
 
@@ -161,3 +173,7 @@ class InvoiceDetailsLogic:
         details = self.update_with_percent_change(details, 'advance', details.advance_payment_percent)
 
         return details
+
+    def create_empty_details(self):
+        """Creates empty details for resetting the view."""
+        return InvoiceDetails()

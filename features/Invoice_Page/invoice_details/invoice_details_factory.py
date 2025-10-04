@@ -17,7 +17,9 @@ class InvoiceDetailsFactory:
     Factory class to create and wire the Invoice Details module components.
     """
     @staticmethod
-    def create(users_engine: Engine, invoices_engine, parent=None) -> InvoiceDetailsController:
+    def create(users_engine: Engine, invoices_engine,
+               state_manager: WorkflowStateManager,
+               parent=None) -> InvoiceDetailsController:
         """
         Creates and wires the complete Invoice Details module.
         """
@@ -29,7 +31,6 @@ class InvoiceDetailsFactory:
         logic = InvoiceDetailsLogic(repo=repository, users_engine=users_session, invoices_engine=invoices_session,
                                     settings_manager=settings_manager)
         view = InvoiceDetailsWidget(parent=parent, settings_manager=settings_manager)
-        state_manager = WorkflowStateManager()
         controller = InvoiceDetailsController(view=view, logic=logic, state_manager=state_manager,
                                               settings_manager=settings_manager)
 

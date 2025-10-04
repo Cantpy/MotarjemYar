@@ -3,6 +3,10 @@
 from contextlib import contextmanager
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.engine import Engine
+from typing import Optional
+
+from features.Login.auth_file_repo import AuthFileRepository
+from shared.dtos.auth_dtos import SessionDataDTO
 
 
 class SessionProvider:
@@ -74,3 +78,37 @@ class ManagedSessionProvider:
             # Always close the session.
             print("[DEBUG] Managed session closed.")
             session.close()
+
+
+class SessionManager:
+    """
+    Singleton-style manager to access the current session from anywhere.
+    """
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._auth_repo = AuthFileRepository()
+            cls._instance._session_data = None
+        return cls._instance
+
+    def get_session(self) -> Optional[SessionDataDTO]:
+        """
+        Loads the current session data if not cached.
+        """
+        if self._session_data is None:
+            self._session_data = self._auth_repo.load_session()
+        return self._session_data
+
+    def refresh(self) -> None:
+        """
+        Reloads the session data from disk (useful after login).
+        """
+        self._session_data = self._auth_repo.load_session()
+
+    def clear(self) -> None:
+        """
+        Clears the cached session (useful after logout).
+        """
+        self._session_data = None

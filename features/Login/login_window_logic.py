@@ -8,8 +8,8 @@ from typing import Optional
 from sqlalchemy.exc import SQLAlchemyError
 
 from features.Login.login_window_repo import LoginRepository
-from features.Login.login_settings_repo import LoginSettingsRepository
-from shared.dtos.auth_dtos import RememberSettingsDTO, UserLoginDTO, LoggedInUserDTO
+from features.Login.auth_file_repo import AuthFileRepository
+from shared.dtos.auth_dtos import RememberSettingsDTO, UserLoginDTO, LoggedInUserDTO, SessionDataDTO
 from shared.session_provider import ManagedSessionProvider
 
 
@@ -17,11 +17,12 @@ class LoginService:
     """
     The refactored _logic layer for the login feature.
     """
-    def __init__(self, repo: LoginRepository, settings_repo: LoginSettingsRepository,
-                 session_provider: ManagedSessionProvider):
+    def __init__(self, repo: LoginRepository,
+                 auth_file_repo: AuthFileRepository,
+                 user_engine: ManagedSessionProvider):
         self.repo = repo
-        self.settings_repo = settings_repo
-        self._users_session = session_provider
+        self.auth_file_repo = auth_file_repo
+        self._users_session = user_engine
 
     def login(self, login_dto: UserLoginDTO) -> tuple[bool, str, Optional[LoggedInUserDTO]]:
         """
@@ -51,40 +52,68 @@ class LoginService:
             self._clear_remember_me(username)
         else:
             # If there's no user, just make sure the file is gone.
-            self.settings_repo.clear()
+            self.auth_file_repo.clear_remember_me()
 
     def authenticate_user(self, login_dto: UserLoginDTO) -> tuple[bool, str, Optional[LoggedInUserDTO]]:
-        """Authenticates a user based on provided credentials."""
-        # REFACTORED: Simplified session management
+        """
+        Authenticates a user, now with spam protection and lockout logic.
+        """
         with self._users_session() as session:
             try:
                 user = self.repo.get_user_by_username(session, login_dto.username)
 
-                if not user or user.active == 0:
+                # --- STEP 1: Check for existing user ---
+                if not user:
                     return False, "نام کاربری یا رمز عبور اشتباه است.", None
 
-                if not bcrypt.checkpw(login_dto.password.encode('utf-8'), user.password_hash):
-                    return False, "نام کاربری یا رمز عبور اشتباه است.", None
+                # --- STEP 2: Check if account is currently locked ---
+                if user.lockout_until_utc and user.lockout_until_utc > datetime.utcnow():
+                    time_remaining = user.lockout_until_utc - datetime.utcnow()
+                    minutes_left = round(time_remaining.total_seconds() / 60)
+                    message = (f"حساب کاربری به دلیل تلاش‌های ناموفق متعدد قفل شده است."
+                               f" لطفاً بعد از {minutes_left} دقیقه دوباره امتحان کنید.")
+                    return False, message, None
 
-                # If authentication is successful, build the DTO
-                profile = user.user_profile
-                logged_in_user = LoggedInUserDTO(
-                    username=user.username,
-                    role=user.role,
-                    role_fa=profile.role_fa if profile else None,
-                    full_name=profile.full_name if profile else None
-                )
-                return True, "ورود موفق!", logged_in_user
+                # --- STEP 3: Check if user is active ---
+                if user.active == 0:
+                    return False, "حساب کاربری غیرفعال است.", None
+
+                # --- STEP 4: Verify the password ---
+                password_is_valid = bcrypt.checkpw(login_dto.password.encode('utf-8'), user.password_hash)
+
+                if password_is_valid:
+                    # --- SUCCESS PATH ---
+                    # If the user had previous failed attempts, reset them.
+                    self.repo.reset_login_attempts(session, user)
+                    session.commit()
+
+                    # Build and return the successful user DTO
+                    profile = user.user_profile
+                    logged_in_user = LoggedInUserDTO(
+                        username=user.username,
+                        role=user.role,
+                        role_fa=profile.role_fa if profile else None,
+                        full_name=profile.full_name if profile else None
+                    )
+                    return True, "ورود موفق!", logged_in_user
+                else:
+                    # --- FAILURE PATH ---
+                    # Record the failed attempt in the database.
+                    self.repo.record_failed_login(session, user)
+                    session.commit()
+
+                    # Return the generic error message. Do not reveal how many attempts are left.
+                    return False, "نام کاربری یا رمز عبور اشتباه است.", None
 
             except (SQLAlchemyError, ValueError) as e:
-                # Catch specific, expected errors
+                session.rollback()
                 print(f"Authentication Error: {e}")
                 return False, "خطا در فرآیند احراز هویت.", None
 
     def check_and_auto_login(self) -> tuple[bool, Optional[LoggedInUserDTO]]:
         """Checks for and performs auto-login."""
         # REFACTORED: Uses the settings _repository
-        settings = self.settings_repo.load()
+        settings = self.auth_file_repo.load_remember_me()
         if not (settings and settings.remember_me and settings.username and settings.token):
             return False, None
 
@@ -102,7 +131,7 @@ class LoginService:
                     )
 
         # If we reach here, auto-login failed. Clear the invalid settings.
-        self.settings_repo.clear()
+        self.auth_file_repo.clear_remember_me()
         return False, None
 
     def _verify_remember_token(self, username: str, token: str) -> bool:
@@ -135,11 +164,81 @@ class LoginService:
         settings_dto = RememberSettingsDTO(
             remember_me=True, username=username, token=token, full_name=full_name
         )
-        self.settings_repo.save(settings_dto)
+        self.auth_file_repo.save_remember_me(settings_dto)
 
     def _clear_remember_me(self, username: str):
         """Clears remember-me tokens from the DB and the settings file."""
         with self._users_session() as session:
             self.repo.update_user_token(session, username, None, None)
             session.commit()
-        self.settings_repo.clear()
+        self.auth_file_repo.clear_remember_me()
+
+    def start_session(self, user_dto: LoggedInUserDTO) -> None:
+        """
+        Orchestrates all actions needed for a successful login session start:
+        1. Create a log entry in the database.
+        2. Create the current_session.json file.
+        """
+        print(f"--- Starting session for user: {user_dto.username} ---")
+        login_time = datetime.now()
+
+        with self._users_session() as session:
+            try:
+                # Get the full user object to access its ID
+                user = self.repo.get_user_by_username(session, user_dto.username)
+                if not user:
+                    print("Error: Could not find user to start session.")
+                    return
+
+                # 1. Create the DB log entry
+                log_entry = self.repo.create_login_log_entry(session, user.id, login_time)
+                session.commit()
+
+                # 2. Create the DTO for the session file
+                session_dto = SessionDataDTO(
+                    user_id=user.id,
+                    username=user.username,
+                    role=user.role,
+                    full_name=user_dto.full_name,
+                    role_fa=user_dto.role_fa,
+                    login_time=login_time.isoformat(),
+                    log_id=log_entry.id  # <-- Store the log ID
+                )
+
+                # 3. Create the session file using its repository
+                self.auth_file_repo.save_session(session_dto)
+                print("--- Session started successfully. ---")
+
+            except Exception as e:
+                print(f"Error starting session: {e}")
+                session.rollback()
+
+    def end_session(self) -> None:
+        """
+        Orchestrates all actions for a graceful session end:
+        1. Load the session file to find out who is logged in.
+        2. Update the corresponding log entry in the database with a logout time.
+        3. Delete the session file.
+        """
+        print("--- Ending session... ---")
+        # 1. Find out who is logged in by loading the session file
+        session_data = self.auth_file_repo.load_session()
+        if not session_data:
+            print("No active session file found to end.")
+            return
+
+        logout_time = datetime.now()
+
+        # 2. Update the DB log entry
+        with self._users_session() as session:
+            try:
+                self.repo.update_logout_time(session, session_data.log_id, logout_time)
+                session.commit()
+                print(f"Logout time recorded for user: {session_data.username}")
+            except Exception as e:
+                print(f"Error recording logout time: {e}")
+                session.rollback()
+
+        # 3. Delete the session file
+        self.auth_file_repo.clear_session()
+        print("--- Session ended successfully. ---")

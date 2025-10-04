@@ -10,7 +10,7 @@ from features.Invoice_Page.invoice_page_state_manager import WorkflowStateManage
 from features.Invoice_Page.customer_info.customer_info_models import Customer
 from features.Invoice_Page.document_selection.document_selection_models import InvoiceItem
 
-from shared import show_question_message_box, show_error_message_box, show_information_message_box
+from shared import show_question_message_box, show_warning_message_box
 
 
 class InvoiceWizardController(QObject):
@@ -39,7 +39,10 @@ class InvoiceWizardController(QObject):
         """Connects high-level navigation signals."""
         self._view.next_button_clicked.connect(self._on_next_step)
         self._view.prev_button_clicked.connect(self._on_previous_step)
-        # Bridge the signal from doc selection to the state manager
+
+        preview_view = self.sub_controllers['preview'].get_view()
+        preview_view.finish_clicked.connect(self.finish_and_reset)
+
         doc_select_ctrl = self.sub_controllers['documents']
         doc_select_ctrl.invoice_items_changed.connect(self._state_manager.set_invoice_items)
 
@@ -70,6 +73,17 @@ class InvoiceWizardController(QObject):
                     self._state_manager.get_customer(), self._state_manager.get_invoice_items()
                 )
             elif action == 'PREPARE_PREVIEW':
+                is_valid, error_message = self.sub_controllers['details'].validate()
+
+                if not is_valid:
+                    # --- 4. SHOW THE MESSAGE BOX ---
+                    show_warning_message_box(
+                        self._view,
+                        "خطا در اطلاعات فاکتور",
+                        error_message
+                    )
+                    return
+
                 self.sub_controllers['preview'].prepare_and_display_data()
 
             if 'unpacked_items' in payload:
@@ -114,6 +128,22 @@ class InvoiceWizardController(QObject):
             self._state_manager.set_customer(customer_obj)
 
         return True  # Navigation can proceed
+
+    def finish_and_reset(self):
+        """Public slot to end the current invoice process and reset the wizard."""
+        print("WORKFLOW: Finish & Reset requested.")
+
+        # 1. Clear all data in the state manager
+        self._state_manager.reset()
+
+        # 2. Command all sub-controllers to reset their views
+        for name, controller in self.sub_controllers.items():
+            # It's good practice to check if the reset method exists
+            if hasattr(controller, 'reset_view'):
+                controller.reset_view()
+
+        # 3. Command the main wizard view to return to the first page
+        self._view.set_current_step(0)
 
     def _print_customer_state(self, customer: Customer):
         print("\n--- STEP 1 COMPLETE: Customer Data ---")

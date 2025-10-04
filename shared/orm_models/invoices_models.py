@@ -1,3 +1,5 @@
+# shared/orm_models/invoices_models
+
 from sqlalchemy import (
     Integer, Text, Date, ForeignKey, CheckConstraint, Index
 )
@@ -12,24 +14,31 @@ class IssuedInvoiceModel(BaseInvoices):
     __tablename__ = 'issued_invoices'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    invoice_number: Mapped[int] = mapped_column(Integer, nullable=False, unique=True)
+    invoice_number: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+
     name: Mapped[str] = mapped_column(Text, nullable=False)
-    national_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    national_id: Mapped[str] = mapped_column(Text, nullable=False)
     phone: Mapped[str] = mapped_column(Text, nullable=False)
+
     issue_date: Mapped[Date] = mapped_column(Date, nullable=False)
     delivery_date: Mapped[Date] = mapped_column(Date, nullable=False)
+
     translator: Mapped[str] = mapped_column(Text, nullable=False)
-    total_items: Mapped[Optional[int]] = mapped_column(Integer)
+
+    total_items: Mapped[int] = mapped_column(Integer, nullable=False)
     total_amount: Mapped[int] = mapped_column(Integer, nullable=False)
     total_translation_price: Mapped[int] = mapped_column(Integer, nullable=False)
     advance_payment: Mapped[int] = mapped_column(Integer, default=0)
     discount_amount: Mapped[int] = mapped_column(Integer, default=0)
     force_majeure: Mapped[int] = mapped_column(Integer, default=0)
     final_amount: Mapped[int] = mapped_column(Integer, nullable=False)
+
     payment_status: Mapped[int] = mapped_column(Integer, default=0)
     delivery_status: Mapped[int] = mapped_column(Integer, default=0)
 
-    # ⚡ FIXED: no real FK, just store the username
+    source_language: Mapped[str] = mapped_column(Text, nullable=False)
+    target_language: Mapped[str] = mapped_column(Text, nullable=False)
+
     username: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     pdf_file_path: Mapped[Optional[str]] = mapped_column(Text)
@@ -51,8 +60,8 @@ class InvoiceItemModel(BaseInvoices):
     __tablename__ = 'invoice_items'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    invoice_number: Mapped[int] = mapped_column(
-        Integer,
+    invoice_number: Mapped[str] = mapped_column(
+        Text,
         ForeignKey("issued_invoices.invoice_number", ondelete="CASCADE"),
         nullable=False
     )
@@ -61,25 +70,20 @@ class InvoiceItemModel(BaseInvoices):
     quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     page_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     additional_issues: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-
     is_official: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     has_judiciary_seal: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     has_foreign_affairs_seal: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-
     dynamic_price_1: Mapped[int] = mapped_column(Integer, default=0)
     dynamic_price_2: Mapped[int] = mapped_column(Integer, default=0)
     dynamic_price_amount_1: Mapped[int] = mapped_column(Integer, default=0)
     dynamic_price_amount_2: Mapped[int] = mapped_column(Integer, default=0)
-
     remarks: Mapped[Optional[str]] = mapped_column(Text)
-
     translation_price: Mapped[int] = mapped_column(Integer, default=0)
     certified_copy_price: Mapped[int] = mapped_column(Integer, default=0)
     registration_price: Mapped[int] = mapped_column(Integer, default=0)
     judiciary_seal_price: Mapped[int] = mapped_column(Integer, default=0)
     foreign_affairs_seal_price: Mapped[int] = mapped_column(Integer, default=0)
     additional_issues_price: Mapped[int] = mapped_column(Integer, default=0)
-
     total_price: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     __table_args__ = (

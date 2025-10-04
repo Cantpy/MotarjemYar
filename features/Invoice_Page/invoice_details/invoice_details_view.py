@@ -441,10 +441,10 @@ class InvoiceDetailsWidget(QWidget):
         }
         self.other_input_changed.emit(data)
 
-    def display_static_info(self, customer, office_info):
+    def display_static_info(self, customer, office_info, user_info):
         """Populates the non-editable fields once at the beginning."""
         # Invoice Info
-        self.user_label.setText("محمد سجادی")
+        self.user_label.setText(user_info.full_name)
 
         # Customer Info
         self.customer_name.setText(customer.name)
@@ -486,9 +486,6 @@ class InvoiceDetailsWidget(QWidget):
             self.copy_cert_cost_label.setText(to_persian_numbers(f"{details.certified_copy_costs:,} تومان"))
             self.office_affairs_cost_label.setText(to_persian_numbers(f"{details.office_costs:,} تومان"))
 
-            # --- FIX: REMOVED ALL setValue calls to the old, non-existent widgets ---
-            # The new design only updates the display labels, not the input fields themselves.
-
             # Update the display labels with word-based amounts
             discount_words = amount_to_persian_words(details.discount_amount)
             if discount_words:
@@ -518,9 +515,21 @@ class InvoiceDetailsWidget(QWidget):
         finally:
             self._is_programmatically_updating = False
             self._update_translation_direction()
-            # Unblock signals for the correct new widgets
             for w in [self.discount_input, self.emergency_input, self.advance_input]:
                 w.blockSignals(False)
+
+    def highlight_error(self, widget_name: str):
+        """Applies an error style to a specific widget by its name."""
+        widget_to_style = None
+        if widget_name == 'delivery_date':
+            widget_to_style = self.delivery_date_edit
+
+        if widget_to_style:
+            widget_to_style.setStyleSheet("border: 2px solid #e53e3e; border-radius: 4px;")
+
+    def clear_errors(self):
+        """Resets the stylesheet for all widgets that can be highlighted."""
+        self.delivery_date_edit.setStyleSheet("")
 
     def update_financial_limits(self, details: InvoiceDetails):
         """

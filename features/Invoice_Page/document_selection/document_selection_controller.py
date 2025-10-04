@@ -138,3 +138,7 @@ class DocumentSelectionController(QObject):
             self._populate_view_completers()
 
             print("Fixed prices updated and application state refreshed successfully.")
+
+    def reset_view(self):
+        """Clears all fields in the invoice details view."""
+        self._on_clear_clicked()

@@ -36,13 +36,54 @@ class InvoiceDetailsController:
         """Public method called by MainWindow to kick off this step."""
         # 1. Display static info that never changes
         office_info = self._logic.get_static_office_info()
-        self._view.display_static_info(customer, office_info)
+        user_info = self._logic.get_static_user_info()
+        self._view.display_static_info(customer, office_info, user_info)
 
         # 2. Ask logic to calculate the initial DTO (this now applies default remarks)
         self._current_details = self._logic.create_initial_details(customer, items)
 
         # 3. Update the view and the global state with the initial DTO
         self._process_update(self._current_details)
+
+    def validate(self) -> (bool, str):
+        """
+        Checks if the essential data in the invoice details is valid.
+
+        Returns:
+            A tuple (is_valid: bool, error_message: str).
+            If valid, returns (True, "").
+            If invalid, returns (False, "The error message to display").
+        """
+        # First, clear any previous error highlights from the view
+        self._view.clear_errors()
+
+        # --- Rule: Delivery date must be set ---
+        # The .text() method of your DatePicker returns the displayed date string.
+        delivery_date_text = self._view.delivery_date_edit.text()
+
+        if not delivery_date_text or delivery_date_text.strip() == "":
+            # Command the view to highlight the specific widget
+            self._view.highlight_error('delivery_date')
+
+            # Return failure status and the message
+            error_msg = "تاریخ تحویل مشخص نشده است. لطفا یک تاریخ معتبر انتخاب کنید."
+            return False, error_msg
+
+        # Add any other validation rules here in the future
+        # if some_other_condition_is_bad:
+        #     self._view.highlight_error('some_other_widget')
+        #     return False, "Another error message."
+
+        # If all checks pass
+        return True, ""
+
+    def reset_view(self):
+        """Clears all fields in the invoice details view."""
+        # Create a new, empty details object to clear the form
+        empty_details = self._logic.create_empty_details()
+        self._view.update_display(empty_details)
+        self._view.delivery_date_edit.clear()
+        print("VIEW RESET: Invoice Details view cleared.")
 
     def _process_update(self, details: InvoiceDetails):
         """A central place to handle all updates."""

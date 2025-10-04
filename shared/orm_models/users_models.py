@@ -1,5 +1,8 @@
+# shared/orm_models/users_models.py
+
 from __future__ import annotations
-from sqlalchemy import ForeignKey, Integer, Text, Index, CheckConstraint, LargeBinary, Date, DateTime, func
+from datetime import datetime
+from sqlalchemy import ForeignKey, Integer, Text, Index, CheckConstraint, LargeBinary, Date, DateTime, func, String
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -20,6 +23,8 @@ class UsersModel(BaseUsers):
     expires_at: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[str | None] = mapped_column(Text)
     updated_at: Mapped[str | None] = mapped_column(Text)
+    failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False, server_default='0')
+    lockout_until_utc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     # 🔑 One-to-One relationship
     user_profile: Mapped["UserProfileModel"] = relationship(
@@ -34,6 +39,11 @@ class UsersModel(BaseUsers):
         "LoginLogsModel",
         back_populates="user",
         cascade="all, delete-orphan"
+    )
+
+    # 🔑 One-to-Many relationship to SecurityQuestions
+    security_questions: Mapped[list["SecurityQuestionModel"]] = relationship(
+        "SecurityQuestionModel", back_populates="user", cascade="all, delete-orphan"
     )
 
     __table_args__ = (
@@ -103,6 +113,7 @@ class TranslationOfficeDataModel(BaseUsers):
     __tablename__ = 'translation_office'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    license_key: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     reg_no: Mapped[str | None] = mapped_column(Text)
     representative: Mapped[str | None] = mapped_column(Text)
@@ -116,9 +127,27 @@ class TranslationOfficeDataModel(BaseUsers):
     telegram: Mapped[str | None] = mapped_column(Text)
     other_media: Mapped[str | None] = mapped_column(Text)
     open_hours: Mapped[str | None] = mapped_column(Text)
+    logo: Mapped[bytes | None] = mapped_column(LargeBinary)
     map_url: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[DateTime] = mapped_column(DateTime, default=func.current_timestamp())
     updated_at: Mapped[DateTime] = mapped_column(DateTime, default=func.current_timestamp())
 
     def __repr__(self) -> str:
         return f"<TranslationOfficeDataModel(id={self.id}, name={self.name!r})>"
+
+
+class SecurityQuestionModel(BaseUsers):
+    __tablename__ = 'security_questions'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    # The answer is hashed for security, just like a password.
+    answer_hash: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+
+    # 🔑 backref to UsersModel
+    user: Mapped[UsersModel] = relationship("UsersModel", back_populates="security_questions")
+
+    def __repr__(self) -> str:
+        return f"<SecurityQuestionModel(id={self.id}, user_id={self.user_id}, question='{self.question[:20]}...')>"

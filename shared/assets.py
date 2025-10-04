@@ -10,5 +10,7 @@ USERS_DB_URL = get_resource_path('databases', 'users.db')
 PAYROLL_DB_URL = get_resource_path('databases', 'payroll.db')
 INFO_PAGE_DB_URL = get_resource_path('databases', 'info_page.db')
 WORKSPACE_DB_URL = get_resource_path('databases', 'workspace.db')
+LICENSES_DB_URL = get_resource_path('databases', 'licenses.db')
 
-APP_LOGO = get_resource_path("resources", "png-icon.png", "Designs")
+
+APP_LOGO = get_resource_path("resources", "designs", "png-icon.png")

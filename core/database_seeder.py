@@ -11,13 +11,13 @@ class DatabaseSeeder:
     """
     Responsible for populating the databases with initial or default data.
     """
-
     def __init__(self, engines: dict[str, Engine]):
         self.engines = engines
 
-    def seed_initial_data(self):
+    def seed_initial_data(self, is_demo_mode: bool = False):
         print("Seeding initial application data...")
-        self._seed_default_user()
+        if is_demo_mode:
+            self._seed_default_user()
         self._seed_fixed_prices()
         print("Data seeding complete.")
 
@@ -62,8 +62,8 @@ class DatabaseSeeder:
             session.close()
 
     def _seed_default_user(self):
-        """Creates a default 'testuser' for development and testing."""
-        # Use the session provider to get the correct session
+        """Creates a default 'testuser' for development and testing in demo mode."""
+        print("Demo mode enabled: Seeding 'testuser'...")
         users_engine = self.engines.get('users')
         if not users_engine:
             print("Warning: 'users' engine not found. Skipping user seeding.")
@@ -73,23 +73,15 @@ class DatabaseSeeder:
         session = Session()
 
         try:
-            # Check if the user already exists
             user_exists = session.query(UsersModel).filter_by(username="testuser").first()
             if not user_exists:
-                # Best practice: Don't hardcode passwords.
-                # In a real app, this would come from a config file or environment variable.
                 password = "password123"
                 hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-
                 new_user = UsersModel(username="testuser", password_hash=hashed_password, role="translator", active=1)
                 session.add(new_user)
                 session.flush()
 
-                new_profile = UserProfileModel(
-                    user_id=new_user.id,
-                    full_name="کاربر آزمایشی",
-                    role_fa="مترجم"
-                )
+                new_profile = UserProfileModel(user_id=new_user.id, full_name="کاربر آزمایشی", role_fa="مترجم")
                 session.add(new_profile)
                 session.commit()
                 print("Default user 'testuser' created.")

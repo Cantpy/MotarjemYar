@@ -1,9 +1,9 @@
-# _view.py
-import os
+# features/Login/login_window_view.py
+
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QCheckBox,
                                QSpacerItem, QSizePolicy)
 from PySide6.QtCore import Qt, Signal, QSize
-from shared import show_error_message_box, show_warning_message_box, show_information_message_box
+
 from features.Login.login_window_styles import (LOGIN_WINDOW_STYLES, REMEMBER_ME_STYLES, LOGIN_SUCCESS_STYLES,
                                                 LOGIN_FAILED_STYLES, RESET_FORM_STYLES)
 
@@ -225,6 +225,6 @@ class LoginWidget(QWidget):
         self.login_text.setObjectName("login_text")
         self.login_text.setStyleSheet(RESET_FORM_STYLES)
         self.role_label.hide()
-        self.password_input.setEchoMode(QLineEdit.Password)
+        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
         self.show_password_btn.setText("نمایش")
         self.remember_me_checkbox.setChecked(False)

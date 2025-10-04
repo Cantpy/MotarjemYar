@@ -1,9 +1,11 @@
-# Login/login_window_repo.py
+# features/Login/login_window_repo.py
 
-from sqlalchemy.orm import joinedload
-from shared.orm_models.users_models import UsersModel
-from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
+from sqlalchemy.orm import joinedload, Session
 from sqlalchemy.exc import SQLAlchemyError
+
+from config.config import MAX_LOGIN_ATTEMPTS, LOCKOUT_DURATION_MINUTES
+from shared.orm_models.users_models import UsersModel, LoginLogsModel
 
 
 class LoginRepository:
@@ -13,16 +15,18 @@ class LoginRepository:
     def get_user_by_username(self, session: Session, username: str) -> UsersModel | None:
         """Fetch a user by username, eagerly loading their profile."""
         try:
-            user = session.query(UsersModel).options(joinedload(UsersModel.user_profile)).filter_by(username=username).first()
+            user = (session.query(UsersModel).options(joinedload(UsersModel.user_profile))
+                    .filter_by(username=username).first())
             return user
         except SQLAlchemyError as e:
             print(f"SQLAlchemyError in get_user_by_username: {e}")
-            raise   # Re-raise to allow service/_logic to handle transaction rollback
+            raise
         except Exception as e:
             print(f"Unexpected error in get_user_by_username: {e}")
             raise
 
-    def update_user_token(self, session: Session, username: str, token_hash: bytes | None, expires_at: str | None) -> None:
+    def update_user_token(self, session: Session,
+                          username: str, token_hash: bytes | None, expires_at: str | None) -> None:
         """Update a user's remember me token hash and expiration."""
         try:
             user = session.query(UsersModel).filter_by(username=username).first()
@@ -41,7 +45,8 @@ class LoginRepository:
     def get_user_full_name(self, session: Session, username: str) -> str:
         """Get user's full name from profile."""
         try:
-            user = session.query(UsersModel).options(joinedload(UsersModel.user_profile)).filter_by(username=username).first()
+            user = (session.query(UsersModel).options(joinedload(UsersModel.user_profile)).
+                    filter_by(username=username).first())
             if user and user.user_profile:  # Changed to user_profile
                 return user.user_profile.full_name or "کاربر میهمان"
             return "کاربر میهمان"
@@ -51,3 +56,41 @@ class LoginRepository:
         except Exception as e:
             print(f"Unexpected error in get_user_full_name: {e}")
             raise
+
+    def create_login_log_entry(self, session: Session, user_id: int, login_time: datetime) -> LoginLogsModel:
+        """Creates a new record in the login_logs table and returns it."""
+        new_log = LoginLogsModel(
+            user_id=user_id,
+            login_time=login_time.isoformat(),
+            status='success' or 'auto_login_success'
+        )
+        session.add(new_log)
+        session.flush()
+        return new_log
+
+    def update_logout_time(self, session: Session, log_id: int, logout_time: datetime) -> None:
+        """Finds a log entry by its ID and updates the logout_time."""
+        log_entry = session.get(LoginLogsModel, log_id)
+        if log_entry:
+            log_entry.logout_time = logout_time.isoformat()
+            # You could also calculate and store the duration here
+            login_dt = datetime.fromisoformat(log_entry.login_time)
+            duration_seconds = (logout_time - login_dt).total_seconds()
+            log_entry.time_on_app = int(duration_seconds)
+
+    def record_failed_login(self, session: Session, user: UsersModel) -> None:
+        """
+        Increments the failed login counter for a user and locks their
+        account if the threshold is exceeded.
+        """
+        user.failed_login_attempts += 1
+        if user.failed_login_attempts >= MAX_LOGIN_ATTEMPTS:
+            lockout_time = datetime.utcnow() + timedelta(minutes=LOCKOUT_DURATION_MINUTES)
+            user.lockout_until_utc = lockout_time
+            print(f"User '{user.username}' account locked until {lockout_time.isoformat()} UTC.")
+
+    def reset_login_attempts(self, session: Session, user: UsersModel) -> None:
+        """Resets the failed login counter and unlocks the account."""
+        if user.failed_login_attempts > 0 or user.lockout_until_utc is not None:
+            user.failed_login_attempts = 0
+            user.lockout_until_utc = None

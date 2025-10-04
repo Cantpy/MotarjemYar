@@ -1,12 +1,12 @@
-# orm_models.py
+# features/Invoice_Page/invoice_preview/invoice_preview_models.py
 
 from dataclasses import dataclass, field
-from typing import List, Optional
-from datetime import date
+from typing import List
+from datetime import datetime
 
 
 @dataclass
-class TranslationOffice:
+class PreviewOfficeInfo:
     """Represents the contact and identity information for the translation office."""
     name: str
     reg_no: str
@@ -14,8 +14,10 @@ class TranslationOffice:
     address: str
     phone: str
     email: str
-    socials: str
-    logo_path: str
+    website: str
+    whatsapp: str
+    telegram: str
+    logo: bytes | None = None
 
 
 @dataclass
@@ -42,11 +44,11 @@ class PreviewItem:
 class Invoice:
     """Represents the entire invoice data for a single transaction."""
     invoice_number: str
-    issue_date: date
-    delivery_date: date
+    issue_date: datetime
+    delivery_date: datetime
     username: str
     customer: Customer
-    office: TranslationOffice
+    office: PreviewOfficeInfo
     source_language: str
     target_language: str
     items: List[PreviewItem] = field(default_factory=list)

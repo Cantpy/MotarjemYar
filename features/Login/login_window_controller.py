@@ -1,10 +1,12 @@
-# controller.py
+# features/Login/login_window_controller.py
+
 from PySide6.QtCore import QTimer, QObject, Signal, Slot
 from features.Login.login_window_view import LoginWidget
 from features.Login.login_window_logic import LoginService
 from features.Login.login_window_models import UserLoginDTO
+from shared.dtos.auth_dtos import LoggedInUserDTO
 
-from shared import show_error_message_box, show_information_message_box, show_warning_message_box
+from shared import show_error_message_box, show_warning_message_box
 from shared.utils.login_utils import get_persian_role_text
 
 
@@ -12,7 +14,7 @@ class LoginController(QObject):
     """
     Controller for the login window, mediating between the _view and the service layer.
     """
-    login_successful = Signal(str, str)
+    login_successful = Signal(LoggedInUserDTO)
 
     def __init__(self, view: LoginWidget, logic: LoginService):
         super().__init__()
@@ -50,7 +52,7 @@ class LoginController(QObject):
         if success and user_dto:
             role_text = get_persian_role_text(user_dto.role, user_dto.role_fa)
             self._view.login_successful_ui(user_dto.full_name, role_text)
-            self.login_successful.emit(user_dto.username, user_dto.role)
+            self.login_successful.emit(user_dto)
         else:
             self._view.login_failed_ui(message)
             show_error_message_box(self._view, "خطا", message)
@@ -64,7 +66,7 @@ class LoginController(QObject):
             role_text = get_persian_role_text(user_dto.role, user_dto.role_fa)
             self._view.set_remember_me_checkbox(True)
             self._view.login_successful_ui(user_dto.full_name, role_text)
-            self.login_successful.emit(user_dto.username, user_dto.role)
+            self.login_successful.emit(user_dto)
         else:
             self._view.reset_form_ui()
 

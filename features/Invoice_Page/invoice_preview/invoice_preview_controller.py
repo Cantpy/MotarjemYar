@@ -1,6 +1,6 @@
 # features/Invoice_Page/invoice_preview/invoice_preview_controller.py
 
-from PySide6.QtWidgets import QFileDialog, QMessageBox, QApplication, QWidget
+from PySide6.QtWidgets import QFileDialog, QApplication, QDialog
 from PySide6.QtGui import QPixmap, QPainter, QPageSize, QRegion
 from PySide6.QtPrintSupport import QPrinter, QPrintDialog
 from PySide6.QtCore import QPoint
@@ -10,8 +10,10 @@ from typing import Callable
 from features.Invoice_Page.invoice_preview.invoice_preview_view import MainInvoicePreviewWidget
 from features.Invoice_Page.invoice_preview.invoice_preview_logic import InvoicePreviewLogic
 from features.Invoice_Page.invoice_page_state_manager import WorkflowStateManager
+from features.Invoice_Page.invoice_preview.invoice_preview_settings_dialog import SettingsDialog
 
-from shared import show_warning_message_box, show_information_message_box, show_error_message_box
+from shared import (show_warning_message_box, show_information_message_box, show_error_message_box,
+                    show_question_message_box)
 
 
 class InvoicePreviewController:
@@ -19,6 +21,7 @@ class InvoicePreviewController:
     Manages the application flow for the preview step, connecting the
     UI (View) with the business _logic (Logic).
     """
+
     def __init__(self, view: MainInvoicePreviewWidget, logic: InvoicePreviewLogic, state_manager: WorkflowStateManager):
         self._state_manager = state_manager
         self._logic = logic
@@ -30,6 +33,10 @@ class InvoicePreviewController:
 
         self._connect_signals()
 
+    def get_view(self) -> MainInvoicePreviewWidget:
+        """"""
+        return self._view
+
     def _connect_signals(self):
         """Connects signals from the _view to slots in this controller."""
         self._view.print_clicked.connect(self.print_invoice)
@@ -37,6 +44,8 @@ class InvoicePreviewController:
         self._view.save_png_clicked.connect(self.save_as_png)
         self._view.next_page_clicked.connect(self.next_page)
         self._view.prev_page_clicked.connect(self.prev_page)
+        self._view.issue_clicked.connect(self.issue_invoice)
+        self._view.settings_clicked.connect(self._on_settings_requested)
 
     def prepare_and_display_data(self):
         """Assembles the final invoice and updates the _view for the first time."""
@@ -46,7 +55,6 @@ class InvoicePreviewController:
         assignments = self._state_manager.get_assignments()
 
         if not all([customer, details, assignments]):
-            print("ERROR: Missing data in state manager.")
             show_error_message_box(self._view, "خطای داده", "اطلاعات لازم برای ساخت پیش‌نمایش فاکتور یافت نشد.")
             return
 
@@ -61,8 +69,51 @@ class InvoicePreviewController:
     def _update_view(self):
         """Fetches the correct items for the current page and tells the _view to render."""
         if not self._invoice: return
+
+        settings = self._logic.settings_manager.get_current_settings()
         items = self._logic.get_items_for_page(self._invoice, self.current_page)
-        self._view.update_view(self._invoice, items, self.current_page, self.total_pages)
+
+        existing_invoice_orm = self._logic.get_issued_invoice(self._invoice.invoice_number)
+        is_issued = existing_invoice_orm is not None
+
+        # 2. Call the view's update method
+        self._view.update_view(self._invoice, items, self.current_page, self.total_pages, settings)
+
+        # 3. Explicitly command the view's pagination panel
+        self._view.control_panel.issue_button.setEnabled(not is_issued)
+
+    def issue_invoice(self):
+        """
+        Handles the user request to finalize and save the invoice to the database.
+        """
+        if not self._invoice:
+            show_error_message_box(self._view, "خطا", "فاکتوری برای صدور وجود ندارد.")
+            return
+
+        def issue_invoice():
+            # 2. Get the full assignment data from the state manager
+            assignments = self._state_manager.get_assignments()
+
+            # 3. Call the logic layer to perform the operation
+            success, message = self._logic.issue_invoice_in_database(self._invoice, assignments)
+
+            # 4. Provide feedback to the user
+            if success:
+                show_information_message_box(self._view, "موفق", message)
+                # Refresh the view to disable the button
+                self._update_view()
+            else:
+                show_error_message_box(self._view, "خطا", message)
+
+        # Confirm with the user
+        title = "تایید صدور فاکتور"
+        message = (f"آیا از صدور و ثبت نهایی فاکتور شماره {self._invoice.invoice_number} اطمینان دارید؟\n"
+                   "در صورت وجود فاکتور با این شماره، اطلاعات قبلی بازنویسی خواهد شد.")
+        button_1 = "بله"
+        button_2 = "خیر"
+        button_3 = "انصراف"
+        show_question_message_box(parent=self._view, title=title, message=message,
+                                  button_1=button_1, button_2=button_2, button_3=button_3, yes_func=issue_invoice)
 
     def next_page(self):
         if self.current_page < self.total_pages:
@@ -108,25 +159,44 @@ class InvoicePreviewController:
         )
 
     def _handle_save_operation(self, save_logic_func: Callable[[str], bool], file_dialog_title: str, file_filter: str):
-        """Manages the check-confirm-save workflow."""
-        if not self._invoice: return
+        """
+        Manages the check-confirm-save workflow. Checks if a file already exists
+        and acts accordingly.
+        """
+        if not self._invoice:
+            return
 
         invoice_number = self._invoice.invoice_number
         existing_path = self._logic.get_invoice_path(invoice_number)
 
         if existing_path:
-            reply = QMessageBox.question(self._view, "تایید ذخیره مجدد",
-                                         f"این فاکتور قبلاً ذخیره شده است. آیا می‌خواهید بازنویسی کنید؟",
-                                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                                         QMessageBox.StandardButton.No)
-            if reply == QMessageBox.StandardButton.No:
-                return
+            # Case 1: The invoice was saved before. Ask to overwrite.
+            def save_anyway():
+                self._prompt_and_save(save_logic_func, file_dialog_title, file_filter)
 
-        file_path, _ = QFileDialog.getSaveFileName(self._view, file_dialog_title, f"Invoice-{invoice_number}",
-                                                   file_filter)
+            title = "تایید ذخیره مجدد"
+            message = f"این فاکتور قبلاً ذخیره شده است. آیا می‌خواهید بازنویسی کنید؟"
+            show_question_message_box(parent=self._view, title=title, message=message,
+                                      button_1="بله", button_2="خیر",
+                                      yes_func=save_anyway)
+        else:
+            # Case 2: The invoice has never been saved. Prompt to save directly.
+            self._prompt_and_save(save_logic_func, file_dialog_title, file_filter)
+
+    def _prompt_and_save(self, save_logic_func: Callable[[str], bool], file_dialog_title: str, file_filter: str):
+        """
+        Handles the core logic: showing the file dialog, saving the file, updating the DB,
+        and providing user feedback.
+        """
+        invoice_number = self._invoice.invoice_number
+        default_path = f"Invoice-{invoice_number}"
+        file_path, _ = QFileDialog.getSaveFileName(self._view, file_dialog_title, default_path, file_filter)
+
+        # If user cancels the dialog, file_path will be empty
         if not file_path:
             return
 
+        # Call the appropriate save function (PDF or PNG)
         if save_logic_func(file_path):
             if self._logic.update_invoice_path(invoice_number, file_path):
                 show_information_message_box(self._view, "موفق", f"فاکتور با موفقیت ذخیره شد:\n{file_path}")
@@ -154,7 +224,7 @@ class InvoicePreviewController:
 
     def print_invoice(self):
         """Opens a print dialog and prints the document."""
-        if not self._logic.invoice:
+        if not self._invoice:
             show_error_message_box(self._view, "خطا", "فاکتوری برای چاپ وجود ندارد.")
             return
 
@@ -198,5 +268,42 @@ class InvoicePreviewController:
             self._update_view()
         return True
 
-    def get_view(self) -> QWidget:
-        return self._view
+    def _on_settings_requested(self):
+        """Opens the settings dialog and applies changes if accepted."""
+        # Get current settings to populate the dialog
+        current_settings = self._logic.settings_manager.get_current_settings()
+
+        dialog = SettingsDialog(current_settings, self._view)
+
+        if dialog.exec() == QDialog.Accepted:
+            # Get new settings from the dialog
+            new_settings = dialog.get_new_settings()
+
+            # Tell the logic's manager to save them
+            self._logic.settings_manager.save_settings(new_settings)
+
+            # Immediately trigger a refresh of the view to apply the new settings
+            print("Settings updated. Refreshing view.")
+            self._update_view()
+
+    def reset_view(self):
+        """Resets the invoice preview view to its default empty state."""
+        empty_invoice = self._logic.create_empty_preview()
+
+        items_on_page = []
+        current_page = 1
+        total_pages = 1
+        settings = {}
+
+        self._view.update_view(empty_invoice, items_on_page, current_page, total_pages, settings)
+        # Optionally clear static UI fields if they are outside update_view()
+        if hasattr(self, "customer_name"):
+            self.customer_name.setText("نامشخص")
+
+        # Disable export/print buttons since there's no invoice
+        self._view.control_panel.export_button.setEnabled(False)
+        self._view.control_panel.issue_button.setEnabled(False)
+        self._view.control_panel.prev_button.setEnabled(False)
+        self._view.control_panel.next_button.setEnabled(False)
+
+        print("VIEW RESET: Invoice preview cleared to default state.")

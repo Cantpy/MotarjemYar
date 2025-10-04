@@ -2,17 +2,25 @@
 
 import sys
 import time
-from PySide6.QtWidgets import QApplication, QWidget
-from PySide6.QtCore import Qt
+
 from pathlib import Path
 from sqlalchemy import Engine
+from sqlalchemy.orm import sessionmaker
+
+from PySide6.QtWidgets import QApplication, QWidget, QDialog
+from PySide6.QtCore import Qt, Slot
 
 from core.database_init import DatabaseInitializer
 from core.database_seeder import DatabaseSeeder
 from config.config import DATABASE_PATHS
 
+from features.Setup_Wizard.setup_wizard_factory import SetupWizardFactory
 from features.Login.login_window_factory import LoginWindowFactory
 from features.Main_Window.main_window_factory import MainWindowFactory
+
+from shared.dtos.auth_dtos import LoggedInUserDTO
+from shared.orm_models.license_models import LicenseModel
+from shared.orm_models.users_models import UsersModel
 
 
 class CheckpointTimer:
@@ -45,11 +53,8 @@ class ApplicationManager:
     def __init__(self):
         self.timer = CheckpointTimer()
         self.timer.checkpoint("AppManager.__init__")
-
         self.app: QApplication = None
-
         self.engines: dict[str, Engine] = {}
-
         self.active_controller = None
 
     def start_application(self) -> int:
@@ -60,11 +65,9 @@ class ApplicationManager:
         self.app = QApplication(sys.argv)
         self.timer.checkpoint("QApplication created")
 
+        # --- STEP 1: INITIALIZE DATABASES ---
         PROJECT_ROOT = Path(__file__).resolve().parent.parent
-        database_absolute_paths = {
-            name: str(PROJECT_ROOT / path) for name, path in DATABASE_PATHS.items()
-        }
-
+        database_absolute_paths = {name: str(PROJECT_ROOT / path) for name, path in DATABASE_PATHS.items()}
         initializer = DatabaseInitializer()
         is_demo_mode = "--demo" in self.app.arguments()
 
@@ -72,14 +75,25 @@ class ApplicationManager:
             self.engines = initializer.setup_memory_databases()
         else:
             self.engines = initializer.setup_file_databases(database_absolute_paths)
-
         self.timer.checkpoint("Database engines initialized")
 
-        # The seeder takes the dictionary of engines
+        # --- STEP 2: CHECK IF SETUP IS REQUIRED ---
+        if self._is_setup_required():
+            self.timer.checkpoint("Setup required. Launching wizard...")
+            setup_successful = self.run_setup_wizard()
+            if not setup_successful:
+                print("Setup was cancelled by the user. Exiting application.")
+                return 1  # Exit with an error code
+            self.timer.checkpoint("Setup wizard completed successfully.")
+        else:
+            self.timer.checkpoint("Setup not required. Proceeding with normal startup.")
+
+        # --- STEP 3: SEED DATA (NOW SAFEGUARDED) ---
         seeder = DatabaseSeeder(self.engines)
-        seeder.seed_initial_data()
+        seeder.seed_initial_data(is_demo_mode=is_demo_mode)
         self.timer.checkpoint("Database seeding complete")
 
+        # --- STEP 4: PROCEED TO LOGIN/MAIN WINDOW ---
         users_engine = self.engines.get('users')
         if not users_engine:
             raise RuntimeError("The 'users' database engine is required but was not found.")
@@ -89,51 +103,111 @@ class ApplicationManager:
 
         if auto_login_successful and user_dto:
             self.timer.checkpoint(f"Auto-login success for '{user_dto.username}'")
-            self.transition_to_main_window(user_dto.username, user_dto.role)
+            temp_login_controller._logic.start_session(user_dto)
+            self.transition_to_main_window(user_dto)
         else:
             self.timer.checkpoint("Auto-login failed or not enabled")
             self.show_login()
 
-        # --- STEP 4: START THE EVENT LOOP ---
+        # --- STEP 5: START THE EVENT LOOP ---
         self.timer.checkpoint("Starting app event loop")
         exit_code = self.app.exec()
         self.timer.summary()
         return exit_code
 
+    def _is_setup_required(self) -> bool:
+        """
+        Checks if the application is fully configured. A complete setup
+        requires BOTH a license AND at least one admin user.
+        """
+        license_engine = self.engines.get('licenses')
+        users_engine = self.engines.get('users')
+        if not license_engine or not users_engine:
+            raise RuntimeError("Both 'licenses' and 'users' engines are required for setup check.")
+
+        # Check for license existence
+        LicenseSession = sessionmaker(bind=license_engine)
+        license_session = LicenseSession()
+        try:
+            license_exists = license_session.query(LicenseModel).first() is not None
+        finally:
+            license_session.close()
+
+        # Check for admin user existence
+        UserSession = sessionmaker(bind=users_engine)
+        user_session = UserSession()
+        try:
+            admin_exists = user_session.query(UsersModel).filter(UsersModel.role == 'admin').first() is not None
+        finally:
+            user_session.close()
+
+        # If either one is missing, setup is required.
+        return not license_exists or not admin_exists
+
+    def run_setup_wizard(self) -> bool:
+        """
+        Creates and runs the setup wizard modally.
+        The application will wait here until the wizard is finished or cancelled.
+        Returns True if the wizard was completed, False otherwise.
+        """
+        users_engine = self.engines.get('users')
+        license_engine = self.engines.get('licenses')
+
+        # 1. Create the wizard using the factory
+        wizard_controller = SetupWizardFactory.create(
+            user_db_engine=users_engine,
+            license_db_engine=license_engine
+        )
+
+        # 2. Get the view from the controller
+        wizard_view = wizard_controller.get_view()
+
+        # 3. Ask the controller to PREPARE the wizard. This sets the start page.
+        #    It does NOT show the window.
+        needs_run = wizard_controller.prepare_wizard()
+        if not needs_run:
+            # This is a safeguard; _is_setup_required should prevent this case.
+            return True
+
+        # 4. EXECUTE the prepared wizard modally. This is a BLOCKING call.
+        #    The code will pause here until the user finishes or cancels.
+        result_code = wizard_view.exec()
+
+        # 5. Return True only if the user clicked "Finish".
+        return result_code == QDialog.Accepted
+
     def show_login(self):
         """Creates and shows the login window feature using its factory."""
         self.timer.checkpoint("show_login()")
-
         users_engine = self.engines.get('users')
         if not users_engine:
-            # In a real app, you might show an error dialog here
             raise RuntimeError("Cannot show login window: 'users' database engine is missing.")
 
         self.active_controller = LoginWindowFactory.create(engine=users_engine)
         self.active_controller.login_successful.connect(self.on_login_successful)
-
         login_view = self.active_controller.get_view()
         login_view.show()
         self.timer.checkpoint("Login window displayed")
 
-    def on_login_successful(self, username: str, role: str):
+    @Slot(LoggedInUserDTO)
+    def on_login_successful(self, user_dto: LoggedInUserDTO):
         """Handles the transition after a successful manual login."""
-        self.timer.checkpoint(f"Manual login success for '{username}'")
+        self.timer.checkpoint(f"Manual login success for '{user_dto.username}'")
         if self.active_controller:
+            self.active_controller._logic.start_session(user_dto)
             self.active_controller.get_view().close()
             self.active_controller = None
-        self.transition_to_main_window(username, role)
+        self.transition_to_main_window(user_dto)
 
-    def transition_to_main_window(self, username: str, role: str):
+    def transition_to_main_window(self, user_dto: LoggedInUserDTO):
         """Shows a splash screen, then creates and shows the main window feature."""
         splash = self._create_splash_screen()
         splash.show()
         self.app.processEvents()
         self.timer.checkpoint("Splash screen shown")
 
-        self.active_controller = MainWindowFactory.create(engines=self.engines, username=username)
-
-        self.active_controller.initialize_with_user(username)
+        self.active_controller = MainWindowFactory.create(engines=self.engines, username=user_dto.username)
+        self.active_controller.initialize_with_user(user_dto.username)
 
         main_view = self.active_controller.get_view()
         splash.close()
@@ -146,3 +220,9 @@ class ApplicationManager:
         splash_widget.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         splash_widget.resize(400, 300)
         return splash_widget
+
+    def on_app_quit(self):
+        """Slot for when the QApplication is about to quit."""
+        print("Application is closing. Ending session.")
+        temp_login_controller = LoginWindowFactory.create(engine=self.engines.get('users'))
+        temp_login_controller._logic.end_session()

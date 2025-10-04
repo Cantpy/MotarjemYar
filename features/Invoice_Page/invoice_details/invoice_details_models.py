@@ -1,30 +1,28 @@
 # features/Invoice_Page/invoice_details/invoice_details_models.py
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
+from features.Invoice_Page.invoice_preview.invoice_preview_models import PreviewOfficeInfo
 
 
 @dataclass
-class OfficeInfo:
-    """Represents the translation office's data."""
-    name: str = ""
-    reg_no: str = ""
-    representative: str = ""
-    address: str = ""
-    phone: str = ""
-    email: str = ""
-    socials: str = ""
+class UserInfo:
+    """Represents the logged-in user's data."""
+    full_name: str = "نامشخص"
+    role: str = "نامشخص"
+    role_fa: str = "نامشخص"
+    username: str = "نامشخص"
 
 
 @dataclass
 class InvoiceDetails:
     """Holds all calculated and user-inputted data for the details step."""
     # Factual Info
-    invoice_number: int = 0
+    invoice_number: str = ""
     docu_num: int = 0
     issue_date: str = ""
     delivery_date: str = ""
-    user: str = "نامشخص"
+    user: UserInfo = field(default_factory=UserInfo)
     src_lng: str = "فارسی"
     trgt_lng: str = "انگلیسی"
 
@@ -53,7 +51,7 @@ class InvoiceDetails:
     final_amount: int = 0
 
     # Office Info
-    office_info: OfficeInfo = None
+    office_info: PreviewOfficeInfo | None = None
 
 
 class Language(Enum):

@@ -5,38 +5,43 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import date
 
-from shared.orm_models.invoices_models import IssuedInvoiceModel
+from shared.orm_models.invoices_models import IssuedInvoiceModel, InvoiceItemModel
 
 
 # --- Repository for Data Export ---
 class InvoicePreviewRepository:
-    """Handles database operations for exporting invoice data."""
-    def _ensure_dummy_invoice_exists(self, session: Session, invoice_number: str):
+    """
+    Handles database operations for exporting invoice data.
+    """
+    def issue_invoice(self, session: Session,
+                      invoice_orm: IssuedInvoiceModel,
+                      items_orm: list[InvoiceItemModel]) -> tuple[bool, str]:
         """
-        Creates a complete and valid placeholder invoice record
-        to satisfy all NOT NULL constraints.
+        Saves a new invoice and its items to the database in a single transaction.
+        If an invoice with the same number exists, it will be overwritten.
         """
         try:
-            exists = session.query(IssuedInvoiceModel).filter_by(invoice_number=invoice_number).first()
-            if not exists:
-                # Create a record with all required fields populated
-                dummy_invoice = IssuedInvoiceModel(
-                    invoice_number=invoice_number,
-                    name="مشتری نمونه",
-                    national_id="0000000000",
-                    phone="09000000000",
-                    issue_date=date.today(),
-                    delivery_date=date.today(),
-                    translator="مترجم نمونه",
-                    total_amount=1000.0,
-                    total_translation_price=1000.0,
-                    final_amount=1000.0,
-                    pdf_file_path=None  # Path is initially null
-                )
-                session.add(dummy_invoice)
-                session.commit()
-        finally:
-            session.close()
+            # Check if the invoice already exists to overwrite it
+            existing_invoice = session.query(IssuedInvoiceModel).filter_by(
+                invoice_number=invoice_orm.invoice_number
+            ).first()
+
+            if existing_invoice:
+                # The ondelete="CASCADE" in the relationship should handle deleting the old items
+                session.delete(existing_invoice)
+                # Flush the session to execute the delete command before adding the new one
+                session.flush()
+
+            # Add the new invoice and its items
+            session.add(invoice_orm)
+            session.add_all(items_orm)
+            session.commit()
+            return True, "فاکتور با موفقیت صادر و در پایگاه داده ثبت شد."
+
+        except SQLAlchemyError as e:
+            session.rollback()
+            print(f"Database error during invoice issue: {e}")
+            return False, f"خطا در ثبت فاکتور در پایگاه داده: {e}"
 
     def get_invoice_path(self, session: Session, invoice_number: str) -> str | None:
         """Retrieves the saved file path for a given invoice number."""
@@ -62,3 +67,6 @@ class InvoicePreviewRepository:
             print(f"Database error while updating path: {e}")
             session.rollback()
             return False
+
+    def get_issued_invoice(self, session: Session, invoice_number: str) -> IssuedInvoiceModel | None:
+        return session.query(IssuedInvoiceModel).filter_by(invoice_number=invoice_number).first()

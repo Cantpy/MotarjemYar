@@ -1,4 +1,5 @@
-# workflow_state_manager.py
+# features/Invoice_Page/invoice_page_state_manager.py
+
 from PySide6.QtCore import QObject, Signal
 from features.Invoice_Page.customer_info.customer_info_models import Customer
 from features.Invoice_Page.document_selection.document_selection_models import InvoiceItem
@@ -40,6 +41,20 @@ class WorkflowStateManager(QObject):
 
     def get_invoice_details(self) -> InvoiceDetails:
         return self._invoice_details
+
+    def reset(self):
+        """Resets all state variables to their initial empty state."""
+        self._customer = None
+        self._invoice_items = []
+        self._assignments = {}
+        self._invoice_details = None
+        print("STATE RESET: All workflow data has been cleared.")
+
+        # Emit signals to notify listeners that the data has been cleared
+        self.customer_updated.emit(None)
+        self.invoice_items_updated.emit([])
+        self.assignments_updated.emit({})
+        self.invoice_details_updated.emit(None)
 
     # --- Public slots to update the state ---
     def set_customer(self, customer: Customer):

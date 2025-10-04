@@ -28,11 +28,15 @@ class InvoiceWizardFactory:
 
         state_manager = WorkflowStateManager()
         sub_controllers = {
-            'customer': CustomerInfoFactory.create(customer_engine=customer_engine),
-            'documents': DocumentSelectionFactory.create(services_engine=services_engine),
+            'customer': CustomerInfoFactory.create(customer_engine=customer_engine,
+                                                   state_manager=state_manager),
+            'documents': DocumentSelectionFactory.create(services_engine=services_engine,
+                                                         state_manager=state_manager),
             'assignment': AssignmentWidget(state_manager=state_manager),
-            'details': InvoiceDetailsFactory.create(users_engine=users_engine, invoices_engine=invoices_engine),
-            'preview': InvoicePreviewFactory.create(invoices_engine=invoices_engine)
+            'details': InvoiceDetailsFactory.create(users_engine=users_engine, invoices_engine=invoices_engine,
+                                                    state_manager=state_manager),
+            'preview': InvoicePreviewFactory.create(invoices_engine=invoices_engine,
+                                                    state_manager=state_manager)
         }
 
         wizard_view = InvoiceWizardWidget(parent=parent)
