@@ -1,5 +1,7 @@
+# shared/orm_models/customer_models.py
+
 from __future__ import annotations
-from sqlalchemy import Column, Integer, Text, Index, ForeignKey
+from sqlalchemy import Integer, Text, Index, ForeignKey
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.ext.declarative import declarative_base
 

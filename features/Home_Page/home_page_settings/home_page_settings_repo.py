@@ -2,9 +2,11 @@
 
 import json
 import logging
-from pathlib import Path
 from typing import Optional
+from pathlib import Path
 from features.Home_Page.home_page_settings.home_page_settings_models import Settings, StatCardConfig
+
+from shared.utils.path_utils import get_user_data_path
 
 logger = logging.getLogger(__name__)
 
@@ -13,8 +15,8 @@ class HomepageSettingsRepository:
     """
     Stateless _repository for persisting homepage settings to a JSON file.
     """
-    SETTINGS_FILE = Path("resources") / Path("config") / "homepage_settings.json"
-    BACKUP_FILE = Path("resources") / Path("config") / "homepage_settings_backup.json"
+    SETTINGS_FILE = get_user_data_path("config", "homepage_settings.json")
+    BACKUP_FILE = get_user_data_path("config", "homepage_settings_backup.json")
 
     def load(self) -> Optional[Settings]:
         """Loads settings from file, with fallback to backup."""

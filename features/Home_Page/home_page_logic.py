@@ -1,16 +1,16 @@
-# home_page/_logic.py
+# features/Home_Page/home_page_logic.py
 
 import jdatetime
 from datetime import date, timedelta
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 import requests
 
-# Import the stateless _repository and the DTOs
 from features.Home_Page.home_page_repo import HomePageRepository
-from features.Home_Page.home_page_models import TimeInfo, DashboardStats, StatusChangeRequest
+from features.Home_Page.home_page_models import TimeInfo, DashboardStats, StatusChangeRequest, InvoiceDTO, CustomerDTO
+
 from shared.dtos.notification_dialog_dtos import NotificationDataDTO, SmsRequestDTO, EmailRequestDTO
-from shared.dtos.invoice_dtos import IssuedInvoiceDTO
 from shared.orm_models.invoices_models import IssuedInvoiceModel
+
 from shared.utils.persian_tools import to_persian_numbers
 from shared.enums import DeliveryStatus
 from shared.session_provider import ManagedSessionProvider
@@ -55,7 +55,7 @@ class HomePageLogic:
             most_repeated_document_month=most_repeated_month_formatted
         )
 
-    def get_recent_invoices_with_priority(self, days_threshold: int = 7) -> List[Tuple[IssuedInvoiceDTO, str]]:
+    def get_recent_invoices_with_priority(self, days_threshold: int) -> list[tuple[InvoiceDTO, str]]:
         """
         Get recent invoices with priority labels.
         This business _logic does not belong in the _repository.
@@ -63,6 +63,7 @@ class HomePageLogic:
         today = date.today()
         threshold_date = today + timedelta(days=days_threshold)
 
+        print(f'finding invoices between {today} to {threshold_date}')
         invoice_priority_list = []
         with self._invoices_session() as session:
             invoice_models = self._repository.get_invoices_by_delivery_date_range(
@@ -71,47 +72,60 @@ class HomePageLogic:
                 end_date=threshold_date,
                 exclude_completed=True
             )
+            print(f'found {len(invoice_models)} invoice(s)')
 
             for model in invoice_models:
                 priority = self._calculate_priority(model.delivery_date, today)
-                # Convert ORM Model to DTO for the layer above
-                invoice_dto = self._map_orm_to_invoice_dto(model)
+                invoice_dto = self.map_orm_to_invoice_dto(model)
                 invoice_priority_list.append((invoice_dto, priority))
 
         # Sorting is business _logic
         invoice_priority_list.sort(key=lambda x: x[0].delivery_date)
         return invoice_priority_list
 
-    def get_data_for_notification(self, invoice_number: int) -> Optional[NotificationDataDTO]:
-        """
-        Gathers the necessary customer and invoice data required for sending a notification.
-        This is a read-only unit of work that may span multiple databases.
-        """
-        # We need data from two different databases, so we'll use two sessions.
+    def get_data_for_notification(self, invoice_number: str) -> Optional[NotificationDataDTO]:
         with self._invoices_session() as invoice_session:
             invoice_model = self._repository.get_invoice_by_number(invoice_session, invoice_number)
 
-        if not invoice_model:
-            # If the invoice doesn't exist, we can't proceed.
-            return None
+            if not invoice_model:
+                raise Exception("اطلاعات فاکتور برای ارسال یافت نشد")
 
-        customer_model = None
-        if invoice_model.national_id:
-            national_id = str(invoice_model.national_id)
+            invoice_name = invoice_model.name
+            invoice_national_id = str(invoice_model.national_id)
+            invoice_phone = invoice_model.phone
+            invoice_number_value = invoice_model.invoice_number
+
+        print(f'found invoice for {invoice_name}, national id: {invoice_national_id}')
+
+        # Now safely open second session
+        customer_data = None
+        if invoice_national_id:
             with self._customer_session() as customer_session:
-                customer_model = self._repository.get_customer_by_national_id(customer_session,
-                                                                              national_id)
+                customer_model = self._repository.get_customer_by_national_id(customer_session, invoice_national_id)
+                if customer_model:
+                    # ✅ Extract values BEFORE closing session
+                    customer_data = {
+                        "name": customer_model.name,
+                        "phone": customer_model.phone,
+                        "email": customer_model.email,
+                        "national_id": customer_model.national_id
+                    }
 
-        # Now, map the data from our ORM models into the clean DTO.
-        # Prioritize the data from the official customer record, but fall back
-        # to the data stored on the invoice if necessary. This is business _logic!
-        customer_name = customer_model.name if customer_model else invoice_model.name
-        customer_phone = customer_model.phone if customer_model else invoice_model.phone
-        customer_email = customer_model.email if customer_model else None
+        if customer_data:
+            customer_name = customer_data["name"]
+            customer_phone = customer_data["phone"]
+            customer_email = customer_data["email"]
+            customer_national_id = customer_data["national_id"]
+        else:
+            customer_name = invoice_name
+            customer_phone = invoice_phone
+            customer_email = None
+            customer_national_id = invoice_national_id
 
         return NotificationDataDTO(
-            invoice_number=invoice_model.invoice_number,
+            invoice_number=invoice_number_value,
             customer_name=customer_name,
+            customer_national_id=customer_national_id,
             customer_phone=customer_phone,
             customer_email=customer_email
         )
@@ -151,12 +165,12 @@ class HomePageLogic:
                 session.rollback()
                 return False, f"خطای سیستمی: {str(e)}"
 
-    def get_invoice_for_menu(self, invoice_number: int) -> Optional[IssuedInvoiceDTO]:
+    def get_invoice_for_menu(self, invoice_number: str) -> Optional[InvoiceDTO]:
         """Gets the necessary invoice data (as a DTO) for creating a context menu."""
         with self._invoices_session() as session:
             invoice_model = self._repository.get_invoice_by_number(session, invoice_number)
             if invoice_model:
-                return self._map_orm_to_invoice_dto(invoice_model)
+                return self.map_orm_to_invoice_dto(invoice_model)
             return None
 
     def get_current_time_info(self) -> TimeInfo:
@@ -186,19 +200,18 @@ class HomePageLogic:
         return 'normal'
 
     @staticmethod
-    def _format_most_repeated_doc(raw_data: Optional[Tuple[str, int]]) -> Optional[str]:
+    def _format_most_repeated_doc(raw_data: Optional[Tuple[int, int]]) -> Optional[str]:
         if not raw_data:
             return None
-        name, total_qty = raw_data
-        # Formatting and conversion _logic lives here!
-        return f"{name} - {to_persian_numbers(total_qty)}"
+        service_id, total_qty = raw_data
+        return f"سرویس شماره {service_id} - {to_persian_numbers(total_qty)}"
 
     @staticmethod
-    def _format_most_repeated_doc_month(raw_data: Optional[Tuple[str, int, int, int]]) -> Optional[str]:
+    def _format_most_repeated_doc_month(raw_data: Optional[Tuple[int, int, int, int]]) -> Optional[str]:
         if not raw_data:
             return None
 
-        name, year, month, total_qty = raw_data
+        service_id, year, month, total_qty = raw_data
 
         persian_month_names = {1: "فروردین",
                                2: "اردیبهشت",
@@ -220,34 +233,79 @@ class HomePageLogic:
             persian_year = to_persian_numbers(g_date.year)
             persian_total_qty = to_persian_numbers(total_qty)
 
-            return f"{name} - {persian_month} {persian_year} - {persian_total_qty}"
+            # REFACTORED: Display the service ID.
+            return f"سرویس شماره {service_id} - {persian_month} {persian_year} - {persian_total_qty}"
         except (ValueError, TypeError):
             # Gracefully handle potential errors during conversion
-            return f"{name} (Data Error)"
+            return f"سرویس شماره {service_id} (Data Error)"
 
     @staticmethod
-    def _map_orm_to_invoice_dto(orm_invoice: IssuedInvoiceModel) -> IssuedInvoiceDTO:
-        """Maps an SQLAlchemy ORM object to a plain DTO."""
-        return IssuedInvoiceDTO(
-            invoice_number=orm_invoice.invoice_number,
-            name=orm_invoice.name,
-            national_id=orm_invoice.national_id,
-            phone=orm_invoice.phone,
-            issue_date=orm_invoice.issue_date,
-            delivery_date=orm_invoice.delivery_date,
-            translator=orm_invoice.translator,
-            total_items=orm_invoice.total_items,
-            total_amount=orm_invoice.total_amount,
-            total_translation_price=orm_invoice.total_translation_price,
-            advance_payment=orm_invoice.advance_payment,
-            discount_amount=orm_invoice.discount_amount,
-            force_majeure=orm_invoice.force_majeure,
-            final_amount=orm_invoice.final_amount,
-            payment_status=orm_invoice.payment_status,
-            delivery_status=orm_invoice.delivery_status,
-            username=orm_invoice.username,
-            pdf_file_path=orm_invoice.pdf_file_path,
+    def map_orm_to_invoice_dto(orm: IssuedInvoiceModel) -> InvoiceDTO:
+        """
+        Maps the IssuedInvoiceModel ORM object to an InvoiceDTO.
+        It correctly constructs the nested CustomerDTO from the flat
+        ORM attributes.
+        """
+        # Create the nested CustomerDTO object first
+        customer_dto = CustomerDTO(
+            name=orm.name,
+            national_id=orm.national_id,
+            phone=orm.phone
         )
+
+        # Now, create the main InvoiceDTO using the customer_dto
+        dto = InvoiceDTO(
+            invoice_number=orm.invoice_number,
+            issue_date=orm.issue_date,
+            delivery_date=orm.delivery_date,
+            username=orm.username or "",
+            customer=customer_dto,
+            source_language=orm.source_language,
+            target_language=orm.target_language,
+            translator=orm.translator or "",
+            total_amount=orm.total_amount,
+            discount_amount=orm.discount_amount,
+            advance_payment=orm.advance_payment,
+            emergency_cost=orm.emergency_cost,
+            final_amount=orm.final_amount,
+            payment_status=orm.payment_status,
+            delivery_status=orm.delivery_status,
+            remarks=orm.remarks or "",
+            pdf_file_path=orm.pdf_file_path
+        )
+
+        # You would typically query and map items separately.
+        # This part remains unchanged.
+        dto.items = []
+
+        return dto
+
+    @staticmethod
+    def map_dto_to_orm(dto: InvoiceDTO) -> IssuedInvoiceModel:
+        orm = IssuedInvoiceModel(
+            invoice_number=dto.invoice_number,
+            issue_date=dto.issue_date,
+            delivery_date=dto.delivery_date,
+            username=dto.username,
+            name=dto.customer.name,
+            national_id=dto.customer.national_id,
+            phone=dto.customer.phone,
+            source_language=dto.source_language,
+            target_language=dto.target_language,
+            total_amount=dto.total_amount,
+            discount_amount=dto.discount_amount,
+            advance_payment=dto.advance_payment,
+            emergency_cost=dto.emergency_cost,
+            final_amount=dto.payable_amount,
+            payment_status=dto.payment_status or 0,
+            delivery_status=dto.delivery_status or 0,
+            remarks=dto.remarks,
+            pdf_file_path=dto.pdf_file_path,
+            total_items=len(dto.items),
+            total_translation_price=sum(item.total_price for item in dto.items),
+            translator=dto.translator or ""
+        )
+        return orm
 
     @staticmethod
     def _format_persian_date(jalali_date: jdatetime.date) -> str:
@@ -282,7 +340,7 @@ class HomePageLogic:
         else:
             return "white"  # Normal
 
-    def get_available_next_step(self, invoice_number: int) -> Optional[Tuple[DeliveryStatus, str]]:
+    def get_available_next_step(self, invoice_number: str) -> Optional[Tuple[DeliveryStatus, str]]:
         """
         Determines the next valid step in the invoice lifecycle based on business rules.
 

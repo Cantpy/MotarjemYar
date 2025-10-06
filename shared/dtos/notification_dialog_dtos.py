@@ -27,7 +27,8 @@ class NotificationDataDTO:
     Contains all the necessary data to show and operate
     the notification dialog for a ready invoice.
     """
-    invoice_number: int
+    invoice_number: str
     customer_name: str
+    customer_national_id: str
     customer_phone: Optional[str]
     customer_email: Optional[str]

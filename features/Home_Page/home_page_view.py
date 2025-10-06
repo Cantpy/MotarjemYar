@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
 )
 
 from shared.utils.number_utils import to_persian_number
-from shared.utils.date_utils import convert_to_persian
+from shared.utils.date_utils import to_jalali_string
 from shared.widgets.toast_widget import show_toast
 from features.Home_Page.home_page_styles import HOME_PAGE_STYLES
 from features.Home_Page.home_page_models import DashboardStats
@@ -32,10 +32,10 @@ class HomePageView(QWidget):
     reset_settings_requested = Signal()
     import_settings_requested = Signal()
     export_settings_requested = Signal()
-    invoice_selected = Signal(int)
-    view_invoice_pdf_requested = Signal(int)
-    change_invoice_status_requested = Signal(int)
-    operations_menu_requested = Signal(int, QPoint)
+    invoice_selected = Signal(str)
+    view_invoice_pdf_requested = Signal(str)
+    change_invoice_status_requested = Signal(str)
+    operations_menu_requested = Signal(str, QPoint)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -228,7 +228,7 @@ class HomePageView(QWidget):
             # Show "no cards configured" message
             no_cards_label = QLabel("هیچ کارت آماری انتخاب نشده است")
             no_cards_label.setObjectName("noCardsLabel")
-            no_cards_label.setAlignment(Qt.AlignCenter)
+            no_cards_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.stats_layout.addWidget(no_cards_label, 0, 0, 1, 3)
             return
 
@@ -300,7 +300,8 @@ class HomePageView(QWidget):
         self.invoices_table.customContextMenuRequested.connect(self.contextMenuEvent)
         self.invoices_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.invoices_table.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-        self.invoices_table.verticalHeader().setDefaultAlignment(Qt.AlignCenter | Qt.AlignRight)
+        self.invoices_table.verticalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter
+                                                                 | Qt.AlignmentFlag.AlignRight)
 
         # Column headers (Persian)
         headers = ["شماره فاکتور", "مشتری", "تاریخ تحویل", "مترجم", "مانده (تومان)", "وضعیت", "عملیات‌ها"]
@@ -348,18 +349,19 @@ class HomePageView(QWidget):
             self.invoices_table.setVerticalHeaderItem(row, QTableWidgetItem(persian_number))
 
             # Invoice number - 1st row
-            invoice_num_item = QTableWidgetItem(to_persian_number(str(invoice_dto.invoice_number)))
+            invoice_num_item = QTableWidgetItem(to_persian_number(invoice_dto.invoice_number))
             invoice_num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.invoices_table.setItem(row, 0, invoice_num_item)
 
             # CustomerModel name
-            customer_item = QTableWidgetItem(invoice_dto.name)
+            customer_item = QTableWidgetItem(invoice_dto.customer.name)
             customer_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.invoices_table.setItem(row, 1, customer_item)
 
             # Due date
-            gregorian_date = invoice_dto.delivery_date.strftime("%Y/%m/%d")
-            jalali_date_item = QTableWidgetItem(convert_to_persian(gregorian_date))
+            jalali_date_str = to_jalali_string(invoice_dto.delivery_date)
+            jalali_date_item = QTableWidgetItem(jalali_date_str)
+
             jalali_date_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.invoices_table.setItem(row, 2, jalali_date_item)
 

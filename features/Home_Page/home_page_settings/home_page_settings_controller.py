@@ -1,4 +1,5 @@
 # features/home_page/settings/controller.py
+
 from PySide6.QtCore import QObject, Slot
 from features.Home_Page.home_page_settings.home_page_settings_logic import HomepageSettingsLogic
 from features.Home_Page.home_page_settings.home_page_settings_view import HomepageSettingsDialog
@@ -12,12 +13,13 @@ class HomepageSettingsController(QObject):
         self._logic = logic
         self._dialog = None
 
-    def show_dialog(self, parent=None):
+    def show_dialog(self, parent=None) -> HomepageSettingsDialog:
         """Creates, shows, and manages the settings dialog."""
         current_settings = self._logic.get_current_settings()
         self._dialog = HomepageSettingsDialog(current_settings, parent)
         self._dialog.save_requested.connect(self._on_save_requested)
-        self._dialog.exec()
+
+        return self._dialog
 
     @Slot(Settings)
     def _on_save_requested(self, updated_settings: Settings):

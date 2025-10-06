@@ -1,11 +1,60 @@
-# Home_Page/models.py
+# features/Home_Page/home_page_models.py
+
 import dataclasses
 from dataclasses import dataclass, field
 from typing import List, Optional
 from datetime import date
 
 
-# --- DTOs for UI and Logic Communication ---
+@dataclass
+class CustomerDTO:
+    """Represents a customer's essential data."""
+    name: str
+    national_id: str
+    phone: str
+
+
+@dataclass
+class InvoiceItemDTO:
+    """Represents a line item in an invoice."""
+    description: str
+    quantity: int
+    unit_price: int
+    total_price: int
+
+
+@dataclass
+class InvoiceDTO:
+    """Represents a complete invoice with nested objects."""
+    invoice_number: str
+    issue_date: date
+    delivery_date: date
+
+    username: str
+    customer: CustomerDTO
+    source_language: str
+    target_language: str
+    translator: str
+
+    items: List[InvoiceItemDTO] = field(default_factory=list)
+
+    total_amount: int = 0
+    discount_amount: int = 0
+    advance_payment: int = 0
+    emergency_cost: int = 0
+    final_amount: int = 0
+
+    payment_status: Optional[int] = None
+    delivery_status: Optional[int] = None
+    remarks: str = ""
+    pdf_file_path: Optional[str] = None
+
+    @property
+    def payable_amount(self) -> int:
+        """Calculate payable amount based on components."""
+        return (self.total_amount - self.discount_amount + self.emergency_cost) - self.advance_payment
+
+
 @dataclass
 class TimeInfo:
     """Time information entity."""
@@ -50,7 +99,7 @@ class DocumentStatistics:
 @dataclass
 class StatusChangeRequest:
     """Data class for status change requests."""
-    invoice_number: int
+    invoice_number: str
     current_status: int
     target_status: int
     translator: Optional[str] = None

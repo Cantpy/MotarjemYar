@@ -50,43 +50,62 @@ class ExcelImportLogic:
 
     def _import_documents_sheet(self, df: pd.DataFrame) -> ImportResult:
         """
-        Parses the 'Documents' sheet and prepares services for bulk creation.
+        Parses the 'Documents' sheet, including aliases for services and their dynamic fees.
         """
         result = ImportResult(source="Excel (Documents Sheet)")
         services_to_create = []
 
         for index, row in df.iterrows():
-            row_num = index + 2  # For user-friendly error messages
+            row_num = index + 2
             try:
                 name = str(row.get('Name', '')).strip()
                 if not name:
-                    result.failed_count += 1
-                    result.errors.append(f"Error on row {row_num}: 'Name' field cannot be empty.")
+                    # Skip rows that don't have a primary service name
                     continue
-
-                # Safely parse base_price and the new default_page_count
-                base_price = self._safe_to_int(row.get('Base Price'), default=0)
-                default_page_count = self._safe_to_int(row.get('Default Page Count'), default=1)
 
                 service_data = {
                     'name': name,
-                    'base_price': base_price if base_price >= 0 else "",
-                    'default_page_count': default_page_count,
+                    'base_price': self._safe_to_int(row.get('Base Price'), default=0),
+                    'default_page_count': self._safe_to_int(row.get('Default Page Count'), default=1),
+                    'aliases': [],
                     'dynamic_prices': []
                 }
 
-                # --- Parse dynamic fees ---
+                # --- 1. Parse main service aliases ---
+                j = 1
+                while f'Alias {j}' in row:
+                    alias_val = row.get(f'Alias {j}')
+                    alias = '' if pd.isna(alias_val) else str(alias_val).strip()
+                    if alias:
+                        service_data['aliases'].append({'alias': alias})
+                    j += 1
+
+                # --- 2. Parse dynamic fees and their aliases ---
                 i = 1
                 while f'Fee {i} Name' in row:
                     fee_name_val = row.get(f'Fee {i} Name')
-                    fee_price_val = row.get(f'Fee {i} Price')
-
-                    # Check for NaN before converting to string
                     fee_name = '' if pd.isna(fee_name_val) else str(fee_name_val).strip()
-                    fee_price = self._safe_to_int(fee_price_val, default=0)
 
-                    if fee_name:
-                        service_data['dynamic_prices'].append({'name': fee_name, 'unit_price': fee_price})
+                    # If the fee name is empty, we stop processing fees for this row
+                    if not fee_name:
+                        break
+
+                    fee_data = {
+                        'name': fee_name,
+                        'price': self._safe_to_int(row.get(f'Fee {i} Price'), default=0),
+                        'aliases': []
+                    }
+
+                    # --- 3. Parse aliases for THIS specific fee ---
+                    k = 1
+                    while f'Fee {i} Alias {k}' in row:
+                        alias_val = row.get(f'Fee {i} Alias {k}')
+                        alias = '' if pd.isna(alias_val) else str(alias_val).strip()
+                        if alias:
+                            fee_data['aliases'].append({'alias': alias})
+                        k += 1
+
+                    service_data['dynamic_prices'].append(fee_data)
                     i += 1
 
                 services_to_create.append(service_data)
@@ -96,12 +115,12 @@ class ExcelImportLogic:
                 result.failed_count += 1
                 result.errors.append(f"Unexpected error on row {row_num} for '{row.get('Name', 'N/A')}': {e}")
 
-        # --- Bulk Database Insertion ---
         if services_to_create:
             try:
                 self._services_logic.bulk_create_services(services_to_create)
                 result.success_count = len(services_to_create)
             except Exception as e:
+                # Handle bulk create failure
                 result.failed_count += len(services_to_create)
                 result.success_count = 0
                 result.added_services_names = []

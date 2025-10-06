@@ -183,12 +183,31 @@ class ServiceRepository:
             return 0
         try:
             for data in services_data:
+                # Pop off the relationship data
+                aliases_data = data.pop("aliases", [])
                 dynamic_prices_data = data.pop("dynamic_prices", [])
+
+                # Create the parent service
                 service = ServicesModel(**data)
-                for fee in dynamic_prices_data:
-                    service.dynamic_prices.append(ServiceDynamicPrice(**fee))
+
+                # Create service aliases
+                for alias_info in aliases_data:
+                    service.aliases.append(ServiceAlias(**alias_info))
+
+                # Create dynamic prices and their aliases
+                for fee_data in dynamic_prices_data:
+                    fee_aliases_data = fee_data.pop("aliases", [])
+                    dynamic_price = ServiceDynamicPrice(**fee_data)
+
+                    for alias_info in fee_aliases_data:
+                        dynamic_price.aliases.append(ServiceDynamicPriceAlias(**alias_info))
+
+                    service.dynamic_prices.append(dynamic_price)
+
                 session.add(service)
-            session.flush()
+
+            session.flush()  # Flushes all pending objects to the DB
             return len(services_data)
         except SQLAlchemyError as e:
+            # It's good practice to log the original error e
             raise Exception(f"Database bulk insert failed: {e}")

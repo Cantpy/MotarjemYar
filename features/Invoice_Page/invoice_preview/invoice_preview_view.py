@@ -11,6 +11,7 @@ from features.Invoice_Page.invoice_preview.invoice_preview_assets import (PRINT_
                                                                           PNG_ICON_PATH, SHARE_ICON_PATH,
                                                                           SETTINGS_ICON_PATH)
 from shared import to_persian_number
+from shared.utils.date_utils import to_jalali
 
 # --- Constants for Styling ---
 FONT_FAMILY = "IRANSans"
@@ -343,11 +344,11 @@ class InvoicePreviewWidget(QFrame):
             self.office_contact_label.setText("\n".join(contact_parts))
             self.office_contact_label.setVisible(bool(contact_parts))
 
+            print(f'Trying to convert {invoice.issue_date} and {invoice.delivery_date} to jalali strings')
             # DATES
-            datetime_format = '%Y/%m/%d - %H:%M'
             self.dates_label.setText(
-                f"تاریخ صدور: {to_persian_number(invoice.issue_date.strftime(datetime_format))}\n"
-                f"تاریخ تحویل: {to_persian_number(invoice.delivery_date.strftime(datetime_format))}")
+                f"تاریخ صدور: {to_jalali(invoice.issue_date)}\n"
+                f"تاریخ تحویل: {to_jalali(invoice.delivery_date)}")
 
             # --- CUSTOMER VISIBILITY ---
             self.customer_name_label.setText(f"مشتری: {customer.name}")
@@ -444,7 +445,7 @@ class ActionPanel(QWidget):
         button.setIconSize(QSize(32, 32))
         button.setFont(QFont(FONT_FAMILY, 10))
         button.setIcon(QIcon(str(icon_path)))
-        button.setStyleSheet("""...""")  # Stylesheet remains the same
+        button.setStyleSheet("""...""")
         return button
 
 
@@ -462,16 +463,12 @@ class ControlPanel(QWidget):
         layout.setSpacing(50)
 
         self.finish_button = self._create_button("پایان و فاکتور جدید")
-
         self.prev_button = self._create_button("<< صفحه قبل")
-
         self.issue_button = self._create_button("✔ صدور فاکتور", is_primary=True)
-
         self.next_button = self._create_button("صفحه بعد >>")
-
         self.settings_button = self._create_button("تنظیمات")
-
         self.export_button = self._create_button("خروجی")
+
         self.export_menu = QMenu(self)
         self._setup_export_menu()
         self.export_button.setMenu(self.export_menu)
@@ -530,7 +527,7 @@ class MainInvoicePreviewWidget(QWidget):
         self.setWindowTitle("پیش نمایش فاکتور")
         self.setStyleSheet(f"background-color: {PRIMARY_BACKGROUND_COLOR};")
 
-        main_layout = QVBoxLayout(self)  # Changed to QVBoxLayout
+        main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(10)
 
@@ -545,7 +542,7 @@ class MainInvoicePreviewWidget(QWidget):
         # --- Use the new consolidated control panel ---
         self.control_panel = ControlPanel()
 
-        main_layout.addWidget(self.scroll_area)  # Takes up most space
+        main_layout.addWidget(self.scroll_area)
         main_layout.addWidget(self.control_panel, alignment=Qt.AlignmentFlag.AlignBottom)
 
         self._connect_signals()

@@ -1,15 +1,13 @@
 # features/Home_Page/home_page_settings_view.py
 
-from PySide6.QtCore import QObject, Signal, Slot, QPoint
-from PySide6.QtWidgets import QWidget, QMenu, QDialog
+from PySide6.QtCore import QObject, Slot, QPoint
+from PySide6.QtWidgets import QWidget, QMenu
 from PySide6.QtGui import QAction
 from pathlib import Path
 
-# Assuming these imports exist
 from features.Home_Page.home_page_logic import HomePageLogic
 from features.Home_Page.home_page_view import HomePageView
 from features.Home_Page.home_page_settings.hom_page_settings_factory import HomepageSettingsFactory
-from features.Home_Page.home_page_settings.home_page_settings_logic import HomepageSettingsLogic
 from features.Home_Page.home_page_models import StatusChangeRequest
 from features.Home_Page.home_page_settings.home_page_settings_models import Settings
 from shared import (
@@ -18,7 +16,6 @@ from shared import (
 )
 from shared.enums import DeliveryStatus
 from shared.dtos.notification_dialog_dtos import SmsRequestDTO, EmailRequestDTO
-from shared.utils.persian_tools import get_persian_delivery_status
 
 
 class HomePageController(QObject):
@@ -27,12 +24,12 @@ class HomePageController(QObject):
     Connects the View to the business _logic and settings manager.
     """
 
-    def __init__(self, view: HomePageView, logic: HomePageLogic, settings_manager: HomepageSettingsLogic):
+    def __init__(self, view: HomePageView, logic: HomePageLogic):
         super().__init__()
         self._view = view
         self._logic = logic
-        self._settings_manager = settings_manager
         self._settings_controller = HomepageSettingsFactory.create()
+        self._settings_manager = self._settings_controller._logic
 
         self._connect_signals()
         self.initialize_view()
@@ -49,24 +46,26 @@ class HomePageController(QObject):
         self._view.refresh_requested.connect(self.refresh_data)
         self._view.operations_menu_requested.connect(self._on_operations_menu_requested)
         self._view.settings_requested.connect(self._on_settings_requested)
-        self._settings_controller._logic.settings_changed.connect(self._on_settings_changed)
+        self._settings_manager.settings_changed.connect(self._on_settings_changed)
 
     def initialize_view(self):
         """Load initial data and apply settings to the _view."""
-        current_settings = self._settings_controller._logic.get_current_settings()
+        settings_controller = HomepageSettingsFactory.create()
+        settings_logic = settings_controller._logic
+        current_settings = settings_logic.get_current_settings()
         self._view.apply_settings(current_settings)
         self.refresh_data()
 
     # NEW SLOT to handle menu requests from the _view
     @Slot(int, QPoint)
-    def _on_operations_menu_requested(self, invoice_number: int, global_pos: QPoint):
+    def _on_operations_menu_requested(self, invoice_number: str, global_pos: QPoint):
         """
         Creates and shows the operations context menu for a given invoice.
         This _logic now resides ENTIRELY in the controller.
         """
         # 1. Get the necessary data from the _logic layer
-        # Assuming you have a DTO and a _logic method for this
-        invoice_details = self._logic.get_invoice_details_for_menu(invoice_number)
+        invoice_details = self._logic.get_invoice_for_menu(invoice_number)
+        print(f'invoice details for invoice number {invoice_number}: {invoice_details}')
 
         if not invoice_details:
             show_error_message_box(self._view, "خطا", "اطلاعات فاکتور یافت نشد.")
@@ -97,19 +96,23 @@ class HomePageController(QObject):
     def refresh_data(self):
         """Refresh all data displayed on the home page."""
         try:
+            # This now correctly uses the single source of truth for settings
+            current_settings = self._settings_manager.get_current_settings()
             stats = self._logic.get_dashboard_statistics()
-            invoices = self._logic.get_recent_invoices_with_priority()
-
-            # The controller can do some light data transformation if needed
+            invoices = self._logic.get_recent_invoices_with_priority(
+                days_threshold=current_settings.threshold_days
+            )
             self._view.update_stats_display(stats)
             self._view.populate_invoices_table(invoices)
         except Exception as e:
+            print(f'[WARNING]: Exception in showing home data: {e}')
             show_error_message_box(self._view, "خطای بروزرسانی", f"خطا در بروزرسانی اطلاعات: {str(e)}")
 
     @Slot()
     def _on_settings_requested(self):
         """Handle the _view's request to open the settings dialog."""
-        self._settings_controller.show_dialog(parent=self._view)
+        dialog = self._settings_controller.show_dialog(parent=self._view)
+        dialog.exec()
 
     @Slot(Settings)
     def _on_settings_changed(self, new_settings: Settings):
@@ -117,8 +120,13 @@ class HomePageController(QObject):
         Slot to handle when settings have been successfully changed and saved
         by the separate settings package.
         """
+        # 1. Apply the new settings directly to the view (e.g., update titles).
         self._view.apply_settings(new_settings)
+
+        # 2. Give the user feedback.
         show_information_message_box(self._view, "موفقیت", "تنظیمات با موفقیت بروزرسانی شد.")
+
+        # 3. Refresh the entire page data to reflect the changes (e.g., new date thresholds).
         self.refresh_data()
 
     def handle_view_pdf_request(self, pdf_path: str):
@@ -132,7 +140,7 @@ class HomePageController(QObject):
         except Exception as e:
             show_error_message_box(self._view, "خطای نمایش", f"خطا در نمایش فایل PDF: {str(e)}")
 
-    def handle_change_invoice_status_request(self, invoice_number: int):
+    def handle_change_invoice_status_request(self, invoice_number: str):
         """Handles the request to open the status change dialog."""
 
         # 1. Ask the _logic layer for the next step info
@@ -150,8 +158,8 @@ class HomePageController(QObject):
         # 3. Show the dialog, passing it the clean data
         dialog = StatusChangeDialog(
             invoice=invoice_dto,
-            next_status=next_status,  # Pass the enum
-            step_text=step_text,  # Pass the button text
+            next_status=next_status,
+            step_text=step_text,
             parent=self._view
         )
 
@@ -172,45 +180,52 @@ class HomePageController(QObject):
 
             if success:
                 show_information_message_box(self._view, "موفقیت", message)
-                self.refresh_data()  # Refresh the UI to show the new status
+                self.refresh_data()
 
                 # Business Flow: If the new status is READY, trigger the notification dialog.
                 if request.target_status == DeliveryStatus.READY:
-                    self._show_notification_dialog(request.invoice_number)
+                    show_question_message_box(parent=self._view,
+                                              title="اطلاع رسانی",
+                                              message="آیا می‌خواهید آماه بودن فاکتور را به مشتری اطلاع‌رسانی کنید؟",
+                                              button_1="بله",
+                                              button_2="خیر",
+                                              yes_func=lambda: self._show_notification_dialog(request.invoice_number))
             else:
                 show_error_message_box(self._view, "خطا", message)
 
         except Exception as e:
             show_error_message_box(self._view, "خطا", f"خطا در پردازش تغییر وضعیت:\n {str(e)}")
 
-    def _show_notification_dialog(self, invoice_number: int):
+    def _show_notification_dialog(self, invoice_number: str):
         """
         Shows the SMS/Email notification dialog.
-        It gets data from the _logic layer first.
+        It gets all required data from the logic layer in a single DTO.
         """
         try:
-            # REFACTORED: Get a DTO from the _logic layer.
+            # A single call now gets ALL the data we need.
             notification_data = self._logic.get_data_for_notification(invoice_number)
             if not notification_data:
                 show_error_message_box(self._view, "خطا", "اطلاعات مورد نیاز برای اطلاع‌رسانی یافت نشد.")
                 return
 
-            # 1. Create the refactored, "dumb" dialog
+            print(f'sending notification to customer with national id: {notification_data.customer_national_id}')
+
+            # 1. Create the dialog with the complete DTO
             dialog = NotificationDialog(notification_data, self._view)
 
             # 2. Connect to its signals
             dialog.send_sms_requested.connect(self._on_send_sms_requested)
-            # We need the national_id for the email update _logic, so we fetch it here
-            national_id = self._logic.get_invoice_for_menu(invoice_number).national_id
+
+            # --- THIS IS THE KEY CHANGE ---
             dialog.send_email_requested.connect(
-                lambda req: self._on_send_email_requested(req, str(national_id))
+                lambda req: self._on_send_email_requested(req, notification_data.customer_national_id)
             )
 
-            # 3. If the dialog is accepted, it means a signal was emitted and handled.
-            if dialog.exec() == QDialog.Accepted:
-                # You can refresh data or take other actions here if needed
-                pass
+            # 3. Show the dialog
+            dialog.exec()
+
         except Exception as e:
+            print(f'show notifications dialog error: {e}')
             show_error_message_box(self._view,
                                    "خطای اطلاع‌رسانی", f"خطا در نمایش پنجره اطلاع‌رسانی: {str(e)}")
 

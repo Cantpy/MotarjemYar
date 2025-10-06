@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 from typing import List
-from datetime import datetime
+from datetime import date
 
 
 @dataclass
@@ -26,7 +26,7 @@ class Customer:
     name: str
     national_id: str
     phone: str
-    address: str
+    address: str = ""
 
 
 @dataclass
@@ -44,21 +44,25 @@ class PreviewItem:
 class Invoice:
     """Represents the entire invoice data for a single transaction."""
     invoice_number: str
-    issue_date: datetime
-    delivery_date: datetime
+
+    issue_date: date
+    delivery_date: date
+
     username: str
     customer: Customer
     office: PreviewOfficeInfo
     source_language: str
     target_language: str
     items: List[PreviewItem] = field(default_factory=list)
-    total_amount: float = 0.0
-    discount_amount: float = 0.0
-    advance_payment: float = 0.0
-    emergency_cost: float = 0.0
+
+    total_amount: int = 0
+    discount_amount: int = 0
+    advance_payment: int = 0
+    emergency_cost: int = 0
+
     remarks: str = ""
 
     @property
-    def payable_amount(self) -> float:
-        """Calculates the final amount to be paid, now including emergency cost."""
+    def payable_amount(self) -> int:
+        """Calculates the final amount to be paid."""
         return (self.total_amount - self.discount_amount + self.emergency_cost) - self.advance_payment

@@ -103,45 +103,41 @@ class ServicesLogic:
 
     def _normalize_service_data(self, data: dict[str, Any]) -> dict[str, Any]:
         """
-        Takes a structured dictionary and cleans/converts all its values,
-        including the new 'default_page_count' field.
+        Normalizes service data, including its aliases and nested dynamic prices with their aliases.
         """
-        normalized = {}
-
         # --- Normalize Parent Fields ---
-        normalized['name'] = str(data.get('name', '')).strip()
+        normalized = {
+            'name': str(data.get('name', '')).strip(),
+            'base_price': int(data.get('base_price', 0)),
+            'default_page_count': int(data.get('default_page_count', 1))
+        }
 
-        try:
-            base_price_str = str(data.get('base_price', '0')).strip()
-            normalized['base_price'] = int(float(base_price_str)) if base_price_str else ""
-        except (ValueError, TypeError):
-            raise ValueError(f"مقدار نامعتبر برای هزینه پایه: '{data.get('base_price')}'")
+        # --- Normalize Service Aliases ---
+        normalized['aliases'] = []
+        for alias_data in data.get('aliases', []):
+            alias = str(alias_data.get('alias', '')).strip()
+            if alias:
+                normalized['aliases'].append({'alias': alias})
 
-        # --- FIX: Add the default_page_count ---
-        try:
-            page_count_str = str(data.get('default_page_count', '1')).strip()
-            page_count = int(float(page_count_str)) if page_count_str else 1
-            # Ensure the page count is at least 1, as per your model's logic.
-            normalized['default_page_count'] = page_count if page_count > 0 else 1
-        except (ValueError, TypeError):
-            raise ValueError(f"مقدار نامعتبر برای تعداد صفحات پیشفرض: '{data.get('default_page_count')}'")
-
-        # --- Normalize Nested Dynamic Prices ---
+        # --- Normalize Nested Dynamic Prices and Their Aliases ---
         normalized['dynamic_prices'] = []
         for fee_data in data.get('dynamic_prices', []):
-            try:
-                name = str(fee_data.get('name', '')).strip()
-                price_str = str(fee_data.get('unit_price', '0')).strip()
+            fee_name = str(fee_data.get('name', '')).strip()
+            if not fee_name:
+                continue
 
-                if not name:
-                    continue
+            normalized_fee = {
+                'name': fee_name,
+                'unit_price': int(fee_data.get('price', 0)),
+                'aliases': []
+            }
 
-                normalized['dynamic_prices'].append({
-                    'name': name,
-                    'unit_price': int(float(price_str))
-                })
-            except (ValueError, TypeError):
-                raise ValueError(f"مقدار نامعتبر برای هزینه متغیر: '{fee_data.get('price')}'")
+            for alias_data in fee_data.get('aliases', []):
+                alias = str(alias_data.get('alias', '')).strip()
+                if alias:
+                    normalized_fee['aliases'].append({'alias': alias})
+
+            normalized['dynamic_prices'].append(normalized_fee)
 
         return normalized
 

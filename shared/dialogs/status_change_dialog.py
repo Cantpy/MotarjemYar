@@ -1,11 +1,13 @@
+# shared/dialogs/status_change_dialog
+
 from PySide6.QtWidgets import (QDialog, QFrame, QScrollArea, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
                                QLineEdit)
 from PySide6.QtCore import Qt, Signal
 
-from features.Home_Page.home_page_models import StatusChangeRequest
+from features.Home_Page.home_page_models import StatusChangeRequest, InvoiceDTO
+
 from shared.enums import DeliveryStatus
 from shared.utils.number_utils import to_persian_number
-from shared.dtos.invoice_dtos import IssuedInvoiceDTO
 
 
 class StepIndicator(QFrame):
@@ -180,7 +182,7 @@ class StatusChangeDialog(QDialog):
 
     status_change_requested = Signal(StatusChangeRequest)
 
-    def __init__(self, invoice: IssuedInvoiceDTO, next_status: int, step_text: str, parent=None):
+    def __init__(self, invoice: InvoiceDTO, next_status: int, step_text: str, parent=None):
         super().__init__(parent)
         self.invoice = invoice
         self.next_status = next_status
@@ -278,7 +280,7 @@ class StatusChangeDialog(QDialog):
         customer_layout = QVBoxLayout()
         customer_label = QLabel("نام مشتری")
         customer_label.setObjectName("cardLabel")
-        customer_val_label = QLabel(self.invoice.name)
+        customer_val_label = QLabel(self.invoice.customer.name)
         customer_val_label.setObjectName("cardValue")
         customer_layout.addWidget(customer_label)
         customer_layout.addWidget(customer_val_label)
@@ -425,7 +427,7 @@ class StatusChangeDialog(QDialog):
 
         # Create status change request
         request = StatusChangeRequest(
-            invoice_number=int(self.invoice.invoice_number),
+            invoice_number=self.invoice.invoice_number,
             current_status=self.invoice.delivery_status,
             target_status=self.next_status,
             translator=translator

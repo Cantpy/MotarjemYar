@@ -34,7 +34,7 @@ class InvoiceData:
     total_translation_price: int = 0
     advance_payment: int = 0
     discount_amount: int = 0
-    force_majeure: int = 0
+    emergency_cost: int = 0
     final_amount: int = 0
     payment_status: int = 0
     delivery_status: int = 0

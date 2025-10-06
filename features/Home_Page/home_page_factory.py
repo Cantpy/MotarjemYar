@@ -46,15 +46,10 @@ class HomePageFactory:
         # 2. Create the UI (View)
         view = HomePageView(parent=parent)
 
-        # 3. Create the Settings Manager
-        settings_repository = HomepageSettingsRepository()
-        settings_manager = HomepageSettingsLogic(settings_repository)
-
         # 4. Create the Controller, injecting its dependencies
         controller = HomePageController(
             view=view,
-            logic=logic,
-            settings_manager=settings_manager
+            logic=logic
         )
 
         return controller

@@ -9,6 +9,7 @@ from features.Invoice_Page.invoice_details.invoice_details_models import Invoice
 from shared.utils.persian_tools import to_persian_numbers
 from shared.widgets.persian_tools import PlainDoubleSpinBox
 from shared.utils.text_utils import amount_to_persian_words
+from shared.utils.date_utils import get_persian_date
 
 
 class InvoiceDetailsWidget(QWidget):
@@ -474,7 +475,7 @@ class InvoiceDetailsWidget(QWidget):
             # Invoice Info
             self.invoice_number_label.setText(to_persian_numbers(details.invoice_number))
             self.total_documents.setText(to_persian_numbers(details.docu_num))
-            self.issue_date_label.setText(details.issue_date)
+            self.issue_date_label.setText(get_persian_date())
             # Prevent cursor jump by only updating if text is different
             if self.remarks_text.toPlainText() != details.remarks:
                 self.remarks_text.setPlainText(details.remarks)

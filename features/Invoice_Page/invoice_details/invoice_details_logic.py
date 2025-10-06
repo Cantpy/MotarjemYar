@@ -1,3 +1,4 @@
+
 # features/Invoice_Page/invoice_details/invoice_details_logic.py
 
 from features.Invoice_Page.invoice_details.invoice_details_repo import InvoiceDetailsRepository
@@ -7,7 +8,6 @@ from features.Invoice_Page.invoice_details.invoice_details_models import Invoice
 from features.Invoice_Page.invoice_details.invoice_details_settings_dialog import SettingsManager
 from features.Invoice_Page.invoice_preview.invoice_preview_models import PreviewOfficeInfo
 
-from shared.utils.date_utils import get_persian_date
 from shared.session_provider import ManagedSessionProvider, SessionManager
 
 
@@ -40,7 +40,6 @@ class InvoiceDetailsLogic:
         details = InvoiceDetails(
             invoice_number=invoice_number,
             docu_num=total_documents,
-            issue_date=get_persian_date(),
             translation_cost=translation_cost,
             confirmation_cost=confirmation_cost,
             office_costs=office_costs,

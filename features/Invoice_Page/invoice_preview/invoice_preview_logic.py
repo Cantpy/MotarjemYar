@@ -9,7 +9,7 @@ from features.Invoice_Page.invoice_details.invoice_details_models import Invoice
 from features.Invoice_Page.invoice_preview.invoice_preview_settings_manager import PreviewSettingsManager
 
 from shared.session_provider import ManagedSessionProvider, SessionManager
-from shared.utils.date_utils import sanitize_date_string
+from shared.utils.date_utils import jalali_obj_to_gregorian, to_gregorian
 from shared.orm_models.invoices_models import IssuedInvoiceModel, InvoiceItemModel
 
 
@@ -138,11 +138,10 @@ class InvoicePreviewLogic:
                     ))
 
         print(f'raw issued date {details.issue_date} and delivery date {details.delivery_date}')
-        clean_delivery_str = sanitize_date_string(details.delivery_date)
-        clean_issue_str = sanitize_date_string(details.issue_date)
+        issue_date = datetime.now()
+        delivery_date = to_gregorian(details.delivery_date)
 
-        delivery_datetime = self._parse_flexible_date(clean_delivery_str)
-        issue_datetime = self._parse_flexible_date(clean_issue_str)
+        print(f'issue date: {issue_date}, delivery date: {delivery_date}')
 
         user_info = SessionManager().get_session()
 
@@ -152,7 +151,7 @@ class InvoicePreviewLogic:
 
         return Invoice(
             invoice_number=str(details.invoice_number),
-            issue_date=issue_datetime, delivery_date=delivery_datetime,
+            issue_date=issue_date, delivery_date=delivery_date,
             username=issuer_name, customer=customer, office=details.office_info,
             source_language=details.src_lng, target_language=details.trgt_lng,
             items=preview_items, total_amount=details.total_before_discount,
@@ -186,7 +185,7 @@ class InvoicePreviewLogic:
                 total_translation_price=int(total_translation_price),
                 advance_payment=int(invoice_dto.advance_payment),
                 discount_amount=int(invoice_dto.discount_amount),
-                force_majeure=int(invoice_dto.emergency_cost),
+                emergency_cost=int(invoice_dto.emergency_cost),
                 final_amount=int(invoice_dto.payable_amount),
                 username=invoice_dto.username,
                 source_language=invoice_dto.source_language,
@@ -249,18 +248,18 @@ class InvoicePreviewLogic:
         )
         empty_invoice = Invoice(
             invoice_number="",
-            issue_date=datetime.today(),
-            delivery_date=datetime.today(),
+            issue_date=datetime.today().strftime("%Y/%m/%d - %H:%M"),
+            delivery_date=datetime.today().strftime("%Y/%m/%d - %H:%M"),
             username="",
             customer=empty_customer,
             office=empty_preview_office,
             source_language="",
             target_language="",
             items=[],
-            total_amount=0.0,
-            discount_amount=0.0,
-            advance_payment=0.0,
-            emergency_cost=0.0,
+            total_amount=0,
+            discount_amount=0,
+            advance_payment=0,
+            emergency_cost=0,
             remarks=""
         )
 

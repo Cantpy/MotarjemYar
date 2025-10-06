@@ -5,6 +5,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, declarative_base
 from typing import Optional
+from datetime import date
 
 
 BaseInvoices = declarative_base()
@@ -20,8 +21,8 @@ class IssuedInvoiceModel(BaseInvoices):
     national_id: Mapped[str] = mapped_column(Text, nullable=False)
     phone: Mapped[str] = mapped_column(Text, nullable=False)
 
-    issue_date: Mapped[Date] = mapped_column(Date, nullable=False)
-    delivery_date: Mapped[Date] = mapped_column(Date, nullable=False)
+    issue_date: Mapped[date] = mapped_column(Date, nullable=False)
+    delivery_date: Mapped[date] = mapped_column(Date, nullable=False)
 
     translator: Mapped[str] = mapped_column(Text, nullable=False)
 
@@ -30,7 +31,9 @@ class IssuedInvoiceModel(BaseInvoices):
     total_translation_price: Mapped[int] = mapped_column(Integer, nullable=False)
     advance_payment: Mapped[int] = mapped_column(Integer, default=0)
     discount_amount: Mapped[int] = mapped_column(Integer, default=0)
-    force_majeure: Mapped[int] = mapped_column(Integer, default=0)
+
+    emergency_cost: Mapped[int] = mapped_column( Integer, default=0)
+
     final_amount: Mapped[int] = mapped_column(Integer, nullable=False)
 
     payment_status: Mapped[int] = mapped_column(Integer, default=0)
@@ -40,8 +43,10 @@ class IssuedInvoiceModel(BaseInvoices):
     target_language: Mapped[str] = mapped_column(Text, nullable=False)
 
     username: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-
     pdf_file_path: Mapped[Optional[str]] = mapped_column(Text)
+
+    # --- NEW: Added remarks field to match DTOs ---
+    remarks: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         CheckConstraint('payment_status IN (0, 1)', name='check_payment_status'),

@@ -1,8 +1,5 @@
-"""
-Notification dialog for sending SMS and Email notifications to customers.
-"""
-import sqlite3
-import requests
+# shared/dialogs/notification_dialog.py
+
 import re
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget, QLabel,
@@ -20,7 +17,7 @@ class NotificationDialog(QDialog):
 
     def __init__(self, data: NotificationDataDTO, parent=None):
         super().__init__(parent)
-        self.customer_data = data  # Store the DTO
+        self.customer_data = data
         self.uploaded_files = []
         self._setup_ui()
 
