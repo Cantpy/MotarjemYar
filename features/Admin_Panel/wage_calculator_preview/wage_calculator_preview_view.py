@@ -20,7 +20,6 @@ class WageCalculatorPreviewDialog(QDialog):
     def __init__(self, employees: list[EmployeeInfo], parent=None):
         super().__init__(parent)
         self.setWindowTitle("ایجاد فیش حقوقی جدید")
-        self.setMinimumSize(1150, 700)
 
         main_layout = QHBoxLayout(self)
 

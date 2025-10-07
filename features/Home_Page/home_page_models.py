@@ -2,8 +2,9 @@
 
 import dataclasses
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from datetime import date
+from shared.utils.persian_tools import to_persian_numbers
 
 
 @dataclass
@@ -71,21 +72,34 @@ class DashboardStats:
     today_invoices: int
     total_documents: int
     available_documents: int
-    most_repeated_document: Optional[str] = None
-    most_repeated_document_month: Optional[str] = None
+    most_repeated_document: Optional[Tuple[str, str]] = None
+    most_repeated_document_month: Optional[Tuple[str, str]] = None
 
     def get_value_by_id(self, stat_id: str) -> str:
-        # This is simple _view-helper _logic, so it's acceptable here.
-        value_map = {
-            'total_customers': str(self.total_customers),
-            'total_invoices': str(self.total_invoices),
-            'today_invoices': str(self.today_invoices),
-            'total_documents': str(self.total_documents),
-            'available_documents': str(self.available_documents),
-            'most_repeated_document': self.most_repeated_document or "نامشخص",
-            'most_repeated_document_month': self.most_repeated_document_month or "نامشخص"
+        """
+        Helper method to get a stat value by its ID, now with Persian
+        number conversion for all numeric values.
+        """
+        raw_values = {
+            'total_customers': self.total_customers,
+            'total_invoices': self.total_invoices,
+            'today_invoices': self.today_invoices,
+            'total_documents': self.total_documents,
+            'available_documents': self.available_documents,
         }
-        return value_map.get(stat_id, "0")
+
+        # Handle complex types first
+        if stat_id == 'most_repeated_document':
+            return self.most_repeated_document[0] if self.most_repeated_document else "نامشخص"
+        if stat_id == 'most_repeated_document_month':
+            return self.most_repeated_document_month[0] if self.most_repeated_document_month else "نامشخص"
+
+        # Handle simple numeric types and convert them
+        raw_value = raw_values.get(stat_id)
+        if raw_value is not None:
+            return to_persian_numbers(str(raw_value))
+
+        return to_persian_numbers("0")  # Default value
 
 
 @dataclass

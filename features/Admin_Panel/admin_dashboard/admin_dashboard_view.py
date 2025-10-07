@@ -1,16 +1,17 @@
 # features/Admin_Panel/admin_dashboard/admin_dashboard_view.py
 
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QGroupBox,
-                               QFrame, QGridLayout, QListWidget, QListWidgetItem)
-from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QColor
 import qtawesome as qta
-from .admin_dashboard_models import KpiData, AttentionQueueItem, TopPerformer
-from shared.fonts.font_manager import FontManager
+from datetime import date
+
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QGroupBox,
+                               QGridLayout, QListWidget, QListWidgetItem)
+from PySide6.QtCore import Signal, Qt
+
+from features.Admin_Panel.admin_dashboard.admin_dashboard_models import KpiData, AttentionQueueItem
+from features.Admin_Panel.admin_dashboard.admin_dashboard_qss import ADMIN_DASHBOARD_STYLES
+
 from shared.utils.persian_tools import to_persian_jalali_string, to_persian_numbers
 from shared.widgets.custom_widgets import create_stat_card
-from datetime import date
-from PySide6.QtCore import Signal
 
 
 class AdminDashboardView(QWidget):
@@ -29,11 +30,10 @@ class AdminDashboardView(QWidget):
 
         # --- Quick Actions Bar ---
         actions_layout = QHBoxLayout()
-        self.refresh_btn = QPushButton(" بروزرسانی", icon=qta.icon('fa5s.sync-alt'))
-        self.calc_wage_btn = QPushButton(" محاسبه دستمزد کارکنان", icon=qta.icon('fa5s.calculator'))
+        self.refresh_btn = QPushButton(" بروزرسانی")
+        self.refresh_btn.setIcon(qta.icon('fa5s.sync-alt'))
 
         actions_layout.addWidget(self.refresh_btn)
-        actions_layout.addWidget(self.calc_wage_btn)
         actions_layout.addStretch()
         main_layout.addLayout(actions_layout)
 
@@ -59,6 +59,7 @@ class AdminDashboardView(QWidget):
 
         # Action Queue
         attention_group = QGroupBox("سفارشات نیازمند توجه")
+        attention_group.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         attention_layout = QVBoxLayout(attention_group)
         self.attention_list = QListWidget()
         attention_layout.addWidget(self.attention_list)
@@ -66,7 +67,7 @@ class AdminDashboardView(QWidget):
 
         # --- Sidebar (Right) ---
         sidebar_column = QVBoxLayout()
-        content_layout.addLayout(sidebar_column, 3)  # 30% width
+        content_layout.addLayout(sidebar_column, 3)
 
         performers_group = QGroupBox("برترین‌های ماه")
         performers_layout = QVBoxLayout(performers_group)
@@ -84,8 +85,7 @@ class AdminDashboardView(QWidget):
         self.top_clerks_list.setObjectName("performerList")
         performers_layout.addWidget(self.top_clerks_list)
 
-        # --- Connections ---
-        self.calc_wage_btn.clicked.connect(self.calculate_wage_requested)
+        self.setStyleSheet(ADMIN_DASHBOARD_STYLES)
 
     def update_kpi_cards(self, data: KpiData):
         self.kpi_revenue_today.findChild(QLabel, "statValue").setText(to_persian_numbers(data.revenue_today))
@@ -131,10 +131,10 @@ class AdminDashboardView(QWidget):
             item_layout.setSpacing(2)
 
             main_label = QLabel(main_text)
-            main_label.setFont(FontManager.get_font(size=11, bold=True))
+            # main_label.setFont(FontManager.get_font(size=11, bold=True))
 
             details_label = QLabel("".join(details))
-            details_label.setFont(FontManager.get_font(size=9))
+            # details_label.setFont(FontManager.get_font(size=9))
 
             item_layout.addWidget(main_label)
             item_layout.addWidget(details_label)

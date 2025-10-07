@@ -23,7 +23,6 @@ class AdminMainWindow(QWidget):
 
         self.setWindowTitle("پنل مدیریت مترجم‌یار")
         self.setFont(FontManager.get_font(size=10))
-        self.setMinimumSize(1200, 800)
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)

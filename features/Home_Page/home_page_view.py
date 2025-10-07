@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout, QLabel, QPushButton, QApplication
 )
 
-from shared.utils.number_utils import to_persian_number
+from shared.utils.persian_tools import to_persian_numbers
 from shared.utils.date_utils import to_jalali_string
 from shared.widgets.toast_widget import show_toast
 from features.Home_Page.home_page_styles import HOME_PAGE_STYLES
@@ -182,38 +182,61 @@ class HomePageView(QWidget):
         title_label.setObjectName("statTitle")
         title_label.setStyleSheet("font-size: 14px; color: #666; margin-bottom: 5px;")
 
-        # Value
-        value_label = QLabel("در حال بارگذاری...")
-        value_label.setObjectName("statValue")
-        value_label.setAlignment(Qt.AlignmentFlag.AlignRight)
-        value_label.setStyleSheet(f"""
-            font-size: 24px; 
-            font-weight: bold; 
-            color: {card_config.color};
-            margin-top: 5px;
-        """)
+        value_layout = QVBoxLayout()
+        value_layout.setSpacing(2)
+
+        primary_value_label = QLabel("در حال بارگذاری...")
+        primary_value_label.setStyleSheet(f"""
+                                font-size: 18px;
+                                font-weight: bold;
+                                color: {card_config.color};
+                                margin-top: 5px;
+                            """)
+
+        secondary_value_label = QLabel("")  # Initially empty
+        secondary_value_label.setStyleSheet(f"""
+                                font-size: 12px;
+                                font-weight: normal;
+                                color: {card_config.color};
+                                margin-top: 2px;
+                            """)
+
+        value_layout.addWidget(primary_value_label)
+        value_layout.addWidget(secondary_value_label)
 
         layout.addWidget(title_label)
-        layout.addWidget(value_label)
+        layout.addLayout(value_layout)
 
         # Store card config in the widget for later reference
-        card.card_config = card_config
+        card.primary_label = primary_value_label
+        card.secondary_label = secondary_value_label
 
         return card
 
     def _update_card_values(self):
-        """Update the values displayed in all visible stat cards using the cached DTO."""
+        """
+        Update the values displayed in all visible stat cards,
+        now with tooltip support for rich data.
+        """
         if not self._current_stats_dto:
             return
 
         for card_id, card_widget in self.stats_cards.items():
-            layout = card_widget.layout()
-            if layout and layout.count() >= 2:
-                value_label = layout.itemAt(1).widget()
-                if isinstance(value_label, QLabel):
-                    # Get value from the cached DTO
-                    value = self._current_stats_dto.get_value_by_id(card_id)
-                    value_label.setText(str(value))
+            # Get the raw data directly from the DTO
+            value_from_dto = getattr(self._current_stats_dto, card_id, "0")
+
+            if isinstance(value_from_dto, tuple):
+                primary_text, secondary_text = value_from_dto
+                card_widget.primary_label.setText(primary_text)
+                card_widget.secondary_label.setText(secondary_text)
+                card_widget.secondary_label.setVisible(True)
+            else:
+                # --- THIS IS THE KEY CHANGE FOR SIMPLE CARDS ---
+                persian_value = to_persian_numbers(str(value_from_dto))
+                card_widget.primary_label.setText(persian_value)
+
+                # Hide the secondary label as it's not needed
+                card_widget.secondary_label.setVisible(False)
 
     def _update_stats_cards(self, enabled_cards_config: List[StatCardConfig]):
         """
@@ -345,11 +368,11 @@ class HomePageView(QWidget):
         self.invoices_table.setRowCount(len(invoices_with_priority))
 
         for row, (invoice_dto, priority) in enumerate(invoices_with_priority):
-            persian_number = to_persian_number(row + 1)
+            persian_number = to_persian_numbers(row + 1)
             self.invoices_table.setVerticalHeaderItem(row, QTableWidgetItem(persian_number))
 
             # Invoice number - 1st row
-            invoice_num_item = QTableWidgetItem(to_persian_number(invoice_dto.invoice_number))
+            invoice_num_item = QTableWidgetItem(to_persian_numbers(invoice_dto.invoice_number))
             invoice_num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.invoices_table.setItem(row, 0, invoice_num_item)
 
@@ -372,7 +395,7 @@ class HomePageView(QWidget):
 
             # Amount
             raw_amount = f"{invoice_dto.final_amount:,}"
-            amount_item = QTableWidgetItem(f"{to_persian_number(raw_amount)} تومان")
+            amount_item = QTableWidgetItem(f"{to_persian_numbers(raw_amount)} تومان")
             amount_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.invoices_table.setItem(row, 4, amount_item)
 

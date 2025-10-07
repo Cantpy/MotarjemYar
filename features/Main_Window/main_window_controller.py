@@ -59,12 +59,13 @@ class MainWindowController(QObject):
         This is where the main controller passes the application's core
         dependencies (like session makers) down to the feature factories.
         """
-        # --- Home Page: Needs 'customers' and 'invoices' engines ---
+        # --- Home Page: Needs 'customers', 'invoices' and 'services engines ---
         self.page_manager.register(
             "home",
             lambda: HomePageFactory.create(
                 customers_engine=self._engines.get('customers'),
                 invoices_engine=self._engines.get('invoices'),
+                services_engine=self._engines.get('services'),
                 parent=self._view
             )
         )

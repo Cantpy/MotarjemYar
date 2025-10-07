@@ -1,8 +1,7 @@
 # Admin_Panel/admin_dashboard/admin_dashboard_controller.py
 
-from .admin_dashboard_view import AdminDashboardView
-from .admin_dashboard_logic import AdminDashboardLogic
-from .wage_calculator_dialog import WageCalculatorDialog
+from features.Admin_Panel.admin_dashboard.admin_dashboard_view import AdminDashboardView
+from features.Admin_Panel.admin_dashboard.admin_dashboard_logic import AdminDashboardLogic
 
 
 class AdminDashboardController:
@@ -14,7 +13,6 @@ class AdminDashboardController:
 
         # --- Connect signals for new action buttons ---
         self._view.refresh_btn.clicked.connect(self.load_dashboard_data)
-        self._view.calculate_wage_requested.connect(self._open_wage_calculator)
 
     def load_dashboard_data(self):
         try:
@@ -30,12 +28,6 @@ class AdminDashboardController:
 
         except Exception as e:
             print(f"Failed to load dashboard data: {e}")
-
-    def _open_wage_calculator(self):
-        """Creates and shows the wage calculator dialog."""
-        dialog = WageCalculatorDialog(self._view)
-        # In a real app, you would pass employee data to the dialog here
-        dialog.exec()
 
     def get_view(self):
         """

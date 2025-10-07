@@ -25,7 +25,6 @@ class TabbedAdminPanel(QWidget):
     def setup_ui(self):
         """Setup the main user interface"""
         self.setWindowTitle("پنل مدیریت سیستم")
-        self.setMinimumSize(900, 800)
         self.setStyleSheet("""
             QWidget {
                 background-color: #f5f6fa;

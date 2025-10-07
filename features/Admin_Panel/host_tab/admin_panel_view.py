@@ -9,7 +9,6 @@ class AdminMainWindowView(QWidget):
 
         self.setWindowTitle("پنل مدیریت مترجم‌یار")
         self.setFont(FontManager.get_font(size=12))
-        self.setMinimumSize(1200, 800)
 
         layout = QVBoxLayout(self)
 

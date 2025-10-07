@@ -1,137 +1,136 @@
 # features/Home_Page/home_page_repo.py
 
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict
 from datetime import date
 from sqlalchemy import func, extract, asc
 from sqlalchemy.orm import Session, aliased
 
 from shared.orm_models.invoices_models import IssuedInvoiceModel, InvoiceItemModel
 from shared.orm_models.customer_models import CustomerModel
+from shared.orm_models.services_models import ServicesModel
 
 from features.Home_Page.home_page_models import DocumentStatistics
 
 
-class HomePageRepository:
-    """
-    Stateless _repository for home page data operations.
-    Requires a session to be passed into each method.
-    """
+class HomePageInvoicesRepository:
+    """Stateless repository for accessing invoice-related data."""
 
-    def get_customer_count(self, session: Session) -> int:
-        """Get total number of customers."""
-        return session.query(CustomerModel).count()
-
-    def get_total_invoices_count(self, session: Session) -> int:
-        """Get total number of invoices."""
+    def get_total_count(self, session: Session) -> int:
         return session.query(IssuedInvoiceModel).count()
 
-    def get_today_invoices_count(self, session: Session, today_date: date) -> int:
-        """Get number of invoices issued today."""
+    def get_today_count(self, session: Session, today: date) -> int:
         return session.query(IssuedInvoiceModel).filter(
-            IssuedInvoiceModel.issue_date == today_date
+            IssuedInvoiceModel.issue_date == today
         ).count()
 
-    def get_invoices_by_delivery_date_range(self, session: Session, start_date: date, end_date: date,
-                                            exclude_completed: bool = False) -> List[IssuedInvoiceModel]:
-        """Get invoices within a specific delivery date range."""
+    def get_by_delivery_date_range(
+        self, session: Session, start_date: date, end_date: date, exclude_completed: bool = False
+    ) -> List[IssuedInvoiceModel]:
         query = session.query(IssuedInvoiceModel).filter(
-            IssuedInvoiceModel.delivery_date >= start_date,
-            IssuedInvoiceModel.delivery_date <= end_date
+            IssuedInvoiceModel.delivery_date.between(start_date, end_date)
         )
         if exclude_completed:
-            query = query.filter(IssuedInvoiceModel.delivery_status != 4)  # 4 = COLLECTED
+            query = query.filter(IssuedInvoiceModel.delivery_status != 4)
         return query.order_by(asc(IssuedInvoiceModel.delivery_date)).all()
 
-    def get_document_statistics(self, session: Session) -> DocumentStatistics:
-        """Get document statistics from invoice items considering item quantity."""
-        Invoice = aliased(IssuedInvoiceModel)
-        Item = aliased(InvoiceItemModel)
-
-        total_docs = session.query(func.sum(Item.quantity)).scalar() or 0
-        in_office_docs = session.query(func.sum(Item.quantity)).join(
-            Invoice, Item.invoice_number == Invoice.invoice_number
-        ).filter(Invoice.delivery_status != 4).scalar() or 0
-        delivered_docs = total_docs - in_office_docs
-
-        return DocumentStatistics(
-            total_documents=total_docs,
-            in_office_documents=in_office_docs,
-            delivered_documents=delivered_docs,
-        )
-
-    def get_invoice_by_number(self, session: Session, invoice_number: str) -> Optional[IssuedInvoiceModel]:
-        """Get a specific invoice ORM model by number."""
+    def get_by_number(self, session: Session, invoice_number: str) -> Optional[IssuedInvoiceModel]:
         return session.query(IssuedInvoiceModel).filter(
             IssuedInvoiceModel.invoice_number == invoice_number
         ).first()
 
-    def get_customer_by_national_id(self, session: Session, national_id: str) -> Optional[CustomerModel]:
-        """Gets a customer ORM model by their national ID."""
-        return session.query(CustomerModel).filter(
-            CustomerModel.national_id == national_id
-        ).first()
-
-    def update_invoice_status(self, session: Session, invoice_number: str, new_status: int,
-                              translator: Optional[str] = None) -> bool:
-        """Update invoice delivery status and optionally translator."""
-        invoice_model = self.get_invoice_by_number(session, invoice_number)
-        if not invoice_model:
+    def update_status(self, session: Session, invoice_number: str, new_status: int, translator: Optional[str] = None) -> bool:
+        invoice = self.get_by_number(session, invoice_number)
+        if not invoice:
             return False
-
-        invoice_model.delivery_status = new_status
-        if translator is not None:
-            invoice_model.translator = translator
-
+        invoice.delivery_status = new_status
+        if translator:
+            invoice.translator = translator
         return True
 
-    def get_most_repeated_doc(self, session: Session) -> Optional[Tuple[int, int]]:
-        """
-        Gets the ID and total quantity of the most repeated document.
-        Returns raw data: (service_id, total_quantity).
-        NOTE: 'service' is now an integer ID.
-        """
-        # TODO: To get the service NAME, you would need to join with your services table, e.g.:
-        # .join(ServiceTypeModel, InvoiceItemModel.service == ServiceTypeModel.id)
-        # and query ServiceTypeModel.name instead of InvoiceItemModel.service.
-        result = session.query(
-            InvoiceItemModel.service,
-            func.sum(InvoiceItemModel.quantity).label("total_qty")
-        ).group_by(
-            InvoiceItemModel.service
-        ).order_by(
-            func.sum(InvoiceItemModel.quantity).desc()
-        ).first()
+    def get_document_statistics(self, session: Session) -> DocumentStatistics:
+        Invoice = aliased(IssuedInvoiceModel)
+        Item = aliased(InvoiceItemModel)
 
-        return result  # Returns a tuple like (5, 150) or None
+        total_docs = session.query(func.sum(Item.quantity)).scalar() or 0
+        in_office_docs = (
+            session.query(func.sum(Item.quantity))
+            .join(Invoice, Item.invoice_number == Invoice.invoice_number)
+            .filter(Invoice.delivery_status != 4)
+            .scalar()
+            or 0
+        )
+        delivered_docs = total_docs - in_office_docs
+
+        return DocumentStatistics(total_docs, in_office_docs, delivered_docs)
+
+    def get_most_repeated_doc(self, session: Session) -> Optional[Tuple[int, int]]:
+        return (
+            session.query(
+                InvoiceItemModel.service,
+                func.sum(InvoiceItemModel.quantity).label("total_qty"),
+            )
+            .group_by(InvoiceItemModel.service)
+            .order_by(func.sum(InvoiceItemModel.quantity).desc())
+            .first()
+        )
 
     def get_most_repeated_doc_month(self, session: Session) -> Optional[Tuple[int, int, int, int]]:
-        """
-        Gets the most repeated document in any given month.
-        Returns raw data: (service_id, year, month, total_quantity).
-        NOTE: 'service' is now an integer ID.
-        """
-        # TODO: Join with services table to get the name.
-        result = session.query(
-            InvoiceItemModel.service,
-            extract('year', IssuedInvoiceModel.delivery_date).label("year"),
-            extract('month', IssuedInvoiceModel.delivery_date).label("month"),
-            func.sum(InvoiceItemModel.quantity).label("total_qty")
-        ).join(
-            IssuedInvoiceModel, InvoiceItemModel.invoice_number == IssuedInvoiceModel.invoice_number
-        ).group_by(
-            InvoiceItemModel.service,
-            extract('year', IssuedInvoiceModel.delivery_date),
-            extract('month', IssuedInvoiceModel.delivery_date)
-        ).order_by(
-            func.sum(InvoiceItemModel.quantity).desc()
-        ).first()
+        return (
+            session.query(
+                InvoiceItemModel.service,
+                extract("year", IssuedInvoiceModel.delivery_date).label("year"),
+                extract("month", IssuedInvoiceModel.delivery_date).label("month"),
+                func.sum(InvoiceItemModel.quantity).label("total_qty"),
+            )
+            .join(IssuedInvoiceModel, InvoiceItemModel.invoice_number == IssuedInvoiceModel.invoice_number)
+            .group_by(
+                InvoiceItemModel.service,
+                extract("year", IssuedInvoiceModel.delivery_date),
+                extract("month", IssuedInvoiceModel.delivery_date),
+            )
+            .order_by(func.sum(InvoiceItemModel.quantity).desc())
+            .first()
+        )
 
-        return result   # Returns a tuple like (12, 2024, 8, 45) or None
 
-    def update_customer_email(self, session: Session, national_id: str, new_email: str) -> bool:
-        """Finds a customer by national ID and updates their email."""
-        customer = self.get_customer_by_national_id(session, national_id)
+class HomePageCustomersRepository:
+    """Stateless repository for customer data operations."""
+
+    def get_total_count(self, session: Session) -> int:
+        return session.query(CustomerModel).count()
+
+    def get_by_national_id(self, session: Session, national_id: str) -> Optional[CustomerModel]:
+        return session.query(CustomerModel).filter(CustomerModel.national_id == national_id).first()
+
+    def update_email(self, session: Session, national_id: str, new_email: str) -> bool:
+        customer = self.get_by_national_id(session, national_id)
         if customer:
             customer.email = new_email
             return True
         return False
+
+
+class HomePageServicesRepository:
+    """Stateless repository for services-related operations."""
+
+    def get_name_by_id(self, session: Session, service_id: int) -> Optional[str]:
+        return session.query(ServicesModel.name).filter(ServicesModel.id == service_id).scalar()
+
+    def get_names_by_ids(self, session: Session, service_ids: List[int]) -> Dict[int, str]:
+        if not service_ids:
+            return {}
+        results = session.query(ServicesModel.id, ServicesModel.name).filter(
+            ServicesModel.id.in_(service_ids)
+        ).all()
+        return {sid: name for sid, name in results}
+
+
+class HomePageRepository:
+    """Facade to aggregate data from multiple repositories for the dashboard."""
+
+    def __init__(self, invoices_repo: HomePageInvoicesRepository,
+                 customers_repo: HomePageCustomersRepository,
+                 services_repo: HomePageServicesRepository):
+        self.invoices_repo = invoices_repo
+        self.customers_repo = customers_repo
+        self.services_repo = services_repo

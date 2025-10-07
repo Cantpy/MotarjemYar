@@ -25,7 +25,6 @@ class UsersTabbedWidget(QWidget):
         self.setWindowTitle("پنل کاربری سیستم")
         # Set RTL layout direction for Persian
         self.setLayoutDirection(Qt.RightToLeft)
-        self.setMinimumSize(900, 800)
 
         # Style the widget
         self.setStyleSheet("""
