@@ -1,245 +1,272 @@
 # features/Invoice_Table/invoice_table_logic.py
 
-import os
+from __future__ import annotations
 import csv
-from pathlib import Path
-from typing import Any
-from features.Invoice_Table.invoice_table_models import (InvoiceData, InvoiceSummary, InvoiceFilter,
-                                                         ColumnSettings)
-from features.Invoice_Table.invoice_table_repo import RepositoryManager
-from PySide6.QtCore import QSettings
-from shared.session_provider import ManagedSessionProvider
+import json
 import logging
+from pathlib import Path
+from typing import Any, List, Dict, Optional, Tuple
+
+from features.Invoice_Table.invoice_table_models import InvoiceSummary, InvoiceFilter, ColumnSettings
+from features.Invoice_Table.invoice_table_repo import RepositoryManager, InvoiceData, InvoiceItemData, EditedInvoiceData
+from shared.session_provider import ManagedSessionProvider
+from shared.utils.path_utils import get_user_data_path
 
 logger = logging.getLogger(__name__)
 
 
-class InvoiceTableService:
-    """Business _logic for invoice operations"""
+# =============================================================================
+# 1. SETTINGS SERVICE (Replaces QSettings with JSON)
+# =============================================================================
 
-    def __init__(self, repo_manager: RepositoryManager, invoices_engine: ManagedSessionProvider):
+class SettingsService:
+    """Handles loading and saving of UI settings to a JSON file."""
+
+    def __init__(self):
+        self.settings_path = get_user_data_path("config", "invoice_table_settings.json")
+        self.column_settings = ColumnSettings()
+
+    def _load_settings(self) -> Dict:
+        """Loads the raw settings dictionary from the JSON file."""
+        if not self.settings_path.exists():
+            return {}
+        try:
+            with open(self.settings_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (IOError, json.JSONDecodeError) as e:
+            logger.error(f"Failed to load settings from {self.settings_path}: {e}")
+            return {}
+
+    def _save_settings(self, settings: Dict):
+        """Saves the raw settings dictionary to the JSON file."""
+        try:
+            with open(self.settings_path, 'w', encoding='utf-8') as f:
+                json.dump(settings, f, indent=4)
+        except IOError as e:
+            logger.error(f"Failed to save settings to {self.settings_path}: {e}")
+
+    def load_column_visibility(self) -> List[bool]:
+        """Loads the column visibility state, returning defaults if not found."""
+        settings = self._load_settings()
+        visibility = settings.get('column_visibility', self.column_settings.visible_columns)
+        # Ensure the loaded list has the correct length
+        if len(visibility) != len(self.column_settings.COLUMN_NAMES):
+            return self.column_settings.visible_columns
+        self.column_settings.visible_columns = visibility
+        return visibility
+
+    def save_column_visibility(self):
+        """Saves the current column visibility state."""
+        settings = self._load_settings()
+        settings['column_visibility'] = self.column_settings.visible_columns
+        self._save_settings(settings)
+
+    def set_column_visibility(self, index: int, visible: bool):
+        """Updates the visibility for a specific column."""
+        self.column_settings.set_column_visible(index, visible)
+
+    def is_column_visible(self, index: int) -> bool:
+        """Checks if a column is marked as visible."""
+        return self.column_settings.is_column_visible(index)
+
+    def get_column_names(self) -> List[str]:
+        """Gets the names of all columns."""
+        return self.column_settings.COLUMN_NAMES
+
+
+# =============================================================================
+# 2. CORE INVOICE SERVICE (Focused on Repository Interaction)
+# =============================================================================
+
+class InvoiceService:
+    """
+    Manages core invoice data operations by interacting with the repository.
+    This class is the single gateway to the database for invoices.
+    """
+
+    def __init__(self,
+                 repo_manager: RepositoryManager,
+                 invoices_engine: ManagedSessionProvider,
+                 users_engine: ManagedSessionProvider,
+                 services_engine: ManagedSessionProvider):
         self._repo_manager = repo_manager
         self._invoice_session = invoices_engine
-        self.filter = InvoiceFilter()
-        self.column_settings = ColumnSettings()
-        self._document_counts_cache = {}
+        self._users_session = users_engine
+        self._services_session = services_engine
+        self._document_counts_cache: Dict[str, int] = {}
 
-    def get_all_invoices(self) -> list[InvoiceData]:
-        """Load all invoices from _repository"""
+    # ==============================================================
+    # BASIC FETCH OPERATIONS
+    # ==============================================================
+
+    def get_all_invoices(self) -> List[InvoiceData]:
+        """Loads all invoices and updates the document count cache."""
         with self._invoice_session() as session:
             invoices = self._repo_manager.get_invoice_repository().get_all_invoices(session)
-            # Update document counts cache
             self._update_document_counts_cache()
             return invoices
 
-    def get_filtered_invoices(self, invoices: list[InvoiceData]) -> list[InvoiceData]:
-        """Get invoices filtered by current filter criteria"""
-        if not self.filter.search_text:
-            return invoices
-
-        return [invoice for invoice in invoices if self.filter.matches_search(invoice)]
-
-    def search_invoices(self, search_text: str, invoices: list[InvoiceData]) -> list[InvoiceData]:
-        """Search invoices by text"""
-        self.filter.set_search_text(search_text)
-        return self.get_filtered_invoices(invoices)
-
-    def delete_single_invoice(self, invoice_number: str) -> bool:
-        """Delete a single invoice"""
+    def get_invoice_by_number(self, invoice_number: str) -> Optional[InvoiceData]:
+        """Retrieves a single invoice by its number."""
         with self._invoice_session() as session:
-            return self._repo_manager.get_invoice_repository().delete_invoices(session, [invoice_number])
+            return self._repo_manager.get_invoice_repository().get_invoice_by_number(session, invoice_number)
 
-    def delete_multiple_invoices(self, invoice_numbers: list[str]) -> bool:
-        """Delete multiple invoices"""
+    # ==============================================================
+    # DETAILED FETCH (Invoice + Items + Services)
+    # ==============================================================
+
+    def get_invoice_with_details(self, invoice_number: str) -> Optional[tuple[InvoiceData, list[InvoiceItemData]]]:
+        """
+        Fetches an invoice and all its associated items,
+        then enriches them with dynamic price names.
+        """
+        repo = self._repo_manager.get_invoice_repository()
+
+        # Step 1: Fetch invoice and item dataclasses from the invoices DB.
+        # This is safe because the repository converts ORM objects to dataclasses inside the session.
+        with self._invoice_session() as invoice_session:
+            invoice_data, items_data = repo.get_invoice_and_items(invoice_session, invoice_number)
+
+            if not invoice_data:
+                return None
+
+            if not items_data:
+                return invoice_data, []
+
+        # Step 2: Collect ONLY the dynamic price IDs needed for enrichment.
+        # We no longer need to look up the main service name; it's already in items_data.
+        dynamic_price_ids: set[int] = set()
+        for item in items_data:
+            if item.dynamic_price_1: # Assuming the dataclass field is named `dynamic_price_1_id`
+                dynamic_price_ids.add(item.dynamic_price_1)
+            if item.dynamic_price_2: # Assuming the dataclass field is named `dynamic_price_2_id`
+                dynamic_price_ids.add(item.dynamic_price_2)
+
+        # Step 3: Fetch ONLY dynamic price names from the services DB.
+        with self._services_session() as services_session:
+            # We pass an empty set for service_ids as it's no longer needed.
+            _, dynamic_price_map = repo.get_services_and_dynamic_prices(
+                services_session, set(), dynamic_price_ids
+            )
+
+        # Step 4: Enrich the existing item dataclasses with the dynamic price names.
+        for item in items_data:
+            # The service_name is already correct from the repository. We just add the dynamic price names.
+            item.dynamic_price_1_name = dynamic_price_map.get(item.dynamic_price_1)
+            item.dynamic_price_2_name = dynamic_price_map.get(item.dynamic_price_2)
+
+        return invoice_data, items_data
+
+    # ==============================================================
+    # UPDATE / DELETE OPERATIONS
+    # ==============================================================
+
+    def delete_invoices(self, invoice_numbers: List[str]) -> List[str]:
+        """
+        Deletes one or more invoices by processing them one at a time.
+        Each deletion is a separate transaction.
+        """
         if not invoice_numbers:
-            return False
-        with self._invoice_session() as session:
-            return self._repo_manager.get_invoice_repository().delete_invoices(session, invoice_numbers)
+            return []
 
-    def update_invoice_data(self, invoice_number: str, updates: dict[str, object]) -> bool:
-        """Update invoice data"""
+        repo = self._repo_manager.get_invoice_repository()
+        failed_deletions: List[str] = []
+
+        for number in invoice_numbers:
+            with self._invoice_session() as session:
+                if not repo.delete_invoice(session, number):
+                    failed_deletions.append(number)
+                    logger.error(f"Failed to delete invoice: {number}")
+
+        if not failed_deletions:
+            logger.info(f"Successfully deleted invoices: {invoice_numbers}")
+
+        return failed_deletions
+
+    def update_invoice_data(self, invoice_number: str, updates: Dict[str, Any]) -> bool:
+        """Updates specific fields of an invoice."""
         with self._invoice_session() as session:
             return self._repo_manager.get_invoice_repository().update_invoice(session, invoice_number, updates)
 
     def update_translator(self, invoice_number: str, translator_name: str) -> bool:
-        """Update translator for invoice"""
+        """Updates translator for an invoice."""
         with self._invoice_session() as session:
-            return self._repo_manager.get_invoice_repository().update_translator(session, invoice_number,
-                                                                                 translator_name)
-    def get_invoice_by_number(self, invoice_number: str):
-        """"""
-        with self._invoice_session() as session:
-            return self._repo_manager.get_invoice_repository().get_invoice_by_number(session, invoice_number)
+            return self._repo_manager.get_invoice_repository().update_translator(
+                session, invoice_number, translator_name
+            )
 
-    def get_translator_names(self) -> list[str]:
-        """Get list of available translator names"""
-        with self._invoice_session() as session:
-            return self._repo_manager.get_user_repository().get_translator_names(session)
-
-    def get_document_count(self, invoice_number: str) -> int:
-        """Get document count for specific invoice"""
-        if invoice_number in self._document_counts_cache:
-            return self._document_counts_cache[invoice_number]
-
-        with self._invoice_session() as session:
-            count = self._repo_manager.get_invoice_repository().get_document_count(session, invoice_number)
-            self._document_counts_cache[invoice_number] = count
-            return count
-
-    def get_all_document_counts(self):
-        """"""
-        with self._invoice_session() as session:
-            return self._repo_manager.get_invoice_repository().get_all_document_counts(session)
-
-    def _update_document_counts_cache(self):
-        """Update document counts cache for all invoices"""
-        with self._invoice_session() as session:
-            self._document_counts_cache = self._repo_manager.get_invoice_repository().get_all_document_counts(session)
-
-    def get_invoice_summary(self) -> InvoiceSummary | None:
-        """Get invoice summary statistics"""
-        with self._invoice_session() as session:
-            return self._repo_manager.get_invoice_repository().get_invoice_summary(session)
-
-    def export_invoices_to_csv(self, invoice_numbers: list[str], file_path: str) -> bool:
-        """Export selected invoices to CSV file"""
-        try:
-            with self._invoice_session() as session:
-                data = self._repo_manager.get_invoice_repository().export_invoices_data(session, invoice_numbers)
-
-                if not data:
-                    logger.warning("No data to export")
-                    return False
-
-                with open(file_path, 'w', newline='', encoding='utf-8') as csvfile:
-                    writer = csv.writer(csvfile)
-
-                    # Write header
-                    writer.writerow([
-                        'شماره فاکتور', 'نام', 'کد ملی', 'شماره تماس',
-                        'تاریخ صدور', 'تاریخ تحویل', 'مترجم', 'مبلغ کل'
-                    ])
-
-                    # Write data
-                    for row in data:
-                        writer.writerow([
-                            row['invoice_number'], row['name'], row['national_id'],
-                            row['phone'], row['issue_date'], row['delivery_date'],
-                            row['translator'], row['total_amount']
-                        ])
-
-                return True
-
-        except Exception as e:
-            logger.error(f"Error exporting to CSV: {e}")
-            return False
-
-    def set_column_visibility(self, column_index: int, visible: bool):
-        """Set column visibility"""
-        self.column_settings.set_column_visible(column_index, visible)
-
-    def is_column_visible(self, column_index: int) -> bool:
-        """Check if column is visible"""
-        return self.column_settings.is_column_visible(column_index)
-
-    def get_column_names(self) -> list[str]:
-        """Get list of column names"""
-        return self.column_settings.COLUMN_NAMES
-
-    def validate_invoice_data(self, invoice_data: dict[str, Any]) -> tuple[bool, list[str]]:
-        """Validate invoice data"""
-        errors = []
-
-        # Required fields validation
-        required_fields = ['invoice_number', 'name', 'national_id', 'phone']
-        for field in required_fields:
-            if not invoice_data.get(field, '').strip():
-                errors.append(f"فیلد {field} الزامی است")
-
-        # National ID validation (basic check)
-        national_id = invoice_data.get('national_id', '')
-        if national_id and (len(national_id) != 10 or not national_id.isdigit()):
-            errors.append("کد ملی باید 10 رقم باشد")
-
-        # Phone validation (basic check)
-        phone = invoice_data.get('phone', '')
-        if phone and (len(phone) < 10 or not phone.replace('-', '').replace(' ', '').isdigit()):
-            errors.append("شماره تماس معتبر نیست")
-
-        # Amount validation
-        try:
-            amount = float(invoice_data.get('total_amount', 0))
-            if amount < 0:
-                errors.append("مبلغ نمی‌تواند منفی باشد")
-        except (ValueError, TypeError):
-            errors.append("مبلغ معتبر نیست")
-
-        return len(errors) == 0, errors
-
-    def load_column_settings_from_source(self) -> list[bool]:
-        """
-        In a real app, this would load from QSettings or a config file.
-        For now, it returns the default state from ColumnSettings.
-        """
-        settings = QSettings("YourApp", "InvoiceView")
-        visibility = []
-        for i in range(len(self.column_settings.COLUMN_NAMES)):
-            is_visible = settings.value(f"col_{i}_visible", True, type=bool)
-            visibility.append(is_visible)
-            self.column_settings.set_column_visible(i, is_visible)
-        return visibility
-        # return self.column_settings.visible_columns  # Placeholder
-
-    def save_column_settings_to_source(self):
-        """
-        In a real app, this would save the current state to QSettings.
-        """
-        settings = QSettings("YourApp", "InvoiceView")
-        for i, is_visible in enumerate(self.column_settings.visible_columns):
-            settings.setValue(f"col_{i}_visible", is_visible)
-        # pass  # Placeholder
-
-    def update_pdf_path(self, invoice_number: str, new_path: str):
-        """
-
-        """
+    def update_pdf_path(self, invoice_number: str, new_path: str) -> bool:
+        """Updates the PDF file path for an invoice."""
         with self._invoice_session() as session:
             return self._repo_manager.get_invoice_repository().update_pdf_path(session, invoice_number, new_path)
 
+    # ==============================================================
+    # UTILITY OPERATIONS
+    # ==============================================================
+
+    def get_translator_names(self) -> List[str]:
+        """Gets a list of all available translator names."""
+        with self._users_session() as session:
+            return self._repo_manager.get_user_repository().get_translator_names(session)
+
+    def get_document_counts(self) -> Dict[str, int]:
+        """Returns the cached document counts for all invoices."""
+        return self._document_counts_cache
+
+    def _update_document_counts_cache(self):
+        """Refreshes the internal cache of document counts from the database."""
+        with self._invoice_session() as session:
+            self._document_counts_cache = self._repo_manager.get_invoice_repository().get_all_document_counts(session)
+
+    def get_invoice_summary(self) -> Optional[InvoiceSummary]:
+        """Retrieves summary statistics for all invoices."""
+        with self._invoice_session() as session:
+            return self._repo_manager.get_invoice_repository().get_invoice_summary(session)
+
+    def get_invoices_for_export(self, invoice_numbers: List[str]) -> List[Dict[str, Any]]:
+        """Fetches simplified invoice data suitable for exporting."""
+        with self._invoice_session() as session:
+            return self._repo_manager.get_invoice_repository().export_invoices_data(session, invoice_numbers)
+
+    # ==============================================================
+    # EDIT HISTORY OPERATIONS
+    # ==============================================================
+
+    def log_invoice_edits(self, edits: List[EditedInvoiceData]) -> bool:
+        """Logs a list of changes made to an invoice."""
+        if not edits:
+            return True  # Nothing to log
+        with self._invoice_session() as session:
+            return self._repo_manager.get_invoice_repository().add_invoice_edits(session, edits)
+
+    def get_invoice_edit_history(self, invoice_number: str) -> List[EditedInvoiceData]:
+        """Retrieves the full edit history for a given invoice."""
+        with self._invoice_session() as session:
+            return self._repo_manager.get_invoice_repository().get_edit_history_by_invoice_number(session,
+                                                                                                  invoice_number)
+
+
+# =============================================================================
+# 3. SPECIALIZED HELPER SERVICES (Single-Responsibility Classes)
+# =============================================================================
 
 class NumberFormatService:
-    """Logic for number formatting"""
-
+    """Handles conversion and formatting of numbers, especially for Persian locale."""
     PERSIAN_DIGITS = '۰۱۲۳۴۵۶۷۸۹'
     ENGLISH_DIGITS = '0123456789'
+    TO_PERSIAN_TABLE = str.maketrans(ENGLISH_DIGITS, PERSIAN_DIGITS)
+    TO_ENGLISH_TABLE = str.maketrans(PERSIAN_DIGITS, ENGLISH_DIGITS)
 
     @staticmethod
-    def to_persian_number(text: str) -> str:
-        """Convert English digits to Persian digits"""
-        if not isinstance(text, str):
-            text = str(text)
-
-        translation_table = str.maketrans(
-            NumberFormatService.ENGLISH_DIGITS,
-            NumberFormatService.PERSIAN_DIGITS
-        )
-        return text.translate(translation_table)
+    def to_persian_number(text: Any) -> str:
+        return str(text).translate(NumberFormatService.TO_PERSIAN_TABLE)
 
     @staticmethod
-    def to_english_number(text: str) -> str:
-        """Convert Persian digits to English digits"""
-        if not isinstance(text, str):
-            text = str(text)
-
-        translation_table = str.maketrans(
-            NumberFormatService.PERSIAN_DIGITS,
-            NumberFormatService.ENGLISH_DIGITS
-        )
-        return text.translate(translation_table)
+    def to_english_number(text: Any) -> str:
+        return str(text).translate(NumberFormatService.TO_ENGLISH_TABLE)
 
     @staticmethod
     def format_currency(amount: float) -> str:
-        """Format currency with Persian digits and separators"""
         try:
             formatted = f"{int(amount):,}"
             return NumberFormatService.to_persian_number(formatted)
@@ -248,190 +275,67 @@ class NumberFormatService:
 
 
 class FileService:
-    """Logic for file operations"""
+    """Provides utilities for file system operations like searching and validation."""
 
     @staticmethod
-    def find_file_by_name(filename: str, search_path: str) -> str | None:
-        """Find file by name in given path"""
-        try:
-            for root, dirs, files in os.walk(search_path):
-                if filename in files:
-                    return os.path.join(root, filename)
-            return None
-        except Exception as e:
-            logger.error(f"Error searching for file {filename}: {e}")
-            return None
-
-    @staticmethod
-    def recover_lost_pdf(invoice_number: str) -> str | None:
-        """Try to recover lost PDF file by searching in common directories"""
-        common_paths = [
-            os.path.join(os.getcwd(), "invoices"),
-            os.path.join(os.getcwd(), "pdfs"),
-            os.path.join(os.getcwd(), "documents"),
-            os.path.expanduser("~/Desktop"),
-            os.path.expanduser("~/Documents")
-        ]
-
-        filename_patterns = [
-            f"invoice_{invoice_number}.pdf",
-            f"فاکتور_{invoice_number}.pdf",
-            f"{invoice_number}.pdf"
-        ]
-
-        for path in common_paths:
-            if os.path.exists(path):
-                for pattern in filename_patterns:
-                    found_file = FileService.find_file_by_name(pattern, path)
-                    if found_file:
-                        return found_file
-
-        return None
-
-    @staticmethod
-    def validate_pdf_path(file_path: str) -> bool:
-        """Validate PDF file path"""
+    def validate_pdf_path(file_path: Optional[str]) -> bool:
         if not file_path:
             return False
-
         path = Path(file_path)
-        return path.exists() and path.suffix.lower() == '.pdf'
+        return path.exists() and path.is_file() and path.suffix.lower() == '.pdf'
 
 
 class ValidationService:
-    """Logic for data validation"""
+    """Provides methods for validating business-specific data."""
 
     @staticmethod
-    def validate_national_id(national_id: str) -> bool:
-        """Validate Iranian national ID"""
-        if not national_id or len(national_id) != 10:
-            return False
+    def validate_invoice_update(data: Dict[str, Any]) -> Tuple[bool, List[str]]:
+        """Validates data for an existing invoice being updated."""
+        errors = []
+        if not data.get('name', '').strip():
+            errors.append("فیلد نام الزامی است")
 
-        if not national_id.isdigit():
-            return False
+        national_id = data.get('national_id', '')
+        if national_id and (len(national_id) != 10 or not national_id.isdigit()):
+            errors.append("کد ملی باید 10 رقم باشد")
 
-        # Check for repeated digits
-        if len(set(national_id)) == 1:
-            return False
+        phone = data.get('phone', '')
+        if phone and not (phone.isdigit() and 8 <= len(phone) <= 11):
+            errors.append("شماره تماس معتبر نیست")
 
-        # Calculate checksum
-        total = sum(int(national_id[i]) * (10 - i) for i in range(9))
-        remainder = total % 11
-
-        check_digit = int(national_id[9])
-
-        if remainder < 2:
-            return check_digit == remainder
-        else:
-            return check_digit == (11 - remainder)
+        return not errors, errors
 
     @staticmethod
-    def validate_phone_number(phone: str) -> bool:
-        """Validate Iranian phone number"""
-        if not phone:
-            return False
+    def validate_bulk_delete(selected_count: int, max_allowed: int = 100) -> tuple[bool, str]:
+        """Validate bulk delete operation"""
+        if selected_count == 0:
+            return False, "هیچ فاکتوری انتخاب نشده است"
 
-        # Remove common separators
-        clean_phone = phone.replace('-', '').replace(' ', '').replace('(', '').replace(')', '')
+        if selected_count > max_allowed:
+            return False, f"نمی‌توان بیش از {max_allowed} فاکتور را همزمان حذف کرد"
 
-        # Check if all characters are digits
-        if not clean_phone.isdigit():
-            return False
-
-        # Check length (Iranian mobile: 11 digits starting with 09, landline: 8-11 digits)
-        if len(clean_phone) < 8 or len(clean_phone) > 11:
-            return False
-
-        # Check mobile number format
-        if len(clean_phone) == 11 and not clean_phone.startswith('09'):
-            return False
-
-        return True
-
-    @staticmethod
-    def validate_amount(amount_str: str) -> tuple[bool, float]:
-        """Validate and parse amount string"""
-        try:
-            # Remove Persian digits and separators
-            clean_amount = NumberFormatService.to_english_number(amount_str)
-            clean_amount = clean_amount.replace(',', '').replace(' ', '')
-
-            amount = float(clean_amount)
-            return amount >= 0, amount
-        except (ValueError, TypeError):
-            return False, 0.0
+        return True, ""
 
 
 class SearchService:
-    """Logic for search and filtering operations"""
+    """Implements the logic for filtering invoices based on search text."""
 
-    @staticmethod
-    def create_search_terms(search_text: str) -> list[str]:
-        """Create search terms from search text"""
-        if not search_text:
-            return []
+    def __init__(self):
+        self.filter = InvoiceFilter()
 
-        # Convert Persian numbers to English for consistent searching
-        normalized_text = NumberFormatService.to_english_number(search_text.lower())
-
-        # Split by spaces and remove empty terms
-        terms = [term.strip() for term in normalized_text.split() if term.strip()]
-
-        return terms
-
-    @staticmethod
-    def matches_any_field(invoice: InvoiceData, search_terms: list[str]) -> bool:
-        """Check if invoice matches any search term in any field"""
-        if not search_terms:
-            return True
-
-        # Prepare searchable content
-        searchable_content = [
-            NumberFormatService.to_english_number(invoice.invoice_number.lower()),
-            invoice.name.lower(),
-            invoice.national_id.lower(),
-            invoice.phone.lower(),
-            invoice.translator.lower(),
-            invoice.issue_date.lower(),
-            invoice.delivery_date.lower() if invoice.delivery_date else ""
-        ]
-
-        # Join all content for searching
-        combined_content = ' '.join(searchable_content)
-
-        # Check if any search term matches
-        return any(term in combined_content for term in search_terms)
-
-
-class SortService:
-    """Logic for sorting operations"""
-
-    @staticmethod
-    def sort_invoices(invoices: list[InvoiceData], sort_column: str, reverse: bool = False) -> list[InvoiceData]:
-        """Sort invoices by specified column"""
-        sort_key_map = {
-            'invoice_number': lambda x: x.invoice_number,
-            'name': lambda x: x.name,
-            'national_id': lambda x: x.national_id,
-            'phone': lambda x: x.phone,
-            'issue_date': lambda x: x.issue_date,
-            'delivery_date': lambda x: x.delivery_date or "",
-            'translator': lambda x: x.translator,
-            'total_amount': lambda x: x.total_amount
-        }
-
-        if sort_column not in sort_key_map:
+    def search(self, search_text: str, invoices: List[InvoiceData]) -> List[InvoiceData]:
+        """Filters a list of invoices based on the search text."""
+        self.filter.set_search_text(search_text)
+        if not self.filter.search_text:
             return invoices
-
-        try:
-            return sorted(invoices, key=sort_key_map[sort_column], reverse=reverse)
-        except Exception as e:
-            logger.error(f"Error sorting invoices: {e}")
-            return invoices
+        return [inv for inv in invoices if self.filter.matches_search(inv)]
 
 
 class InvoiceExportService:
-    """Logic for export operations"""
+    """Handles the entire process of exporting invoice data to CSV."""
+
+    def __init__(self, invoice_service: InvoiceService):
+        self._invoice_service = invoice_service
 
     @staticmethod
     def prepare_export_data(invoices: list[InvoiceData], document_counts: dict[str, int]) -> list[dict[str, object]]:
@@ -455,47 +359,66 @@ class InvoiceExportService:
 
         return export_data
 
-    @staticmethod
-    def export_to_csv(data: list[dict[str, object]], file_path: str) -> bool:
-        """Export data to CSV file"""
+    def export_to_csv(self, invoice_numbers: List[str], file_path: str) -> bool:
+        """Exports selected invoices to a CSV file."""
+        if not invoice_numbers:
+            return False
+
         try:
-            if not data:
+            export_data = self._invoice_service.get_invoices_for_export(invoice_numbers)
+            if not export_data:
+                logger.warning("No data found for export.")
                 return False
 
+            headers = [
+                'شماره فاکتور', 'نام', 'کد ملی', 'شماره تماس',
+                'تاریخ صدور', 'تاریخ تحویل', 'مترجم', 'مبلغ کل'
+            ]
+
+            # Map model keys to Persian headers
+            key_map = {
+                'invoice_number': 'شماره فاکتور', 'name': 'نام', 'national_id': 'کد ملی',
+                'phone': 'شماره تماس', 'issue_date': 'تاریخ صدور', 'delivery_date': 'تاریخ تحویل',
+                'translator': 'مترجم', 'total_amount': 'مبلغ کل'
+            }
+
             with open(file_path, 'w', newline='', encoding='utf-8-sig') as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=data[0].keys())
+                writer = csv.DictWriter(csvfile, fieldnames=headers)
                 writer.writeheader()
-                writer.writerows(data)
+                for row_data in export_data:
+                    # Create a new dict with Persian keys
+                    persian_row = {key_map[key]: value for key, value in row_data.items()}
+                    writer.writerow(persian_row)
 
             return True
-
-        except Exception as e:
-            logger.error(f"Error exporting to CSV: {e}")
+        except (IOError, KeyError) as e:
+            logger.error(f"Error exporting invoices to CSV: {e}")
             return False
 
 
-class BulkOperationService:
-    """Logic for bulk operations"""
+# =============================================================================
+# 4. LOGIC FAÇADE (The Controller's Single Point of Contact)
+# =============================================================================
 
-    @staticmethod
-    def validate_bulk_delete(selected_count: int, max_allowed: int = 100) -> tuple[bool, str]:
-        """Validate bulk delete operation"""
-        if selected_count == 0:
-            return False, "هیچ فاکتوری انتخاب نشده است"
+class InvoiceLogic:
+    """
+    A façade that provides a simplified interface to all invoice-related business logic.
+    The controller interacts with this class, not the individual services.
+    """
 
-        if selected_count > max_allowed:
-            return False, f"نمی‌توان بیش از {max_allowed} فاکتور را همزمان حذف کرد"
-
-        return True, ""
-
-    @staticmethod
-    def create_bulk_confirmation_message(operation: str, count: int) -> str:
-        """Create confirmation message for bulk operations"""
-        operation_names = {
-            'delete': 'حذف',
-            'export': 'صادر کردن',
-            'update': 'به‌روزرسانی'
-        }
-
-        operation_name = operation_names.get(operation, operation)
-        return f"آیا از {operation_name} {count} فاکتور انتخاب شده مطمئن هستید؟"
+    def __init__(self,
+                 invoice_service: InvoiceService,
+                 settings_service: SettingsService,
+                 file_service: FileService,
+                 validation_service: ValidationService,
+                 search_service: SearchService,
+                 export_service: InvoiceExportService,
+                 format_service: NumberFormatService):
+        # Assign services to namespaced properties for clarity
+        self.invoice = invoice_service
+        self.settings = settings_service
+        self.file = file_service
+        self.validation = validation_service
+        self.search = search_service
+        self.export = export_service
+        self.format = format_service

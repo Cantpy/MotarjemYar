@@ -256,7 +256,7 @@ class OtherServicesView(QWidget):
             self.bulk_delete_requested.emit(service_ids)
 
     def _show_context_menu(self, position):
-        """Display context menu for table row operations."""
+        """Display services menu for table row operations."""
         selected_row = self.table.indexAt(position).row()
         if selected_row == -1:
             return
@@ -271,7 +271,7 @@ class OtherServicesView(QWidget):
         remove_action.triggered.connect(self._emit_delete_request)
         context_menu.addAction(remove_action)
 
-        # Add bulk operations to context menu if multiple rows are selected
+        # Add bulk operations to services menu if multiple rows are selected
         selected_count = self._get_selected_count()
         if selected_count > 1:
             context_menu.addSeparator()

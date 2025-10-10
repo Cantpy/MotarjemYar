@@ -56,7 +56,7 @@ class ManagedSessionProvider:
     @contextmanager
     def __call__(self) -> Session:
         """
-        Provides a transactional scope via a context manager.
+        Provides a transactional scope via a services manager.
         Automatically handles commit, rollback, and closing.
         Usage:
             with _session_provider() as session:

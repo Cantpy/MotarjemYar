@@ -10,6 +10,7 @@ from features.Invoice_Page.invoice_page_state_manager import WorkflowStateManage
 from features.Invoice_Page.customer_info.customer_info_models import Customer
 from features.Invoice_Page.document_selection.document_selection_models import InvoiceItem
 
+from shared.orm_models.invoices_models import InvoiceData, InvoiceItemData
 from shared import show_question_message_box, show_warning_message_box
 
 
@@ -24,6 +25,9 @@ class InvoiceWizardController(QObject):
         self._logic = logic
         self._state_manager = state_manager
         self.sub_controllers = sub_controllers
+
+        self._is_edit_mode = False
+        self._editing_invoice_number = None
 
         self._connect_signals()
         self._populate_view_widgets()
@@ -130,19 +134,62 @@ class InvoiceWizardController(QObject):
         return True  # Navigation can proceed
 
     def finish_and_reset(self):
-        """Public slot to end the current invoice process and reset the wizard."""
+        """Ends the process and resets the wizard to its 'new invoice' state."""
         print("WORKFLOW: Finish & Reset requested.")
+        self._is_edit_mode = False
+        self._editing_invoice_number = None
 
-        # 1. Clear all data in the state manager
         self._state_manager.reset()
-
-        # 2. Command all sub-controllers to reset their views
         for name, controller in self.sub_controllers.items():
-            # It's good practice to check if the reset method exists
             if hasattr(controller, 'reset_view'):
                 controller.reset_view()
+        self._view.set_current_step(0)
 
-        # 3. Command the main wizard view to return to the first page
+    def start_deep_edit_session(self, customer: Customer, invoice_data: InvoiceData, items_data: list[InvoiceItemData]):
+        """
+        Configures the entire wizard to edit an existing invoice.
+        This is the main entry point for the deep edit feature.
+        """
+        # 1. Start with a completely clean state
+        self.finish_and_reset()
+
+        print(f"Wizard Controller: Starting DEEP EDIT session for {invoice_data.invoice_number}")
+
+        # 2. Set the wizard into edit mode
+        self._is_edit_mode = True
+        self._editing_invoice_number = invoice_data.invoice_number
+
+        # 3. Populate the State Manager with existing data
+        # 3a. Create a Customer DTO from the InvoiceData
+        customer_for_edit = Customer(
+            name=customer.name,
+            national_id=customer.national_id,
+            phone=customer.phone,
+            email=customer.email,
+            address=customer.address
+        )
+        self._state_manager.set_customer(customer_for_edit)
+
+        # 3b. Convert InvoiceItemData to the wizard's internal InvoiceItem model
+        # This step depends on your `document_selection_models.InvoiceItem` structure.
+        # I am assuming it has a `service` and `quantity` attribute.
+        # This is a placeholder and may need adjustment.
+        wizard_items = self._logic.convert_repo_items_to_wizard_items(items_data)
+        self._state_manager.set_invoice_items(wizard_items)
+
+        # 3c. Set other details in the state manager
+        self._state_manager.set_invoice_details({
+            'delivery_date': invoice_data.delivery_date,
+            'translator': invoice_data.translator,
+            'remarks': invoice_data.remarks
+            # Add other fields like payment status, discount, etc., here
+        })
+
+        # 4. Command the sub-controllers to display the now-populated state
+        self.sub_controllers['customer'].load_customer_for_edit(customer_for_edit)
+        self.sub_controllers['documents'].load_items_for_edit(wizard_items)
+
+        # 5. Ensure the view starts at the first page
         self._view.set_current_step(0)
 
     def _print_customer_state(self, customer: Customer):

@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from enum import Enum
 from features.Invoice_Page.invoice_preview.invoice_preview_models import PreviewOfficeInfo
-from datetime import date
+from datetime import datetime
 
 
 @dataclass
@@ -22,8 +22,8 @@ class InvoiceDetails:
     invoice_number: str = ""
     docu_num: int = 0
 
-    issue_date: date | None = None
-    delivery_date: date | None = None
+    issue_date: datetime | None = None
+    delivery_date: datetime | None = None
 
     user: UserInfo = field(default_factory=UserInfo)
     src_lng: str = "فارسی"
@@ -34,6 +34,7 @@ class InvoiceDetails:
     confirmation_cost: int = 0
     office_costs: int = 0
     certified_copy_costs: int = 0
+    additional_issues_costs: int = 0
     total_before_variables: int = 0
 
     # --- User inputs are now expanded ---

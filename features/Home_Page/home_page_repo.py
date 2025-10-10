@@ -66,10 +66,10 @@ class HomePageInvoicesRepository:
     def get_most_repeated_doc(self, session: Session) -> Optional[Tuple[int, int]]:
         return (
             session.query(
-                InvoiceItemModel.service,
+                InvoiceItemModel.service_id,
                 func.sum(InvoiceItemModel.quantity).label("total_qty"),
             )
-            .group_by(InvoiceItemModel.service)
+            .group_by(InvoiceItemModel.service_id)
             .order_by(func.sum(InvoiceItemModel.quantity).desc())
             .first()
         )
@@ -77,14 +77,14 @@ class HomePageInvoicesRepository:
     def get_most_repeated_doc_month(self, session: Session) -> Optional[Tuple[int, int, int, int]]:
         return (
             session.query(
-                InvoiceItemModel.service,
+                InvoiceItemModel.service_id,
                 extract("year", IssuedInvoiceModel.delivery_date).label("year"),
                 extract("month", IssuedInvoiceModel.delivery_date).label("month"),
                 func.sum(InvoiceItemModel.quantity).label("total_qty"),
             )
             .join(IssuedInvoiceModel, InvoiceItemModel.invoice_number == IssuedInvoiceModel.invoice_number)
             .group_by(
-                InvoiceItemModel.service,
+                InvoiceItemModel.service_id,
                 extract("year", IssuedInvoiceModel.delivery_date),
                 extract("month", IssuedInvoiceModel.delivery_date),
             )

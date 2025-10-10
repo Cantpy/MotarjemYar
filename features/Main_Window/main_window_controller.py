@@ -16,6 +16,7 @@ from features.Services.tab_manager.tab_manager_factory import ServicesManagement
 from features.Info_Page.info_page_factory import InfoPageFactory
 from features.Workspace.workspace_factory import WorkspaceFactory
 
+from shared.orm_models.invoices_models import InvoiceData, InvoiceItemData
 from shared import show_error_message_box, get_resource_path
 
 
@@ -34,6 +35,7 @@ class MainWindowController(QObject):
         self._engines = engines
 
         self.page_manager = PageManager(self._view.stackedWidget)
+        self.page_controllers = {}
         self._register_pages()
 
         try:
@@ -70,6 +72,36 @@ class MainWindowController(QObject):
             )
         )
 
+        def create_invoice_wizard():
+            if "invoice" not in self.page_controllers:
+                # Assuming your factory returns the controller
+                controller = InvoiceWizardFactory.create(
+                    customer_engine=self._engines.get('customers'),
+                    invoices_engine=self._engines.get('invoices'),
+                    services_engine=self._engines.get('services'),
+                    users_engine=self._engines.get('users'),
+                    parent=self._view
+                )
+                self.page_controllers["invoice"] = controller
+            return self.page_controllers["invoice"].get_view()
+
+        self.page_manager.register("invoice", create_invoice_wizard)
+
+        # --- Invoice Table Registration (Modified) ---
+        def create_invoice_table():
+            if "invoice_table" not in self.page_controllers:
+                controller = InvoiceTableFactory.create(
+                    invoices_engine=self._engines.get('invoices'),
+                    users_engine=self._engines.get('users'),
+                    services_engine=self._engines.get('services'),
+                    parent=self._view
+                )
+                # --- THIS IS THE KEY CONNECTION ---
+                controller.request_deep_edit_navigation.connect(self._on_request_deep_edit)
+                self.page_controllers["invoice_table"] = controller
+            return self.page_controllers["invoice_table"].get_view()
+
+        self.page_manager.register("invoice_table", create_invoice_table)
         # --- Invoice Wizard: Needs 'customers', 'invoices', 'services', 'users' ---
         self.page_manager.register(
             "invoice",
@@ -101,6 +133,8 @@ class MainWindowController(QObject):
             "invoice_table",
             lambda: InvoiceTableFactory.create(
                 invoices_engine=self._engines.get('invoices'),
+                users_engine=self._engines.get('users'),
+                services_engine=self._engines.get('services'),
                 parent=self._view
             )
         )
@@ -162,6 +196,25 @@ class MainWindowController(QObject):
 
         # --- 3. Show the default page on startup ---
         self.page_manager.show("home")
+
+    def _on_request_deep_edit(self, invoice_data: InvoiceData, items_data: list[InvoiceItemData]):
+        """
+        Receives the signal from the invoice table and orchestrates the navigation
+        and data passing to the invoice wizard.
+        """
+        print(f"MainWindow: Received request to deep edit {invoice_data.invoice_number}. Navigating...")
+
+        # 1. Switch to the invoice wizard page. This will create it if it doesn't exist.
+        self.page_manager.show("invoice")
+
+        # 2. Get the controller for the (now visible) wizard page from our cache.
+        invoice_wizard_controller = self.page_controllers.get("invoice")
+
+        if invoice_wizard_controller:
+            # 3. Command the wizard to start its edit session.
+            invoice_wizard_controller.start_deep_edit_session(invoice_data, items_data)
+        else:
+            show_error_message_box(self._view, "خطای برنامه", "کنترلر صفحه صدور فاکتور یافت نشد.")
 
     # --- Slots for View Signals ---
 

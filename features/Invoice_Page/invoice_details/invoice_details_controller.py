@@ -40,7 +40,7 @@ class InvoiceDetailsController:
         self._view.display_static_info(customer, office_info, user_info)
 
         # 2. Ask logic to calculate the initial DTO (this now applies default remarks)
-        self._current_details = self._logic.create_initial_details(customer, items)
+        self._current_details = self._logic.create_initial_details(items)
 
         # 3. Update the view and the global state with the initial DTO
         self._process_update(self._current_details)

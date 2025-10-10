@@ -1,61 +1,8 @@
+# features/Invoice_Table/invoice_table_models.py
+
 from dataclasses import dataclass
 from typing import List, Optional
-
-
-@dataclass
-class InvoiceItemData:
-    """Data class for invoice item information"""
-    item_name: str
-    item_qty: int
-    item_price: int
-    officiality: int
-    judiciary_seal: int
-    foreign_affairs_seal: int
-    remarks: Optional[str] = None
-    invoice_number: Optional[str] = None  # Added to match _repository usage
-
-    def get_document_count(self) -> int:
-        """Get document count for this item (used by _repository)"""
-        return self.item_qty
-
-
-@dataclass
-class InvoiceData:
-    """Data class for invoice information"""
-    invoice_number: str  # Changed from int to str to match _repository
-    name: str
-    national_id: str  # Changed from int to str for better handling
-    phone: str
-    issue_date: str
-    delivery_date: str
-    translator: str
-    total_items: Optional[int] = None
-    total_amount: int = 0
-    total_translation_price: int = 0
-    advance_payment: int = 0
-    discount_amount: int = 0
-    emergency_cost: int = 0
-    final_amount: int = 0
-    payment_status: int = 0
-    delivery_status: int = 0
-    total_official_docs_count: int = 0
-    total_unofficial_docs_count: int = 0
-    total_pages_count: int = 0
-    total_judiciary_count: int = 0
-    total_foreign_affairs_count: int = 0
-    total_additional_doc_count: int = 0
-    source_language: Optional[str] = None
-    target_language: Optional[str] = None
-    remarks: Optional[str] = None
-    username: Optional[str] = None
-    pdf_file_path: Optional[str] = None
-    items: List[InvoiceItemData] = None
-    id: Optional[int] = None  # Added database ID field
-
-    def __post_init__(self):
-        """Initialize items list if None"""
-        if self.items is None:
-            self.items = []
+from shared.orm_models.invoices_models import InvoiceData, InvoiceItemData
 
 
 @dataclass

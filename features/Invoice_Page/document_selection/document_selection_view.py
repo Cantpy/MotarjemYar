@@ -334,7 +334,7 @@ class DocumentSelectionWidget(QWidget):
         self.edit_button.setEnabled(is_row_selected)
 
     def _show_table_context_menu(self, position):
-        """Creates and shows the right-click context menu."""
+        """Creates and shows the right-click services menu."""
         selected_items = self.table.selectedItems()
         if not selected_items:
             return

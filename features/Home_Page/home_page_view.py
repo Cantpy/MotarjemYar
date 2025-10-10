@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
 )
 
 from shared.utils.persian_tools import to_persian_numbers
-from shared.utils.date_utils import to_jalali_string
+from shared.utils.date_utils import to_jalali
 from shared.widgets.toast_widget import show_toast
 from features.Home_Page.home_page_styles import HOME_PAGE_STYLES
 from features.Home_Page.home_page_models import DashboardStats
@@ -362,7 +362,7 @@ class HomePageView(QWidget):
     def populate_invoices_table(self, invoices_with_priority: List[Tuple]):
         """
         PUBLIC SLOT: Populates the table.
-        It also caches the data for later use (like context menus).
+        It also caches the data for later use (like services menus).
         """
         self._table_data_cache = invoices_with_priority
         self.invoices_table.setRowCount(len(invoices_with_priority))
@@ -382,7 +382,7 @@ class HomePageView(QWidget):
             self.invoices_table.setItem(row, 1, customer_item)
 
             # Due date
-            jalali_date_str = to_jalali_string(invoice_dto.delivery_date)
+            jalali_date_str = to_jalali(invoice_dto.delivery_date, False)
             jalali_date_item = QTableWidgetItem(jalali_date_str)
 
             jalali_date_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)

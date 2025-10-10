@@ -602,7 +602,7 @@ class NotificationHistoryWidget(QWidget):
 
     # Context menu methods
     def show_sms_context_menu(self, position):
-        """Show SMS context menu."""
+        """Show SMS services menu."""
         if self.sms_table.itemAt(position) is not None:
             menu = QMenu(self)
 
@@ -617,7 +617,7 @@ class NotificationHistoryWidget(QWidget):
             menu.exec(self.sms_table.mapToGlobal(position))
 
     def show_email_context_menu(self, position):
-        """Show Email context menu."""
+        """Show Email services menu."""
         if self.email_table.itemAt(position) is not None:
             menu = QMenu(self)
 

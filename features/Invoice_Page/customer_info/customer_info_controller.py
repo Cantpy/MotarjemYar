@@ -3,6 +3,7 @@
 from features.Invoice_Page.customer_info.customer_info_logic import CustomerLogic, CustomerExistsError, ValidationError
 from features.Invoice_Page.customer_info.customer_info_view import CustomerInfoWidget
 from features.Invoice_Page.invoice_page_state_manager import WorkflowStateManager
+from features.Invoice_Page.customer_info.customer_info_models import Customer
 
 
 class CustomerInfoController:
@@ -71,6 +72,15 @@ class CustomerInfoController:
 
         except Exception as e:
             self._view.show_error(f"یک خطای پیشبینی نشده رخ داد: {e}")
+
+    def load_customer_for_edit(self, customer: Customer):
+        """
+        Public method for a parent controller (like a wizard) to load
+        an existing customer's data directly into the view for editing.
+        """
+        self._view.display_customer_details(customer)
+        # Clear any old validation errors
+        self._view.display_validation_results({})
 
     def reset_view(self):
         """Clears all fields in the invoice details view."""

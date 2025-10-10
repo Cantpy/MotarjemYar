@@ -9,22 +9,25 @@ from shared.utils.number_utils import to_persian_number
 
 # --- PRIMARY CONVERSION FUNCTIONS ---
 
-def to_jalali(datetime_input) -> str:
+def to_jalali(datetime_input, include_time: bool = True) -> str:
     """
-    Converts various datetime/date/string inputs to Jalali format: YYYY/MM/DD - HH:MM
-    Accepts:
-      - datetime.datetime
-      - datetime.date
-      - string (various formats, with or without time, with or without microseconds)
+    Converts various datetime/date/string inputs to Jalali format.
+
+    Args:
+        datetime_input: datetime, date, or string
+        include_time (bool): whether to include time (HH:MM) in output. Default is True.
+
+    Returns:
+        str: Jalali date in either:
+             - "YYYY/MM/DD - HH:MM" (if include_time=True)
+             - "YYYY/MM/DD" (if include_time=False)
     """
     # Step 1: Normalize input
     if isinstance(datetime_input, datetime):
         dt = datetime_input
     elif isinstance(datetime_input, date):
-        # Convert to datetime with 00:00 time
         dt = datetime.combine(datetime_input, datetime.min.time())
     elif isinstance(datetime_input, str):
-        # Try multiple formats
         formats = [
             "%Y-%m-%d %H:%M:%S.%f",
             "%Y-%m-%d %H:%M:%S",
@@ -45,15 +48,14 @@ def to_jalali(datetime_input) -> str:
         else:
             raise ValueError(f"Unsupported datetime string format: {datetime_input}")
     else:
-        raise TypeError(
-            f"datetime_input must be a datetime, date, or str — got {type(datetime_input)}"
-        )
+        raise TypeError(f"datetime_input must be a datetime, date, or str — got {type(datetime_input)}")
 
     # Step 2: Convert to Jalali
     jdt = jdatetime.datetime.fromgregorian(datetime=dt)
 
-    # Step 3: Return formatted string
-    return to_persian_number(jdt.strftime("%Y/%m/%d - %H:%M"))
+    # Step 3: Format based on flag
+    fmt = "%H:%M - %Y/%m/%d" if include_time else "%Y/%m/%d"
+    return to_persian_number(jdt.strftime(fmt))
 
 
 def to_jalali_string(gregorian_date_obj: Optional[Union[date, datetime]]) -> str:

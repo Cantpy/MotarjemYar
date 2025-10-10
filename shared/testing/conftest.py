@@ -13,7 +13,7 @@ TestAppContext = namedtuple('TestAppContext', ['qtbot', 'engines'])
 @pytest.fixture(scope="function")
 def app_context(qtbot):
     """
-    A pytest fixture that provides a fully initialized application context
+    A pytest fixture that provides a fully initialized application services
     for an integration test. It uses a fresh in-memory database for each test.
 
     Yields:
@@ -27,7 +27,7 @@ def app_context(qtbot):
     seeder = DatabaseSeeder(engines=all_engines)
     seeder.seed_initial_data()
 
-    # 3. Yield the context to the test function
+    # 3. Yield the services to the test function
     yield TestAppContext(qtbot=qtbot, engines=all_engines)
 
     # 4. Teardown (if any) happens here automatically after the test finishes.

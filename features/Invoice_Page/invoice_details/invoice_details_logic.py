@@ -1,14 +1,13 @@
-
 # features/Invoice_Page/invoice_details/invoice_details_logic.py
 
 from features.Invoice_Page.invoice_details.invoice_details_repo import InvoiceDetailsRepository
-from features.Invoice_Page.customer_info.customer_info_models import Customer
 from features.Invoice_Page.document_selection.document_selection_models import InvoiceItem
 from features.Invoice_Page.invoice_details.invoice_details_models import InvoiceDetails, UserInfo
 from features.Invoice_Page.invoice_details.invoice_details_settings_dialog import SettingsManager
 from features.Invoice_Page.invoice_preview.invoice_preview_models import PreviewOfficeInfo
 
 from shared.session_provider import ManagedSessionProvider, SessionManager
+from shared.services.invoice_number_generator import InvoiceNumberService
 
 
 class InvoiceDetailsLogic:
@@ -23,19 +22,20 @@ class InvoiceDetailsLogic:
         self._users_session = users_engine
         self._invoices_session = invoices_engine
         self._settings_manager = settings_manager
+        self._invoice_number_service = InvoiceNumberService(invoices_engine)
         with self._users_session() as session:
             self._office_info = self._repo.get_office_info(session)
 
-    def create_initial_details(self, customer: Customer, items: list[InvoiceItem]) -> InvoiceDetails:
+    def create_initial_details(self, items: list[InvoiceItem]) -> InvoiceDetails:
         """Calculates all initial values and returns the initial InvoiceDetails DTO."""
-        with self._invoices_session() as session:
-            invoice_number = self._repo.get_next_invoice_number(session)
+        invoice_number = self._invoice_number_service.get_next_invoice_number()
 
         total_documents = sum(item.quantity for item in items)
         translation_cost = sum(item.translation_price for item in items)
         confirmation_cost = sum(item.judiciary_seal_price + item.foreign_affairs_seal_price for item in items)
         office_costs = sum(item.registration_price for item in items)
         certified_copy_costs = sum(item.certified_copy_price for item in items)
+        additional_issues_costs = sum(item.extra_copy_price for item in items)
 
         details = InvoiceDetails(
             invoice_number=invoice_number,
@@ -43,6 +43,7 @@ class InvoiceDetailsLogic:
             translation_cost=translation_cost,
             confirmation_cost=confirmation_cost,
             office_costs=office_costs,
+            additional_issues_costs=additional_issues_costs,
             certified_copy_costs=certified_copy_costs,
             office_info=self._office_info
         )

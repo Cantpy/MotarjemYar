@@ -81,7 +81,7 @@ def get_user_data_path(*path_segments, create_dirs=True):
 
 def return_folder(folder1, folder2=None, folder3=None):
     """
-        Return the path to a folder based on the application's execution context.
+        Return the path to a folder based on the application's execution services.
 
         Args:
             folder1 (str): First folder level

@@ -1,6 +1,6 @@
 # features/Invoice_Page/invoice_preview/invoice_preview_logic.py
 
-from datetime import datetime, date
+from datetime import datetime
 
 from features.Invoice_Page.invoice_preview.invoice_preview_repo import InvoicePreviewRepository
 from features.Invoice_Page.invoice_preview.invoice_preview_models import (Invoice, Customer, PreviewItem,
@@ -9,7 +9,7 @@ from features.Invoice_Page.invoice_details.invoice_details_models import Invoice
 from features.Invoice_Page.invoice_preview.invoice_preview_settings_manager import PreviewSettingsManager
 
 from shared.session_provider import ManagedSessionProvider, SessionManager
-from shared.utils.date_utils import jalali_obj_to_gregorian, to_gregorian
+from shared.utils.date_utils import to_gregorian
 from shared.orm_models.invoices_models import IssuedInvoiceModel, InvoiceItemModel
 
 
@@ -155,6 +155,8 @@ class InvoicePreviewLogic:
             username=issuer_name, customer=customer, office=details.office_info,
             source_language=details.src_lng, target_language=details.trgt_lng,
             items=preview_items, total_amount=details.total_before_discount,
+            total_translation_price=details.translation_cost, total_confirmation_price=details.confirmation_cost,
+            total_office_price=details.office_costs, total_certified_copy_price=details.certified_copy_costs,
             discount_amount=details.discount_amount, advance_payment=details.advance_payment_amount,
             emergency_cost=details.emergency_cost_amount, remarks=details.remarks,
         )
@@ -167,10 +169,13 @@ class InvoicePreviewLogic:
             return False, "هیچ سندی برای صدور فاکتور وجود ندارد."
 
         try:
-            total_translation_price = sum(
-                item.total_price for items_list in assignments.values() for item in items_list
-            )
-            translators = {person for person in assignments if person != "__unassigned__"}
+            total_translation_price = invoice_dto.total_translation_price
+            total_confirmation_price = invoice_dto.total_confirmation_price
+            total_office_price = invoice_dto.total_office_price
+            total_certified_copy_price = invoice_dto.total_certified_copy_price
+            total_additional_price = invoice_dto.total_additional_price
+            total_amount = (total_additional_price + total_certified_copy_price + total_office_price +
+                            total_confirmation_price + total_translation_price)
 
             issued_invoice_orm = IssuedInvoiceModel(
                 invoice_number=invoice_dto.invoice_number,
@@ -179,10 +184,14 @@ class InvoicePreviewLogic:
                 phone=invoice_dto.customer.phone,
                 issue_date=invoice_dto.issue_date,
                 delivery_date=invoice_dto.delivery_date,
-                translator=", ".join(sorted(list(translators))),
+                translator="",  # Translator will be assigned later
                 total_items=len(invoice_dto.items),
-                total_amount=int(invoice_dto.total_amount),
+                total_amount=int(total_amount),
                 total_translation_price=int(total_translation_price),
+                total_confirmation_price=int(total_confirmation_price),
+                total_registration_price=int(total_office_price),
+                total_certified_copy_price=int(total_certified_copy_price),
+                total_additional_issues_price=int(total_additional_price),
                 advance_payment=int(invoice_dto.advance_payment),
                 discount_amount=int(invoice_dto.discount_amount),
                 emergency_cost=int(invoice_dto.emergency_cost),
@@ -191,7 +200,8 @@ class InvoicePreviewLogic:
                 source_language=invoice_dto.source_language,
                 target_language=invoice_dto.target_language,
                 payment_status=0,
-                delivery_status=0
+                delivery_status=0,
+                remarks=invoice_dto.remarks or "",
             )
         except (ValueError, TypeError) as e:
             return False, f"خطا در تبدیل داده‌های فاکتور: {e}"
@@ -203,7 +213,8 @@ class InvoicePreviewLogic:
             for item in assigned_items:
                 item_orm = InvoiceItemModel(
                     invoice_number=invoice_dto.invoice_number,
-                    service=item.service.id,
+                    service_id=item.service.id,
+                    service_name=item.service.name,
                     page_count=item.page_count,
                     quantity=item.quantity,
                     is_official=1 if item.is_official else 0,
@@ -248,8 +259,8 @@ class InvoicePreviewLogic:
         )
         empty_invoice = Invoice(
             invoice_number="",
-            issue_date=datetime.today().strftime("%Y/%m/%d - %H:%M"),
-            delivery_date=datetime.today().strftime("%Y/%m/%d - %H:%M"),
+            issue_date=datetime.today(),
+            delivery_date=datetime.today(),
             username="",
             customer=empty_customer,
             office=empty_preview_office,

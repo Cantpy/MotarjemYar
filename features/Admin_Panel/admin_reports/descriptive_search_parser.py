@@ -87,7 +87,7 @@ class DescriptiveSearchParser:
         criteria = {'type': search_type}
 
         # --- Check if the query contains a month name ---
-        # This is a key piece of context for the parser.
+        # This is a key piece of services for the parser.
         has_month = any(month in query for month in self.MONTHS)
 
         if search_type == 'unpaid':

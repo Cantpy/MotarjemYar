@@ -193,7 +193,7 @@ class ServicesDocumentsView(QWidget):
         return item
 
     def _show_context_menu(self, position):
-        # The context menu now ONLY emits signals.
+        # The services menu now ONLY emits signals.
         row = self.table.indexAt(position).row()
         if row == -1: return
 

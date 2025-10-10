@@ -125,7 +125,7 @@ class NotificationDialog(QDialog):
 
         layout.addLayout(file_layout)
 
-        # File list with context menu
+        # File list with services menu
         self.file_list = QListWidget()
         self.file_list.setMaximumHeight(100)
         self.file_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -236,7 +236,7 @@ class NotificationDialog(QDialog):
                 QMessageBox.information(self, "حذف فایل‌ها", "همه فایل‌ها حذف شدند.")
 
     def _show_file_context_menu(self, position):
-        """Show context menu for file list."""
+        """Show services menu for file list."""
         if self.file_list.itemAt(position) is not None:
             context_menu = QMenu(self)
 

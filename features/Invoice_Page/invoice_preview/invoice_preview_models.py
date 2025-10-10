@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 from typing import List
-from datetime import date
+from datetime import datetime
 
 
 @dataclass
@@ -45,8 +45,8 @@ class Invoice:
     """Represents the entire invoice data for a single transaction."""
     invoice_number: str
 
-    issue_date: date
-    delivery_date: date
+    issue_date: datetime
+    delivery_date: datetime
 
     username: str
     customer: Customer
@@ -55,6 +55,11 @@ class Invoice:
     target_language: str
     items: List[PreviewItem] = field(default_factory=list)
 
+    total_translation_price: int = 0
+    total_confirmation_price: int = 0
+    total_office_price: int = 0
+    total_certified_copy_price: int = 0
+    total_additional_price: int = 0
     total_amount: int = 0
     discount_amount: int = 0
     advance_payment: int = 0

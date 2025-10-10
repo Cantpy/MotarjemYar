@@ -60,7 +60,7 @@ class HomePageController(QObject):
     @Slot(int, QPoint)
     def _on_operations_menu_requested(self, invoice_number: str, global_pos: QPoint):
         """
-        Creates and shows the operations context menu for a given invoice.
+        Creates and shows the operations services menu for a given invoice.
         This _logic now resides ENTIRELY in the controller.
         """
         # 1. Get the necessary data from the _logic layer
@@ -98,10 +98,13 @@ class HomePageController(QObject):
         try:
             # This now correctly uses the single source of truth for settings
             current_settings = self._settings_manager.get_current_settings()
+            print(f'no error in getting current settings')
             stats = self._logic.get_dashboard_statistics()
+            print(f'no errors in getting stats')
             invoices = self._logic.get_recent_invoices_with_priority(
                 days_threshold=current_settings.threshold_days
             )
+            print('no errors in getting invoices')
             self._view.update_stats_display(stats)
             self._view.populate_invoices_table(invoices)
         except Exception as e:

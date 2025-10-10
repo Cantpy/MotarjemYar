@@ -1,7 +1,7 @@
 # features/Home_Page/home_page_logic.py
 
 import jdatetime
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from typing import Optional, Tuple
 import requests
 
@@ -67,13 +67,7 @@ class HomePageLogic:
                     most_repeated_month_name = self._format_most_repeated_doc_month(
                         (service_name, year, month, total_qty))
 
-        print(f'total invoices: {total_invoices}')
-        print(f"today's invoices: {today_invoices}")
-        print(f'doc stats: {doc_stats}')
-        print(f'most repeated document raw: {most_repeated_raw}')
-        print(f'most repeated document in this month raw: {most_repeated_month_raw}')
-        print(f'most repeated document formatted: {most_repeated_name}')
-        print(f'most repeated document in this month formatted: {most_repeated_month_name}')
+        default_display_value = ("نامشخص", "")
 
         return DashboardStats(
             total_customers=total_customers,
@@ -81,14 +75,14 @@ class HomePageLogic:
             today_invoices=today_invoices,
             total_documents=doc_stats.total_documents,
             available_documents=doc_stats.in_office_documents,
-            most_repeated_document=most_repeated_name,
-            most_repeated_document_month=most_repeated_month_name
+            most_repeated_document=most_repeated_name or default_display_value,
+            most_repeated_document_month=most_repeated_month_name or default_display_value
         )
 
     def get_recent_invoices_with_priority(self, days_threshold: int) -> list[tuple[InvoiceDTO, str]]:
         """
-        Get recent invoices with priority labels.
-        This business _logic does not belong in the _repository.
+        Retrieves recent invoices within the specified threshold and calculates their priority.
+        Returns a list of tuples: (InvoiceDTO, priority_str)
         """
         today = date.today()
         threshold_date = today + timedelta(days=days_threshold)
@@ -96,14 +90,18 @@ class HomePageLogic:
         print(f'finding invoices between {today} to {threshold_date}')
         invoice_priority_list = []
         with self._invoices_session() as session:
-            invoice_models = self._repository.invoices_repo.get_by_delivery_date_range(session,
-                                                                                       start_date=today,
-                                                                                       end_date=threshold_date,
-                                                                                       exclude_completed=True)
+            invoice_models = self._repository.invoices_repo.get_by_delivery_date_range(
+                session,
+                start_date=today,
+                end_date=threshold_date,
+                exclude_completed=True
+            )
             print(f'found {len(invoice_models)} invoice(s)')
 
             for model in invoice_models:
-                priority = self._calculate_priority(model.delivery_date, today)
+                delivery_date = self.normalize_date(model.delivery_date)
+                priority = self._calculate_priority(delivery_date, date.today())
+                print(f'Invoice {model.invoice_number} with delivery {delivery_date} is {priority}')
                 invoice_dto = self.map_orm_to_invoice_dto(model)
                 invoice_priority_list.append((invoice_dto, priority))
 
@@ -195,7 +193,7 @@ class HomePageLogic:
                 return False, f"خطای سیستمی: {str(e)}"
 
     def get_invoice_for_menu(self, invoice_number: str) -> Optional[InvoiceDTO]:
-        """Gets the necessary invoice data (as a DTO) for creating a context menu."""
+        """Gets the necessary invoice data (as a DTO) for creating a services menu."""
         with self._invoices_session() as session:
             invoice_model = self._repository.invoices_repo.get_by_number(session, invoice_number)
             if invoice_model:
@@ -219,6 +217,29 @@ class HomePageLogic:
             date_string=persian_date,
             jalali_date=jalali_date
         )
+
+    def normalize_date(self, value):
+        """Converts string, datetime, or date into a Python date object."""
+        if isinstance(value, date) and not isinstance(value, datetime):
+            # Already a date
+            return value
+        elif isinstance(value, datetime):
+            # Convert datetime to date
+            return value.date()
+        elif isinstance(value, str):
+            # Handle common formats
+            try:
+                # First try ISO format (handles "2025-10-12T09:00:00")
+                return datetime.fromisoformat(value).date()
+            except ValueError:
+                # Try fallback format without 'T'
+                try:
+                    return datetime.strptime(value, "%Y-%m-%d %H:%M:%S").date()
+                except ValueError:
+                    # Final fallback: just date only
+                    return datetime.strptime(value, "%Y-%m-%d").date()
+        else:
+            raise TypeError(f"Unsupported type for date normalization: {type(value)}")
 
     # --- PRIVATE HELPER METHODS ---
     @staticmethod
@@ -291,25 +312,28 @@ class HomePageLogic:
             error_text = f"{service_name} (Data Error)"
             return error_text, ""
 
-    @staticmethod
-    def map_orm_to_invoice_dto(orm: IssuedInvoiceModel) -> InvoiceDTO:
+    def map_orm_to_invoice_dto(self, orm: IssuedInvoiceModel) -> InvoiceDTO:
         """
         Maps the IssuedInvoiceModel ORM object to an InvoiceDTO.
-        It correctly constructs the nested CustomerDTO from the flat
-        ORM attributes.
+        Handles datetime conversion for issue_date and delivery_date.
         """
-        # Create the nested CustomerDTO object first
+        # Create the nested CustomerDTO
         customer_dto = CustomerDTO(
             name=orm.name,
             national_id=orm.national_id,
             phone=orm.phone
         )
 
-        # Now, create the main InvoiceDTO using the customer_dto
+        # Safely convert ORM datetimes to ISO format strings for DTO (if DTO expects strings)
+        issue_date = orm.issue_date.isoformat() if isinstance(orm.issue_date, datetime) else str(orm.issue_date)
+        delivery_date = orm.delivery_date.isoformat() if isinstance(orm.delivery_date, datetime) else str(
+            orm.delivery_date)
+
+        # Build the InvoiceDTO
         dto = InvoiceDTO(
             invoice_number=orm.invoice_number,
-            issue_date=orm.issue_date,
-            delivery_date=orm.delivery_date,
+            issue_date=self.normalize_date(issue_date),
+            delivery_date=self.normalize_date(delivery_date),
             username=orm.username or "",
             customer=customer_dto,
             source_language=orm.source_language,
@@ -323,21 +347,39 @@ class HomePageLogic:
             payment_status=orm.payment_status,
             delivery_status=orm.delivery_status,
             remarks=orm.remarks or "",
-            pdf_file_path=orm.pdf_file_path
+            pdf_file_path=orm.pdf_file_path,
         )
 
-        # You would typically query and map items separately.
-        # This part remains unchanged.
+        # The invoice items are typically populated elsewhere
         dto.items = []
-
         return dto
 
     @staticmethod
     def map_dto_to_orm(dto: InvoiceDTO) -> IssuedInvoiceModel:
+        """
+        Maps an InvoiceDTO back to the ORM model.
+        Handles string → datetime conversion for issue_date and delivery_date.
+        """
+
+        # Convert strings to datetime if needed
+        def parse_dt(value):
+            if isinstance(value, datetime):
+                return value
+            if isinstance(value, str):
+                try:
+                    # Try parsing ISO 8601 or 'YYYY/MM/DD - HH:MM' style formats
+                    return datetime.fromisoformat(value)
+                except ValueError:
+                    try:
+                        return datetime.strptime(value, "%Y/%m/%d - %H:%M")
+                    except ValueError:
+                        return datetime.strptime(value, "%Y/%m/%d")
+            raise TypeError(f"Unsupported datetime format: {value}")
+
         orm = IssuedInvoiceModel(
             invoice_number=dto.invoice_number,
-            issue_date=dto.issue_date,
-            delivery_date=dto.delivery_date,
+            issue_date=parse_dt(dto.issue_date),
+            delivery_date=parse_dt(dto.delivery_date),
             username=dto.username,
             name=dto.customer.name,
             national_id=dto.customer.national_id,
@@ -355,7 +397,7 @@ class HomePageLogic:
             pdf_file_path=dto.pdf_file_path,
             total_items=len(dto.items),
             total_translation_price=sum(item.total_price for item in dto.items),
-            translator=dto.translator or ""
+            translator=dto.translator or "",
         )
         return orm
 

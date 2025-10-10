@@ -51,8 +51,6 @@ from shared.dialogs.notification_dialog import NotificationDialog
 from shared.dialogs.rich_text_editor import RichTextEdit
 from shared.dialogs.status_change_dialog import StatusChangeDialog
 
-from shared.context.user_context import UserContext
-
 
 __all__ = [
     # date_utils
@@ -78,6 +76,4 @@ __all__ = [
     "set_winter_palette", "set_dark_palette",
     # dialogs
     "LanguageDialog", "NotificationDialog", "RichTextEdit", "StatusChangeDialog",
-    # user context
-    "UserContext",
 ]

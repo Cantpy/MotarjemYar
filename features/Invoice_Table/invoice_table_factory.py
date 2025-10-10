@@ -1,12 +1,12 @@
 # features/Invoice_Table/invoice_table_factory.py
 
-from sqlalchemy.engine import Engine
+from sqlalchemy import Engine
 
 from features.Invoice_Table.invoice_table_repo import RepositoryManager
 from features.Invoice_Table.invoice_table_view import InvoiceTableView
-from features.Invoice_Table.invoice_table_logic import (SearchService, InvoiceTableService, InvoiceExportService,
-                                                        SortService, FileService, ValidationService,
-                                                        NumberFormatService, BulkOperationService)
+from features.Invoice_Table.invoice_table_logic import (InvoiceLogic, InvoiceService, SearchService, SettingsService,
+                                                        InvoiceExportService, FileService,
+                                                        ValidationService, NumberFormatService)
 from features.Invoice_Table.invoice_table_controller import MainController
 
 from shared.session_provider import ManagedSessionProvider
@@ -17,31 +17,43 @@ class InvoiceTableFactory:
 
     """
     @staticmethod
-    def create(invoices_engine, parent=None) -> MainController:
+    def create(invoices_engine: Engine, users_engine: Engine,
+               services_engine: Engine, parent=None) -> MainController:
         """
 
         """
         invoices_session = ManagedSessionProvider(engine=invoices_engine)
+        users_session = ManagedSessionProvider(engine=users_engine)
+        services_session = ManagedSessionProvider(engine=services_engine)
+
         invoice_table_view = InvoiceTableView(parent=parent)
+
         repo_manager = RepositoryManager()
-        search_service = SearchService()
-        invoice_service = InvoiceTableService(repo_manager, invoices_session)
-        export_service = InvoiceExportService()
-        sort_service = SortService()
+
+        settings_service = SettingsService()
         file_service = FileService()
         validation_service = ValidationService()
-        formatting_srvice = NumberFormatService()
-        operation_srvice = BulkOperationService()
+        search_service = SearchService()
+        invoice_servie = InvoiceService(repo_manager=repo_manager,
+                                        invoices_engine=invoices_session,
+                                        users_engine=users_session,
+                                        services_engine=services_session)
+        export_service = InvoiceExportService(invoice_service=invoice_servie)
+        format_service = NumberFormatService()
 
-        invoice_table_controller = MainController(view=invoice_table_view,
-                                                  invoice_service=invoice_service,
-                                                  search_service=search_service,
-                                                  export_service=export_service,
-                                                  sort_service=sort_service,
-                                                  file_service=file_service,
-                                                  validation_service=validation_service,
-                                                  format_service=formatting_srvice,
-                                                  operation_service=operation_srvice)
+        logic = InvoiceLogic(
+            invoice_service=invoice_servie,
+            settings_service=settings_service,
+            file_service=file_service,
+            validation_service=validation_service,
+            search_service=search_service,
+            export_service=export_service,
+            format_service=format_service
+        )
+
+        invoice_table_controller = MainController(view=invoice_table_view, logic=logic)
+
+        invoice_table_controller.load_initial_data()
 
         return invoice_table_controller
 
