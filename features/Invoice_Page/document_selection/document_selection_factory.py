@@ -35,6 +35,7 @@ class DocumentSelectionFactory:
         view = DocumentSelectionWidget(parent=parent)
 
         controller = DocumentSelectionController(view, logic, state_manager)
+        controller.load_items_for_edit(state_manager.get_invoice_items())
 
         return controller
 

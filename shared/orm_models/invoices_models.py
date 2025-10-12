@@ -1,8 +1,8 @@
 # shared/orm_models/invoices_models.py
 
 from sqlalchemy import Integer, Text, DateTime, ForeignKey, CheckConstraint, Index
-from sqlalchemy.orm import Mapped, mapped_column, declarative_base
-from typing import Optional
+from sqlalchemy.orm import Mapped, mapped_column, declarative_base, relationship
+from typing import Optional, List
 from datetime import datetime
 from dataclasses import dataclass
 
@@ -146,6 +146,12 @@ class IssuedInvoiceModel(BaseInvoices):
     username: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     pdf_file_path: Mapped[Optional[str]] = mapped_column(Text)
     remarks: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    items: Mapped[List["InvoiceItemModel"]] = relationship(
+        "InvoiceItemModel",
+        cascade="all, delete-orphan",
+        back_populates="invoice"
+    )
 
     __table_args__ = (
         CheckConstraint('payment_status IN (0, 1)', name='check_payment_status'),
@@ -328,6 +334,8 @@ class InvoiceItemModel(BaseInvoices):
     foreign_affairs_seal_price: Mapped[int] = mapped_column(Integer, default=0)
     additional_issues_price: Mapped[int] = mapped_column(Integer, default=0)
     total_price: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    invoice: Mapped["IssuedInvoiceModel"] = relationship(back_populates="items")
 
     __table_args__ = (
         CheckConstraint('is_official IN (0, 1)', name='check_is_official'),

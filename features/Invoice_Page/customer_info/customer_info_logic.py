@@ -39,6 +39,7 @@ class CustomerLogic:
         self._customer_session = customer_engine
         self._completer_cache: list[dict] | None = None
         self._loaded_customer_state: Customer | None = None
+        self.customer: Customer | None = None
 
     def _validate_customer_data(self, customer: Customer) -> dict[str, str]:
         """Centralized validation for customer data."""
@@ -112,6 +113,12 @@ class CustomerLogic:
             "phones": phones_data
         }
 
+    def get_customer(self):
+        """
+        Returns the currently loaded customer, if any.
+        """
+        return self.customer
+
     def get_all_customer_and_companion_info(self) -> list[dict]:
         """
         Returns a flat list of dicts for the UI completer.
@@ -175,10 +182,10 @@ class CustomerLogic:
         """Gets full details for one customer."""
         nid_normalized = to_english_number(national_id)
         with self._customer_session() as session:
-            customer = self._repo.get_customer(session, nid_normalized)
-            print(f"customer extracted by the logic layer: {customer} with national id: {national_id}")
-        self._loaded_customer_state = customer
-        return customer
+            self.customer = self._repo.get_customer(session, nid_normalized)
+            print(f"customer extracted by the logic layer: {self.customer} with national id: {national_id}")
+        self._loaded_customer_state = self.customer
+        return self.customer
 
     def get_all_customer_info_for_completer(self) -> list[dict]:
         """Fetches and caches customer info for the completer."""

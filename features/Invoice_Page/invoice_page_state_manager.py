@@ -4,6 +4,7 @@ from PySide6.QtCore import QObject, Signal
 from features.Invoice_Page.customer_info.customer_info_models import Customer
 from features.Invoice_Page.document_selection.document_selection_models import InvoiceItem
 from features.Invoice_Page.invoice_details.invoice_details_models import InvoiceDetails
+from shared.orm_models.invoices_models import InvoiceData
 
 
 class WorkflowStateManager(QObject):
@@ -22,12 +23,14 @@ class WorkflowStateManager(QObject):
         self._invoice_items: list[InvoiceItem] = []
         self._assignments: dict = {}
         self._invoice_details: InvoiceDetails = None
+        self._original_invoice_for_edit: InvoiceData = None
 
     # --- Public methods to get the current state ---
     def get_customer(self) -> Customer:
         return self._customer
 
     def get_invoice_items(self) -> list[InvoiceItem]:
+        print(f'Getting invoice items: {self._invoice_items}')
         return self._invoice_items
 
     def get_assignments(self) -> dict:
@@ -42,12 +45,17 @@ class WorkflowStateManager(QObject):
     def get_invoice_details(self) -> InvoiceDetails:
         return self._invoice_details
 
+    # --- NEW: Getter for the original invoice data ---
+    def get_original_invoice_for_edit(self) -> InvoiceData:
+        return self._original_invoice_for_edit
+
     def reset(self):
         """Resets all state variables to their initial empty state."""
         self._customer = None
         self._invoice_items = []
         self._assignments = {}
         self._invoice_details = None
+        self._original_invoice_for_edit = None # <-- NEW: Reset the original data
         print("STATE RESET: All workflow data has been cleared.")
 
         # Emit signals to notify listeners that the data has been cleared
@@ -62,6 +70,12 @@ class WorkflowStateManager(QObject):
         self._customer = customer
         print(f"STATE UPDATE: Customer set to '{customer.name}'")
         self.customer_updated.emit(self._customer)
+
+    # --- NEW: Setter for the original invoice data ---
+    def set_original_invoice_for_edit(self, invoice_data: InvoiceData):
+        self._original_invoice_for_edit = invoice_data
+        print(f"STATE UPDATE: Original invoice {invoice_data.invoice_number} set for editing.")
+        self.invoice_details_updated.emit(self._original_invoice_for_edit)
 
     def set_invoice_items(self, items: list[InvoiceItem]):
         """Updates the invoice items and notifies listeners."""
@@ -86,5 +100,7 @@ class WorkflowStateManager(QObject):
 
     def set_invoice_details(self, details: InvoiceDetails):
         self._invoice_details = details
+        print(f'details received to set: {details}')
+        print(f'invoice items inside details: {self._invoice_items}')
         print("STATE UPDATE: Invoice details set.")
         self.invoice_details_updated.emit(self._invoice_details)

@@ -136,44 +136,6 @@ class DocumentSelectionLogic:
         self._add_to_smart_search_history(original_text)
 
         return True
-    #
-    # def process_smart_entry(self, text: str) -> bool:
-    #     """
-    #     Main entry point for parsing. FIX: Now finds the service BEFORE extracting patterns.
-    #     """
-    #     original_text = text
-    #
-    #     # 1. Extract options (like seals) and get a cleaned text.
-    #     options, cleaned_text = self._extract_options(text)
-    #
-    #     # 2. Find the service from the full text first. This is the KEY CHANGE.
-    #     service = self._find_service_from_text(cleaned_text)
-    #     if not service:
-    #         return False
-    #
-    #     # 3. Now that we have the service, extract the numeric patterns.
-    #     patterns, _ = self._extract_patterns(cleaned_text)
-    #
-    #     # 4. Assign quantities and dynamic values based on the patterns and the found service.
-    #     quantity, page_count, extra_copies, dynamic_quantities = self._assign_quantities(service, patterns)
-    #
-    #     # 5. Build the preliminary invoice item (the "shell").
-    #     item_shell = self._build_item_shell(
-    #         service=service,
-    #         original_text=original_text,
-    #         quantity=quantity,
-    #         page_count=page_count,
-    #         extra_copies=extra_copies,
-    #         dynamic_quantities=dynamic_quantities,
-    #         options=options,
-    #     )
-    #
-    #     # 6. Pass the shell to the authoritative calculator, add it to the list, and save history.
-    #     final_item = self.calculate_invoice_item(item_shell)
-    #     self.add_item(final_item)
-    #     self._add_to_smart_search_history(original_text)
-    #
-    #     return True
 
     def _extract_options(self, text: str) -> tuple[dict, str]:
         """Parse text for special keywords and return options + cleaned text."""
@@ -293,6 +255,14 @@ class DocumentSelectionLogic:
         """Returns the current list of all invoice items."""
         return self._current_invoice_items
 
+    def set_items(self, items: list[InvoiceItem]):
+        """
+        Directly sets the internal list of invoice items.
+        This is crucial for initializing the logic in an edit session.
+        """
+        self._current_invoice_items = items
+        print(f"LOGIC UPDATE: Internal items set for editing: {self._current_invoice_items}")
+
     def add_item(self, item: InvoiceItem) -> list[InvoiceItem]:
         """Adds a new, fully calculated item to the invoice list."""
         self._current_invoice_items.append(item)
@@ -342,7 +312,7 @@ class DocumentSelectionLogic:
 
     def calculate_invoice_item(self, item_shell: InvoiceItem) -> InvoiceItem:
         """
-        NEW: This is the authoritative calculation engine.
+        This is the authoritative calculation engine.
         It takes an InvoiceItem with user inputs and returns a new
         InvoiceItem with all prices correctly calculated.
         """
@@ -353,19 +323,28 @@ class DocumentSelectionLogic:
         def get_fee(key: str) -> int:
             return self._fees_map.get(key, 0)
 
+        # Clear previous details and calculate new ones
+        item_shell.dynamic_price_details = []
         translation_price_per_item = item_shell.service.base_price
+
         for dyn_name, dyn_quantity in item_shell.dynamic_quantities.items():
             dyn_price_obj = next((dp for dp in item_shell.service.dynamic_prices if dp.name == dyn_name), None)
             if dyn_price_obj:
-                translation_price_per_item += dyn_quantity * dyn_price_obj.unit_price
+                dynamic_price_total_for_item = dyn_quantity * dyn_price_obj.unit_price
+                translation_price_per_item += dynamic_price_total_for_item
+                # Add the detailed breakdown for DB mapping
+                item_shell.dynamic_price_details.append(
+                    (dyn_name, dyn_quantity, dynamic_price_total_for_item)
+                )
 
         item_shell.translation_price = translation_price_per_item * total_quantity
         item_shell.certified_copy_price = item_shell.page_count * get_fee("کپی برابر اصل") * total_quantity
         item_shell.registration_price = get_fee("ثبت در سامانه") * total_quantity if item_shell.is_official else 0
         item_shell.judiciary_seal_price = get_fee(
             "مهر دادگستری") * total_quantity if item_shell.has_judiciary_seal else 0
+        # NOTE: Foreign affairs price is often per page, not per item quantity. This logic seems correct.
         item_shell.foreign_affairs_seal_price = get_fee(
-            "مهر امور خارجه") * item_shell.page_count if item_shell.has_foreign_affairs_seal else 0
+            "مهر امور خارجه") * item_shell.page_count * total_quantity if item_shell.has_foreign_affairs_seal else 0
         item_shell.extra_copy_price = item_shell.extra_copies * get_fee("نسخه اضافی")
 
         item_shell.total_price = (
@@ -373,7 +352,8 @@ class DocumentSelectionLogic:
                 item_shell.certified_copy_price +
                 item_shell.registration_price +
                 item_shell.judiciary_seal_price +
-                item_shell.foreign_affairs_seal_price
+                item_shell.foreign_affairs_seal_price +
+                item_shell.extra_copy_price # Add extra copy price to the grand total
         )
 
         return item_shell

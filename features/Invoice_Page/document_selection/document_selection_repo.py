@@ -4,7 +4,8 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc
 from shared.orm_models.services_models import (ServicesModel, SmartSearchHistoryModel, ServiceDynamicPrice,
                                                FixedPricesModel, OtherServicesModel)
-from features.Invoice_Page.document_selection.document_selection_models import (Service, FixedPrice)
+from shared.orm_models.invoices_models import InvoiceItemModel
+from features.Invoice_Page.document_selection.document_selection_models import InvoiceItem, Service, FixedPrice
 
 
 class DocumentSelectionRepository:

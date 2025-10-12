@@ -264,7 +264,7 @@ class CalculationDialog(QDialog):
         # Update the UI from the calculated values
         for key, price_display_label in self.price_displays.items():
             price = self.calculated_prices.get(key, 0)
-            price_display_label.setText(f"{to_persian_number(f"{price:,}")} تومان")
+            price_display_label.setText(f"{to_persian_number(f'{price:,}')} تومان")
 
     def _generate_auto_remarks(self) -> str:
         """Helper to generate the automatic part of the remarks string."""
@@ -356,18 +356,21 @@ class CalculationDialog(QDialog):
         self.jud_seal_check.setChecked(item.has_judiciary_seal)
         self.fa_seal_check.setChecked(item.has_foreign_affairs_seal)
 
-        # Pre-fill remarks
-        # We need to parse the user's manual remarks out of the full string
-        auto_remarks = self._generate_auto_remarks()  # Generate based on pre-filled values
-        full_remarks = item.remarks
+        # --- FIX: Handle potential None value for remarks ---
+        auto_remarks = self._generate_auto_remarks()
+        full_remarks = item.remarks or ""  # Coalesce None to an empty string
         user_part = full_remarks
+
         if full_remarks.startswith(auto_remarks):
             user_part = full_remarks[len(auto_remarks):].strip()
             if user_part.startswith('(') and user_part.endswith(')'):
                 user_part = user_part[1:-1]
 
-        self.remarks_edit.setText(user_part)
+        # Use _user_manual_remarks to store the extracted part
         self._user_manual_remarks = user_part
+        # Then, trigger the display update logic which combines auto and manual parts
+        self._update_remarks_display()
+
 
     def accept(self):
         """
@@ -376,18 +379,22 @@ class CalculationDialog(QDialog):
         if not self._validate_inputs():
             return  # Stop the accept process if validation fails
 
-        # 1. Generate remarks for dynamic quantities
         final_remarks = self.remarks_edit.toPlainText().strip()
-
-        # 2. Extra copies
         extra_copies = self.extra_copies_spin.value()
-
-        # Ensure calculations are up-to-date
-        self._update_totals()
+        self._update_totals() # Ensure calculations are up-to-date
 
         dynamic_quantities = {name: spinbox.value() for name, spinbox in self.dynamic_spinboxes.items()}
         main_quantity = self.quantity_spin.value()
         total_quantity = main_quantity + extra_copies
+
+        # Calculate dynamic price details just like in the logic layer
+        dynamic_price_details_list = []
+        for dyn_name, dyn_quantity in dynamic_quantities.items():
+            if dyn_quantity > 0:
+                dyn_price_obj = next((dp for dp in self.service.dynamic_prices if dp.name == dyn_name), None)
+                if dyn_price_obj:
+                    total_amount = dyn_quantity * dyn_price_obj.unit_price
+                    dynamic_price_details_list.append((dyn_name, dyn_quantity, total_amount))
 
         self.result_item = InvoiceItem(
             service=self.service,
@@ -400,6 +407,8 @@ class CalculationDialog(QDialog):
             has_foreign_affairs_seal=self.fa_seal_check.isChecked(),
             dynamic_quantities=dynamic_quantities,
             remarks=final_remarks,
+
+            dynamic_price_details=dynamic_price_details_list,
 
             # Pre-calculated Prices
             translation_price=self.calculated_prices.get('translation_price', 0),

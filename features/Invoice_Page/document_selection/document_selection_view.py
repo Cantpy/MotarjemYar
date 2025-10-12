@@ -24,6 +24,9 @@ class DocumentSelectionWidget(QWidget):
     clear_button_clicked = Signal()
     settings_button_clicked = Signal()
     manual_item_updated = Signal(object, int, str)
+    itemEdited = Signal(object)  # Emitted when an item is successfully edited
+    documentAdded = Signal(object)  # Emitted when a new document/service is added
+    documentRemoved = Signal(object)  # Emitted when a document/service is removed
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -321,11 +324,13 @@ class DocumentSelectionWidget(QWidget):
             # Only send an update if the remarks have actually changed.
             if new_remarks != invoice_item.remarks:
                 self.manual_item_updated.emit(invoice_item, invoice_item.total_price, new_remarks)
+                self.itemEdited.emit(invoice_item)
 
     def _on_smart_add(self):
         text = self.smart_entry_edit.text().strip()
         if text:
             self.smart_add_triggered.emit(text)
+            self.documentAdded.emit(text)
 
     def _on_selection_changed(self):
         """Enables/disables edit and delete buttons based on row selection."""
@@ -362,6 +367,12 @@ class DocumentSelectionWidget(QWidget):
         """Deletes the currently selected row. More robust now."""
         current_row = self.table.currentRow()
         if current_row >= 0:
+            # You can extract item info before deletion
+            item = self.table.item(current_row, 0)
+            if item:
+                invoice_item = item.data(Qt.ItemDataRole.UserRole)
+                if invoice_item:
+                    self.documentRemoved.emit(invoice_item)
             self.delete_button_clicked.emit(current_row)
 
     def clear_service_input(self):

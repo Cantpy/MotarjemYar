@@ -8,6 +8,7 @@ from features.Invoice_Page.document_selection.document_selection_models import I
 from features.Invoice_Page.invoice_details.invoice_details_models import InvoiceDetails
 from features.Invoice_Page.invoice_page_state_manager import WorkflowStateManager
 from features.Invoice_Page.invoice_details.invoice_details_settings_dialog import SettingsManager, SettingsDialog
+from shared.orm_models.invoices_models import InvoiceData
 
 
 class InvoiceDetailsController:
@@ -31,55 +32,45 @@ class InvoiceDetailsController:
         self._view.financial_input_changed.connect(self._on_financial_input_changed)
         self._view.other_input_changed.connect(self._on_other_input_changed)
         self._view.settings_requested.connect(self._on_settings_requested)
+        self._state_manager.invoice_items_updated.connect(self._on_invoice_items_updated)
 
     def prepare_and_display_data(self, customer: Customer, items: list[InvoiceItem]):
-        """Public method called by MainWindow to kick off this step."""
-        # 1. Display static info that never changes
+        """Public method for a NEW INVOICE to kick off this step."""
         office_info = self._logic.get_static_office_info()
         user_info = self._logic.get_static_user_info()
         self._view.display_static_info(customer, office_info, user_info)
 
-        # 2. Ask logic to calculate the initial DTO (this now applies default remarks)
         self._current_details = self._logic.create_initial_details(items)
+        self._process_update(self._current_details)
 
-        # 3. Update the view and the global state with the initial DTO
+    # --- NEW METHOD for EDIT WORKFLOW ---
+    def prepare_and_display_data_for_edit(self, customer: Customer, items: list[InvoiceItem],
+                                          original_invoice: InvoiceData):
+        """Public method for an EDITED INVOICE to kick off this step."""
+        office_info = self._logic.get_static_office_info()
+        user_info = self._logic.get_static_user_info()
+        self._view.display_static_info(customer, office_info, user_info)
+
+        # Call the new logic method to pre-populate from original data
+        self._current_details = self._logic.create_details_for_edit(items, original_invoice)
         self._process_update(self._current_details)
 
     def validate(self) -> (bool, str):
         """
         Checks if the essential data in the invoice details is valid.
-
-        Returns:
-            A tuple (is_valid: bool, error_message: str).
-            If valid, returns (True, "").
-            If invalid, returns (False, "The error message to display").
         """
-        # First, clear any previous error highlights from the view
         self._view.clear_errors()
-
-        # --- Rule: Delivery date must be set ---
-        # The .text() method of your DatePicker returns the displayed date string.
         delivery_date_text = self._view.delivery_date_edit.text()
 
         if not delivery_date_text or delivery_date_text.strip() == "":
-            # Command the view to highlight the specific widget
             self._view.highlight_error('delivery_date')
-
-            # Return failure status and the message
             error_msg = "تاریخ تحویل مشخص نشده است. لطفا یک تاریخ معتبر انتخاب کنید."
             return False, error_msg
 
-        # Add any other validation rules here in the future
-        # if some_other_condition_is_bad:
-        #     self._view.highlight_error('some_other_widget')
-        #     return False, "Another error message."
-
-        # If all checks pass
         return True, ""
 
     def reset_view(self):
         """Clears all fields in the invoice details view."""
-        # Create a new, empty details object to clear the form
         empty_details = self._logic.create_empty_details()
         self._view.update_display(empty_details)
         self._view.delivery_date_edit.clear()
@@ -91,18 +82,18 @@ class InvoiceDetailsController:
         self._view.update_display(self._current_details)
         self._state_manager.set_invoice_details(self._current_details)
 
-    # --- Controller Slots ---
+    def _on_invoice_items_updated(self, updated_items: list[InvoiceItem]):
+        if self._current_details:
+            print("InvoiceDetailsController: Detected updated items, refreshing details view.")
+            self._current_details.items = updated_items
+            self._process_update(self._current_details)
 
     def _on_financial_input_changed(self, field: str, value: float, mode: str):
-        """
-        Handles input from the toggled spinboxes and calls the appropriate logic.
-        """
-        if self._current_details is None:
-            return
+        if self._current_details is None: return
 
         if mode == 'percent':
             new_details = self._logic.update_with_percent_change(self._current_details, field, value)
-        else:  # mode == 'amount'
+        else:
             new_details = self._logic.update_with_amount_change(self._current_details, field, int(value))
 
         self._process_update(new_details)
@@ -113,15 +104,9 @@ class InvoiceDetailsController:
         self._process_update(new_details)
 
     def _on_settings_requested(self):
-        """
-        Handles the request to open the settings dialog and triggers all necessary updates.
-        """
         dialog = SettingsDialog(self._settings_manager, self._view)
-
         if dialog.exec() == QDialog.Accepted:
             self._view.apply_settings()
-
             if self._current_details:
                 new_details = self._logic.recalculate_all_variables(self._current_details)
-
                 self._process_update(new_details)

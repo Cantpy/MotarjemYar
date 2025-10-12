@@ -226,6 +226,12 @@ class InvoicePreviewWidget(QFrame):
         self.signature_label = create_styled_label(
             "امضاء و مهر دارالترجمه", 10, True, Qt.AlignmentFlag.AlignCenter)
 
+        # --- NEW: Edited Invoice Label ---
+        self.edited_invoice_label = create_styled_label(
+            "* این فاکتور ویرایش شده است", 9, bold=True, alignment=Qt.AlignmentFlag.AlignRight
+        )
+        self.edited_invoice_label.setStyleSheet("color: #D32F2F;")  # Red color for attention
+
         # --- Populate the Grid ---
         # Column 0 & 1: Totals
         summary_layout.addWidget(self.subtotal_row[0], 0, 1)
@@ -246,8 +252,11 @@ class InvoicePreviewWidget(QFrame):
         # Column 2: Spacer for visual separation
         summary_layout.addItem(QSpacerItem(25, 10, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum), 0, 2)
 
-        # Column 3: Remarks spanning all 5 rows
-        summary_layout.addWidget(self.remarks_label, 0, 3, 4, 1)
+        # Column 3: Remarks and Edit Label spanning all 5 rows
+        remarks_and_edit_layout = QVBoxLayout()
+        remarks_and_edit_layout.addWidget(self.remarks_label)
+        remarks_and_edit_layout.addWidget(self.edited_invoice_label)
+        summary_layout.addLayout(remarks_and_edit_layout, 0, 3, 4, 1)
 
         # Row 5: Signature below everything else, spanning the remarks column
         summary_layout.addWidget(self.signature_label, 5, 3)
@@ -407,6 +416,15 @@ class InvoicePreviewWidget(QFrame):
             self.remarks_label.setText(f"توضیحات: {invoice.remarks}")
             self.remarks_label.setVisible(footer_vis.get("show_remarks", True))
             self.signature_label.setVisible(footer_vis.get("show_signature", True))
+
+            # --- MODIFICATION: Control visibility of the edited label ---
+            edit_message = "* این فاکتور ویرایش شده است"
+            is_edited = edit_message in invoice.remarks
+            self.edited_invoice_label.setVisible(is_edited)
+            # Clean the remarks for display if the edit message is present
+            if is_edited:
+                display_remarks = invoice.remarks.replace(edit_message, "").strip()
+                self.remarks_label.setText(f"توضیحات: {display_remarks}")
 
         # Page Number
         self.page_label.setText(f"صفحه {to_persian_number(page_num)} از {to_persian_number(total_pages)}")

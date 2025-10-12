@@ -8,10 +8,12 @@ from features.Invoice_Page.invoice_preview.invoice_preview_models import Preview
 
 from shared.session_provider import ManagedSessionProvider, SessionManager
 from shared.services.invoice_number_generator import InvoiceNumberService
+from shared.orm_models.invoices_models import InvoiceData
 
 
 class InvoiceDetailsLogic:
     """The pure Python 'brain' for the invoice details step."""
+
     def __init__(self, repo: InvoiceDetailsRepository,
                  users_engine: ManagedSessionProvider,
                  invoices_engine: ManagedSessionProvider,
@@ -27,9 +29,53 @@ class InvoiceDetailsLogic:
             self._office_info = self._repo.get_office_info(session)
 
     def create_initial_details(self, items: list[InvoiceItem]) -> InvoiceDetails:
-        """Calculates all initial values and returns the initial InvoiceDetails DTO."""
+        """Calculates all initial values for a NEW invoice."""
         invoice_number = self._invoice_number_service.get_next_invoice_number()
+        details = self._create_base_details_from_items(items, invoice_number)
 
+        default_remarks = self._settings_manager.get("default_remarks", "")
+        details.remarks = default_remarks
+
+        return self._recalculate_totals(details)
+
+    # --- EDIT WORKFLOW METHOD ---
+    def create_details_for_edit(self, items: list[InvoiceItem], original_invoice: InvoiceData) -> InvoiceDetails:
+        """Calculates totals from items and populates the rest from an existing invoice."""
+        # 1. Start with the base calculations from the (potentially modified) item list
+        details = self._create_base_details_from_items(items, original_invoice.invoice_number)
+
+        # 2. Override defaults with data from the original invoice
+        details.emergency_cost_amount = original_invoice.emergency_cost
+        details.discount_amount = original_invoice.discount_amount
+        details.advance_payment_amount = original_invoice.advance_payment
+        details.remarks = original_invoice.remarks
+        details.delivery_date = original_invoice.delivery_date
+
+        # 3. Back-calculate percentages so the UI controls are correct
+        #    This reuses the logic from update_with_amount_change
+
+        # Emergency Percent
+        basis_setting = self._settings_manager.get("emergency_basis")
+        base_emergency = details.translation_cost if basis_setting == "translation_cost" else details.total_before_variables
+        if base_emergency > 0:
+            details.emergency_cost_percent = (details.emergency_cost_amount / base_emergency) * 100.0
+
+        # Discount Percent
+        base_for_discount = details.total_before_variables + details.emergency_cost_amount
+        if base_for_discount > 0:
+            details.discount_percent = (details.discount_amount / base_for_discount) * 100.0
+
+        # Advance Percent
+        total_after_discount = base_for_discount - details.discount_amount
+        if total_after_discount > 0:
+            details.advance_payment_percent = (details.advance_payment_amount / total_after_discount) * 100.0
+
+        # 4. Perform final recalculation of totals
+        return self._recalculate_totals(details)
+
+    def _create_base_details_from_items(self, items: list[InvoiceItem], invoice_number: str) -> InvoiceDetails:
+        """Helper to perform the initial summation from a list of items."""
+        print(f'Calculating details based on items: {items}.')
         total_documents = sum(item.quantity for item in items)
         translation_cost = sum(item.translation_price for item in items)
         confirmation_cost = sum(item.judiciary_seal_price + item.foreign_affairs_seal_price for item in items)
@@ -37,7 +83,14 @@ class InvoiceDetailsLogic:
         certified_copy_costs = sum(item.certified_copy_price for item in items)
         additional_issues_costs = sum(item.extra_copy_price for item in items)
 
-        details = InvoiceDetails(
+        print(f'Calculated details: total documents {total_documents},'
+              f' translation_cost: {translation_cost},'
+              f' confirmation_cost: {confirmation_cost},'
+              f' office_costs: {office_costs},'
+              f' certified_copy_costs: {certified_copy_costs},'
+              f' additional_issues_costs: {additional_issues_costs}.')
+
+        return InvoiceDetails(
             invoice_number=invoice_number,
             docu_num=total_documents,
             translation_cost=translation_cost,
@@ -48,24 +101,18 @@ class InvoiceDetailsLogic:
             office_info=self._office_info
         )
 
-        default_remarks = self._settings_manager.get("default_remarks", "")
-        details.remarks = default_remarks
-
-        # The initial calculation is performed on the new DTO
-        return self._recalculate_totals(details)
-
     def update_with_percent_change(self, details: InvoiceDetails, field: str, percent: float) -> InvoiceDetails:
         """Returns a new DTO recalculated based on a percentage change."""
         if field == 'emergency':
             basis_setting = self._settings_manager.get("emergency_basis")
-            base = details.translation_cost + details.confirmation_cost + details.office_costs + details.certified_copy_costs
+            base = (details.translation_cost + details.confirmation_cost + details.office_costs +
+                    details.certified_copy_costs)
             emergency_base = details.translation_cost if basis_setting == "translation_cost" else base
             amount = int(emergency_base * (percent / 100.0))
             details.emergency_cost_percent = percent
             details.emergency_cost_amount = amount
 
         elif field == 'discount':
-            # --- RULE 2 CHANGE: The base for discount now includes the emergency cost ---
             base_for_discount = (details.translation_cost + details.confirmation_cost +
                                  details.office_costs + details.certified_copy_costs +
                                  details.emergency_cost_amount)
@@ -88,14 +135,14 @@ class InvoiceDetailsLogic:
         percent = 0.0
         if field == 'emergency':
             basis_setting = self._settings_manager.get("emergency_basis")
-            base = details.translation_cost + details.confirmation_cost + details.office_costs + details.certified_copy_costs
+            base = (details.translation_cost + details.confirmation_cost + details.office_costs +
+                    details.certified_copy_costs)
             emergency_base = details.translation_cost if basis_setting == "translation_cost" else base
             if emergency_base > 0: percent = (amount / emergency_base) * 100.0
             details.emergency_cost_amount = amount
             details.emergency_cost_percent = percent
 
         elif field == 'discount':
-            # --- RULE 2 CHANGE: The base for discount now includes the emergency cost ---
             base_for_discount = (details.translation_cost + details.confirmation_cost +
                                  details.office_costs + details.certified_copy_costs +
                                  details.emergency_cost_amount)
@@ -119,7 +166,6 @@ class InvoiceDetailsLogic:
         details.src_lng = other_data.get('src_lng', details.src_lng)
         details.trgt_lng = other_data.get('trgt_lng', details.trgt_lng)
         details.remarks = other_data.get('remarks', details.remarks)
-        # No recalculation needed for these fields, so we just return the modified object
         return details
 
     def get_static_user_info(self) -> UserInfo:
@@ -127,11 +173,11 @@ class InvoiceDetailsLogic:
         session_data = SessionManager().get_session()
         if session_data:
             return UserInfo(
-                    full_name=session_data.full_name,
-                    role=session_data.role,
-                    role_fa=session_data.role_fa,
-                    username=session_data.username
-                )
+                full_name=session_data.full_name,
+                role=session_data.role,
+                role_fa=session_data.role_fa,
+                username=session_data.username
+            )
 
     def get_static_office_info(self) -> PreviewOfficeInfo:
         """Provides the cached office info to the controller."""
@@ -139,18 +185,16 @@ class InvoiceDetailsLogic:
 
     def _recalculate_totals(self, details: InvoiceDetails) -> InvoiceDetails:
         """Private helper. The single source of truth for all financial calculations."""
-        base = details.translation_cost + details.confirmation_cost + details.office_costs + details.certified_copy_costs
+        base = (details.translation_cost + details.confirmation_cost + details.office_costs +
+                details.certified_copy_costs + details.additional_issues_costs)
         details.total_before_discount = base
 
-        # The total billable amount is the base services plus the emergency fee.
         total_billable = base + details.emergency_cost_amount
-        # Business rule: Discount cannot be more than the total billable amount.
         if details.discount_amount > total_billable:
             details.discount_amount = total_billable
 
         details.total_after_discount = total_billable - details.discount_amount
 
-        # Rule 1 (Advance Payment Cap) is still in place and correct
         if details.advance_payment_amount > details.total_after_discount:
             details.advance_payment_amount = details.total_after_discount
 
@@ -161,17 +205,10 @@ class InvoiceDetailsLogic:
         """
         Re-evaluates emergency, discount, and advance payments based on their
         currently stored percentages and the latest settings.
-        This is used after a settings change that affects calculation logic.
         """
-        # Re-apply the emergency calculation
         details = self.update_with_percent_change(details, 'emergency', details.emergency_cost_percent)
-
-        # Re-apply the discount calculation
         details = self.update_with_percent_change(details, 'discount', details.discount_percent)
-
-        # Re-apply the advance payment calculation
         details = self.update_with_percent_change(details, 'advance', details.advance_payment_percent)
-
         return details
 
     def create_empty_details(self):

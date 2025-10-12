@@ -7,7 +7,7 @@ from features.Invoice_Table.invoice_table_view import InvoiceTableView
 from features.Invoice_Table.invoice_table_logic import (InvoiceLogic, InvoiceService, SearchService, SettingsService,
                                                         InvoiceExportService, FileService,
                                                         ValidationService, NumberFormatService)
-from features.Invoice_Table.invoice_table_controller import MainController
+from features.Invoice_Table.invoice_table_controller import InvoiceTableController
 
 from shared.session_provider import ManagedSessionProvider
 
@@ -18,7 +18,7 @@ class InvoiceTableFactory:
     """
     @staticmethod
     def create(invoices_engine: Engine, users_engine: Engine,
-               services_engine: Engine, parent=None) -> MainController:
+               services_engine: Engine, parent=None) -> InvoiceTableController:
         """
 
         """
@@ -51,7 +51,7 @@ class InvoiceTableFactory:
             format_service=format_service
         )
 
-        invoice_table_controller = MainController(view=invoice_table_view, logic=logic)
+        invoice_table_controller = InvoiceTableController(view=invoice_table_view, logic=logic)
 
         invoice_table_controller.load_initial_data()
 

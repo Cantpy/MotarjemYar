@@ -248,6 +248,7 @@ class InvoiceTableView(QWidget):
                 persian_invoice_number = item.text()
                 english_invoice_number = to_english_numbers(persian_invoice_number)
                 self.deep_edit_invoice_requested.emit(english_invoice_number)
+                print(f"Deep edit requested for invoice: {english_invoice_number}")
 
     def closeEvent(self, event):
         """Handle window close event."""

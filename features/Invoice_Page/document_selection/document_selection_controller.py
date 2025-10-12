@@ -49,12 +49,31 @@ class DocumentSelectionController(QObject):
         self._view.clear_button_clicked.connect(self._on_clear_clicked)
         self._view.manual_item_updated.connect(self._on_manual_update)
         self._view.settings_button_clicked.connect(self._on_settings_clicked)
+        self._view.itemEdited.connect(lambda: self._refresh_view_and_emit_changes())
+        self._view.documentAdded.connect(lambda: self._refresh_view_and_emit_changes())
+        self._view.documentRemoved.connect(lambda: self._refresh_view_and_emit_changes())
 
     def _refresh_view_and_emit_changes(self):
         """A new helper to bundle common refresh actions."""
         updated_items = self._logic.get_current_items()
+        print(f'here is updated items you fat bitch. I will overcome you: {updated_items}')
         self._view.update_table_display(updated_items)
         self.invoice_items_changed.emit(updated_items)
+        self._state_manager.set_invoice_items(updated_items)
+
+    def load_items_for_edit(self, items: list[InvoiceItem]):
+        """
+        Public method to load a list of existing items into this feature
+        for an edit session.
+        """
+        # 1. Force the logic layer to adopt this list as its current state.
+        self._logic.set_items(items)
+        print(f"DocumentSelectionController: setting items {items}.")
+        print(f"Loaded {len(items)} existing items into DocumentSelectionLogic for editing.")
+
+        # 2. Update the view to display the items.
+        self._view.update_table_display(items)
+        self._refresh_view_and_emit_changes()
 
     # --- Slot Implementations ---
 

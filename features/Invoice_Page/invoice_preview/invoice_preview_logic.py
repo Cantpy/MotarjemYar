@@ -1,16 +1,18 @@
 # features/Invoice_Page/invoice_preview/invoice_preview_logic.py
 
 from datetime import datetime
+from typing import List, Tuple, Optional
 
 from features.Invoice_Page.invoice_preview.invoice_preview_repo import InvoicePreviewRepository
 from features.Invoice_Page.invoice_preview.invoice_preview_models import (Invoice, Customer, PreviewItem,
                                                                           PreviewOfficeInfo)
 from features.Invoice_Page.invoice_details.invoice_details_models import InvoiceDetails
+from features.Invoice_Page.document_selection.document_selection_models import InvoiceItem
 from features.Invoice_Page.invoice_preview.invoice_preview_settings_manager import PreviewSettingsManager
 
 from shared.session_provider import ManagedSessionProvider, SessionManager
 from shared.utils.date_utils import to_gregorian
-from shared.orm_models.invoices_models import IssuedInvoiceModel, InvoiceItemModel
+from shared.orm_models.invoices_models import IssuedInvoiceModel, InvoiceItemModel, EditedInvoiceModel
 
 
 class InvoicePreviewLogic:
@@ -32,7 +34,6 @@ class InvoicePreviewLogic:
         """
         Calculates total pages based on the advanced, content-aware rules.
         """
-        # --- FIX: Add a check for a null invoice object ---
         if not invoice: return 1
 
         total_items = len(invoice.items)
@@ -44,7 +45,6 @@ class InvoicePreviewLogic:
         if total_items <= conf['one_page_max_rows']:
             return 1
 
-        # --- SUBTLE BUG FIX: Handle the case where the last page is empty ---
         items_on_first_page = conf['first_page_max_rows']
         if total_items <= items_on_first_page:
             # This can happen if one_page_max_rows is smaller than first_page_max_rows
@@ -62,6 +62,53 @@ class InvoicePreviewLogic:
         middle_pages = (items_for_middle_pages + conf['other_page_max_rows'] - 1) // conf['other_page_max_rows']
 
         return 2 + middle_pages
+
+    @staticmethod
+    def map_dto_to_orm(dto: InvoiceItem, invoice_number: str) -> InvoiceItemModel:
+        """
+        Maps the InvoiceItem DTO to the InvoiceItemModel ORM object for database saving.
+
+        Args:
+            dto: The fully populated InvoiceItem data transfer object.
+            invoice_number: The invoice number this item belongs to.
+
+        Returns:
+            An instance of InvoiceItemModel ready to be added to a session.
+        """
+        orm_item = InvoiceItemModel(
+            invoice_number=invoice_number,
+            service_id=dto.service.id,
+            service_name=dto.service.name,
+            quantity=dto.quantity,
+            page_count=dto.page_count,
+            additional_issues=dto.extra_copies,  # The schema column is 'additional_issues'
+            is_official=1 if dto.is_official else 0,
+            has_judiciary_seal=1 if dto.has_judiciary_seal else 0,
+            has_foreign_affairs_seal=1 if dto.has_foreign_affairs_seal else 0,
+            remarks=dto.remarks,
+
+            # Map the detailed financial breakdown directly
+            translation_price=dto.translation_price,
+            certified_copy_price=dto.certified_copy_price,
+            registration_price=dto.registration_price,
+            judiciary_seal_price=dto.judiciary_seal_price,
+            foreign_affairs_seal_price=dto.foreign_affairs_seal_price,
+            additional_issues_price=dto.extra_copy_price,
+            total_price=dto.total_price
+        )
+
+        # --- Map the dynamic price details to the fixed DB columns ---
+        # The database schema has fixed slots for two dynamic prices. We fill them sequentially.
+        if len(dto.dynamic_price_details) > 0:
+            # The schema uses dynamic_price_1 for the name and amount_1 for the value.
+            orm_item.dynamic_price_1 = dto.dynamic_price_details[0][0]  # e.g., "تعداد ترم"
+            orm_item.dynamic_price_amount_1 = dto.dynamic_price_details[0][2]  # e.g., 80000
+
+        if len(dto.dynamic_price_details) > 1:
+            orm_item.dynamic_price_2 = dto.dynamic_price_details[1][0]
+            orm_item.dynamic_price_amount_2 = dto.dynamic_price_details[1][2]
+
+        return orm_item
 
     def _parse_flexible_date(self, date_str: str) -> datetime:
         """
@@ -121,6 +168,240 @@ class InvoicePreviewLogic:
             end_index = start_index + conf['other_page_max_rows']
             return invoice.items[start_index:end_index]
 
+    def get_issued_invoice_with_items(self, invoice_number: str) -> IssuedInvoiceModel | None:
+        """Manages the session to get an invoice and its items."""
+        with self._invoices_session() as session:
+            return self._repo.get_issued_invoice_with_items(session, invoice_number)
+
+    def get_next_invoice_version_number(self, base_invoice_number: str) -> str:
+        """
+        Calculates the next version suffix for an invoice (e.g., -v2, -v3).
+        This is now session-safe.
+        """
+        with self._invoices_session() as session:
+            latest_invoice = self._repo.get_latest_invoice_version(session, base_invoice_number)
+
+            if not latest_invoice:
+                # If no previous version exists, the next one is -v2.
+                return f"{base_invoice_number}-v2"
+
+            # Access the attribute while the session is active.
+            latest_num = latest_invoice.invoice_number
+            import re
+            match = re.search(r'-v(\d+)$', latest_num)
+
+            if match:
+                version = int(match.group(1))
+                return f"{base_invoice_number}-v{version + 1}"
+            else:
+                # The existing invoice is the base version (e.g., 'INV-101'), so the next is -v2.
+                return f"{base_invoice_number}-v2"
+
+    def compare_invoice_data(self, new_invoice_dto: Invoice, new_items: list[InvoiceItem],
+                             old_invoice_orm: IssuedInvoiceModel) -> bool:
+        """
+        Compares new invoice data with old data from the database.
+        Returns True if identical, False otherwise.
+        """
+        # 1. Compare main invoice fields
+        if (
+                new_invoice_dto.customer.name != old_invoice_orm.name or
+                new_invoice_dto.customer.national_id != old_invoice_orm.national_id or
+                int(new_invoice_dto.payable_amount) != old_invoice_orm.final_amount or
+                int(new_invoice_dto.discount_amount) != old_invoice_orm.discount_amount or
+                int(new_invoice_dto.emergency_cost) != old_invoice_orm.emergency_cost
+        ):
+            return False
+
+        # 2. Compare number of items
+        if len(new_items) != len(old_invoice_orm.items):
+            return False
+
+        # 3. Compare each item in detail
+        # Sort both lists to ensure a consistent comparison order
+        sorted_new_items = sorted(new_items, key=lambda item: item.service.id)
+        sorted_old_items = sorted(old_invoice_orm.items, key=lambda item: item.service_id)
+
+        for new_item, old_item in zip(sorted_new_items, sorted_old_items):
+            if (
+                    new_item.service.id != old_item.service_id or
+                    new_item.quantity != old_item.quantity or
+                    new_item.page_count != old_item.page_count or
+                    (1 if new_item.is_official else 0) != old_item.is_official or
+                    (1 if new_item.has_judiciary_seal else 0) != old_item.has_judiciary_seal or
+                    (1 if new_item.has_foreign_affairs_seal else 0) != old_item.has_foreign_affairs_seal or
+                    new_item.total_price != old_item.total_price
+            ):
+                return False  # Found a difference
+
+        # If all checks pass, the data is identical
+        return True
+
+    def check_for_invoice_changes(self,
+                                  base_invoice_number: str,
+                                  new_invoice_dto: Invoice,
+                                  new_items: List[InvoiceItem]) -> Tuple[bool, IssuedInvoiceModel | None]:
+        """
+        Opens a session to fetch the latest version of an invoice and compares it
+        with the new data. This entire operation is within a single session to
+        avoid DetachedInstanceError.
+
+        Returns:
+            A tuple containing:
+            - bool: True if the data is identical, False otherwise.
+            - IssuedInvoiceModel | None: The fetched ORM object for reference, or None.
+        """
+        with self._invoices_session() as session:
+            # Fetch the latest version using the active session
+            latest_orm = self._repo.get_issued_invoice_with_items(session, base_invoice_number)
+
+            if not latest_orm:
+                # No existing invoice found, so it's definitely not identical.
+                return False, None
+
+            # Perform the comparison while the latest_orm object is still attached to the session
+            is_identical = self._compare_invoice_data(new_invoice_dto, new_items, latest_orm)
+            return is_identical, latest_orm
+
+    @staticmethod
+    def _generate_edit_logs(old_orm: IssuedInvoiceModel,
+                            new_dto: Invoice,
+                            new_items: List[InvoiceItem]) -> List[EditedInvoiceModel]:
+        """
+        Compares an old ORM invoice with new DTO data and generates a list of
+        ORM objects detailing every change for the edit history table.
+        """
+        logs = []
+        user_info = SessionManager().get_session()
+        edited_by = user_info.username if user_info else "نامشخص"
+
+        # Helper to create a log entry
+        def add_log(field, old, new, remarks=""):
+            logs.append(EditedInvoiceModel(
+                invoice_number=old_orm.invoice_number,  # Log against the original number
+                edited_field=field,
+                old_value=str(old),
+                new_value=str(new),
+                edited_by=edited_by,
+                remarks=remarks
+            ))
+
+        # 1. Compare Customer and Financial Fields
+        if old_orm.name != new_dto.customer.name:
+            add_log("نام مشتری", old_orm.name, new_dto.customer.name)
+        if old_orm.national_id != new_dto.customer.national_id:
+            add_log("کد ملی", old_orm.national_id, new_dto.customer.national_id)
+        if old_orm.phone != new_dto.customer.phone:
+            add_log("تلفن", old_orm.phone, new_dto.customer.phone)
+        if old_orm.final_amount != int(new_dto.payable_amount):
+            add_log("مبلغ نهایی", old_orm.final_amount, int(new_dto.payable_amount))
+        if old_orm.discount_amount != int(new_dto.discount_amount):
+            add_log("تخفیف", old_orm.discount_amount, int(new_dto.discount_amount))
+        if old_orm.emergency_cost != int(new_dto.emergency_cost):
+            add_log("هزینه فوریت", old_orm.emergency_cost, int(new_dto.emergency_cost))
+        if old_orm.delivery_date != new_dto.delivery_date:
+            add_log("تاریخ تحویل", old_orm.delivery_date.strftime('%Y-%m-%d'),
+                    new_dto.delivery_date.strftime('%Y-%m-%d'))
+        if old_orm.remarks != new_dto.remarks:
+            add_log("توضیحات", old_orm.remarks, new_dto.remarks)
+
+        # 2. Compare Items (more complex)
+        old_items_map = {item.service_id: item for item in old_orm.items}
+        new_items_map = {item.service.id: item for item in new_items}
+
+        all_service_ids = set(old_items_map.keys()) | set(new_items_map.keys())
+
+        for service_id in all_service_ids:
+            old_item = old_items_map.get(service_id)
+            new_item = new_items_map.get(service_id)
+
+            if old_item and not new_item:
+                add_log("آیتم‌های فاکتور", old_item.service_name, "حذف شده", f"آیتم '{old_item.service_name}' حذف شد.")
+            elif new_item and not old_item:
+                add_log("آیتم‌های فاکتور", "اضافه شده", new_item.service.name,
+                        f"آیتم '{new_item.service.name}' اضافه شد.")
+            elif old_item and new_item:
+                # Item exists in both, check for modifications
+                if old_item.total_price != new_item.total_price:
+                    add_log(f"قیمت آیتم: {new_item.service.name}", old_item.total_price, new_item.total_price)
+                if old_item.quantity != new_item.quantity:
+                    add_log(f"تعداد آیتم: {new_item.service.name}", old_item.quantity, new_item.quantity)
+
+        return logs
+
+    def prepare_reissue_data(self,
+                             base_invoice_number: str,
+                             new_invoice_dto: Invoice,
+                             new_items: List[InvoiceItem]
+                             ) -> Tuple[bool, Optional[List[EditedInvoiceModel]]]:
+        """
+        A session-safe method that handles the entire process of checking for
+        changes and generating edit logs.
+
+        Returns:
+            A tuple containing:
+            - bool: True if the data has changed, False otherwise.
+            - Optional[List[EditedInvoiceModel]]: A list of generated edit logs if
+              changes were found, otherwise None.
+        """
+        with self._invoices_session() as session:
+            # 1. Fetch the latest version using the active session
+            latest_orm = self._repo.get_issued_invoice_with_items(session, base_invoice_number)
+
+            if not latest_orm:
+                # No existing invoice found, so there are changes (it's a new issue)
+                return True, None
+
+            # 2. Perform the comparison while the object is attached to the session
+            is_identical = self._compare_invoice_data(new_invoice_dto, new_items, latest_orm)
+
+            if is_identical:
+                return False, None  # Data has NOT changed
+
+            # 3. If not identical, generate logs while the object is still attached
+            edit_logs = self._generate_edit_logs(latest_orm, new_invoice_dto, new_items)
+            return True, edit_logs # Data HAS changed, and here are the logs
+
+    @staticmethod
+    def _compare_invoice_data(new_invoice_dto: Invoice, new_items: List[InvoiceItem],
+                              old_invoice_orm: IssuedInvoiceModel) -> bool:
+        """
+        Compares new invoice data with old data from the database.
+        Returns True if identical, False otherwise.
+        (Now a static helper method).
+        """
+        # 1. Compare main invoice fields
+        if (
+                new_invoice_dto.customer.name != old_invoice_orm.name or
+                new_invoice_dto.customer.national_id != old_invoice_orm.national_id or
+                int(new_invoice_dto.payable_amount) != old_invoice_orm.final_amount or
+                int(new_invoice_dto.discount_amount) != old_invoice_orm.discount_amount or
+                int(new_invoice_dto.emergency_cost) != old_invoice_orm.emergency_cost
+        ):
+            return False
+
+        # 2. Compare number of items
+        if len(new_items) != len(old_invoice_orm.items):
+            return False
+
+        # 3. Compare each item in detail
+        sorted_new_items = sorted(new_items, key=lambda item: item.service.id)
+        sorted_old_items = sorted(old_invoice_orm.items, key=lambda item: item.service_id)
+
+        for new_item, old_item in zip(sorted_new_items, sorted_old_items):
+            if (
+                    new_item.service.id != old_item.service_id or
+                    new_item.quantity != old_item.quantity or
+                    new_item.page_count != old_item.page_count or
+                    (1 if new_item.is_official else 0) != old_item.is_official or
+                    (1 if new_item.has_judiciary_seal else 0) != old_item.has_judiciary_seal or
+                    (1 if new_item.has_foreign_affairs_seal else 0) != old_item.has_foreign_affairs_seal or
+                    new_item.total_price != old_item.total_price
+            ):
+                return False  # Found a difference
+
+        return True  # If all checks pass, the data is identical
+
     def assemble_invoice_data(self, customer: Customer, details: InvoiceDetails, assignments: dict) -> Invoice:
         """Core method to build the final Invoice DTO from other DTOs."""
         preview_items = []
@@ -161,7 +442,8 @@ class InvoicePreviewLogic:
             emergency_cost=details.emergency_cost_amount, remarks=details.remarks,
         )
 
-    def issue_invoice_in_database(self, invoice_dto: Invoice, assignments: dict) -> tuple[bool, str]:
+    def issue_invoice_in_database(self, invoice_dto: Invoice, assignments: dict,
+                                  edit_logs: Optional[List[EditedInvoiceModel]] = None) -> tuple[bool, str]:
         """
         Maps the invoice DTOs to ORM models and calls the repository to save them.
         """
@@ -210,22 +492,12 @@ class InvoicePreviewLogic:
         for person_name, assigned_items in assignments.items():
             if person_name == "__unassigned__":
                 continue
-            for item in assigned_items:
-                item_orm = InvoiceItemModel(
-                    invoice_number=invoice_dto.invoice_number,
-                    service_id=item.service.id,
-                    service_name=item.service.name,
-                    page_count=item.page_count,
-                    quantity=item.quantity,
-                    is_official=1 if item.is_official else 0,
-                    has_judiciary_seal=1 if item.has_judiciary_seal else 0,
-                    has_foreign_affairs_seal=1 if item.has_foreign_affairs_seal else 0,
-                    total_price=int(item.total_price)
-                )
+            for item_dto in assigned_items:
+                item_orm = self.map_dto_to_orm(item_dto, invoice_dto.invoice_number)
                 items_orm_list.append(item_orm)
 
         with self._invoices_session() as session:
-            return self._repo.issue_invoice(session, issued_invoice_orm, items_orm_list)
+            return self._repo.issue_invoice(session, issued_invoice_orm, items_orm_list, edit_logs)
 
     # --- New methods to handle calls that were previously controller -> _repo ---
     def get_invoice_path(self, invoice_number: str) -> str | None:

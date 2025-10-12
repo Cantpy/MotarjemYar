@@ -17,8 +17,8 @@ from shared import show_question_message_box, show_error_message_box, show_infor
 logger = logging.getLogger(__name__)
 
 
-# The MainController now creates the _view and handles all _logic.
-class MainController(QObject):
+# The InvoiceTableController now creates the _view and handles all _logic.
+class InvoiceTableController(QObject):
     """
     Main controller that coordinates all components for the invoice table feature.
     It creates and manages the _view, and connects UI signals to application _logic.
@@ -304,7 +304,6 @@ class MainController(QObject):
 
     def _handle_deep_edit_request(self, invoice_number: str):
         """Handles the request for a deep edit by fetching all data and emitting it upwards."""
-        logger.info(f"Deep edit requested for invoice {invoice_number}. Fetching details...")
         invoice_details = self._logic.invoice.get_invoice_with_details(invoice_number)
 
         if not invoice_details:
@@ -313,3 +312,4 @@ class MainController(QObject):
 
         invoice_data, items_data = invoice_details
         self.request_deep_edit_navigation.emit(invoice_data, items_data)
+        print(f"DEBUG: Emitted deep edit request for invoice {invoice_number} to the main controller")

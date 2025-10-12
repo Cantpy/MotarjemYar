@@ -5,7 +5,7 @@ from PySide6.QtGui import QPixmap, QPainter, QPageSize, QRegion
 from PySide6.QtPrintSupport import QPrinter, QPrintDialog
 from PySide6.QtCore import QPoint
 
-from typing import Callable
+from typing import Callable, List
 
 from features.Invoice_Page.invoice_preview.invoice_preview_view import MainInvoicePreviewWidget
 from features.Invoice_Page.invoice_preview.invoice_preview_logic import InvoicePreviewLogic
@@ -14,6 +14,7 @@ from features.Invoice_Page.invoice_preview.invoice_preview_settings_dialog impor
 
 from shared import (show_warning_message_box, show_information_message_box, show_error_message_box,
                     show_question_message_box)
+from shared.orm_models.invoices_models import EditedInvoiceModel
 
 
 class InvoicePreviewController:
@@ -78,42 +79,89 @@ class InvoicePreviewController:
 
         # 2. Call the view's update method
         self._view.update_view(self._invoice, items, self.current_page, self.total_pages, settings)
-
-        # 3. Explicitly command the view's pagination panel
-        self._view.control_panel.issue_button.setEnabled(not is_issued)
+        self._view.control_panel.issue_button.setEnabled(True)
 
     def issue_invoice(self):
         """
-        Handles the user request to finalize and save the invoice to the database.
+        Handles the smart invoice issuance workflow.
+        - Issues a new invoice normally.
+        - For existing invoices, checks for changes and issues a new version if needed.
         """
         if not self._invoice:
             show_error_message_box(self._view, "خطا", "فاکتوری برای صدور وجود ندارد.")
             return
 
-        def issue_invoice():
-            # 2. Get the full assignment data from the state manager
+        original_invoice_data = self._state_manager.get_original_invoice_for_edit()
+        is_edit_mode = original_invoice_data is not None
+
+        if not is_edit_mode:
+            # --- STANDARD WORKFLOW for a new invoice ---
+            self._confirm_and_issue_new()
+        else:
+            # --- EDITING WORKFLOW for an existing invoice ---
+            self._handle_reissue()
+
+    def _confirm_and_issue_new(self):
+        """Handles the simple case of issuing a brand-new invoice."""
+        def do_issue():
             assignments = self._state_manager.get_assignments()
-
-            # 3. Call the logic layer to perform the operation
             success, message = self._logic.issue_invoice_in_database(self._invoice, assignments)
-
-            # 4. Provide feedback to the user
             if success:
                 show_information_message_box(self._view, "موفق", message)
-                # Refresh the view to disable the button
+                self._update_view() # Refresh view to reflect issued state
+            else:
+                show_error_message_box(self._view, "خطا", message)
+
+        title = "تایید صدور فاکتور"
+        message = f"آیا از صدور و ثبت نهایی فاکتور شماره {self._invoice.invoice_number} اطمینان دارید؟"
+        show_question_message_box(parent=self._view, title=title, message=message,
+                                  button_1="بله",button_2="خیر", yes_func=do_issue)
+
+    def _handle_reissue(self):
+        """
+        Handles the logic for re-issuing an edited invoice using a single,
+        session-safe call to the logic layer.
+        """
+        import re
+        base_invoice_number = re.split(r'-v\d+', self._invoice.invoice_number)[0]
+        assignments = self._state_manager.get_assignments()
+        new_items = [item for sublist in assignments.values() for item in sublist]
+
+        # --- MODIFICATION START ---
+        # 1. Make a single call to the logic layer
+        has_changed, edit_logs = self._logic.prepare_reissue_data(
+            base_invoice_number, self._invoice, new_items
+        )
+
+        # 2. Check the result
+        if not has_changed:
+            show_warning_message_box(self._view, "بدون تغییر",
+                                     "اطلاعات فاکتور تغییری نکرده است. فاکتور جدیدی صادر نشد.")
+            return
+
+        # 3. If there are changes, the 'do_reissue' function now receives the pre-generated logs
+        def do_reissue(generated_logs: List[EditedInvoiceModel]):
+            new_versioned_number = self._logic.get_next_invoice_version_number(base_invoice_number)
+            self._invoice.invoice_number = new_versioned_number
+            edit_remark = f"* نسخه ویرایش شده فاکتور شماره {base_invoice_number}"
+            self._invoice.remarks = f"{edit_remark}\n{self._invoice.remarks}".strip()
+
+            # Pass the generated logs directly to the database saving method
+            success, message = self._logic.issue_invoice_in_database(self._invoice, assignments, generated_logs)
+
+            if success:
+                show_information_message_box(self._view, "موفق",
+                                             f"تغییرات شناسایی و ثبت شد. نسخه جدید فاکتور با شماره {new_versioned_number} صادر شد.")
                 self._update_view()
             else:
                 show_error_message_box(self._view, "خطا", message)
 
-        # Confirm with the user
-        title = "تایید صدور فاکتور"
-        message = (f"آیا از صدور و ثبت نهایی فاکتور شماره {self._invoice.invoice_number} اطمینان دارید؟\n"
-                   "در صورت وجود فاکتور با این شماره، اطلاعات قبلی بازنویسی خواهد شد.")
-        button_1 = "بله"
-        button_2 = "خیر"
-        button_3 = "انصراف"
-        show_question_message_box(parent=self._view, title=title, message=message,
-                                  button_1=button_1, button_2=button_2, button_3=button_3, yes_func=issue_invoice)
+        title = "تایید صدور نسخه جدید"
+        message = "تغییراتی در فاکتور شناسایی شد. آیا مایل به صدور یک نسخه جدید و ویرایش شده هستید؟"
+
+        # 4. The lambda now passes the safe 'edit_logs' list, not the detached ORM object
+        show_question_message_box(parent=self._view, title=title, message=message, button_1="بله، صادر کن",
+                                  button_2="خیر", yes_func=lambda: do_reissue(edit_logs))
 
     def next_page(self):
         if self.current_page < self.total_pages:

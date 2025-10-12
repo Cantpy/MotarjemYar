@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 from dataclasses import dataclass, field
+from typing import List, Tuple
 import copy
 import uuid
-from shared.orm_models.services_models import ServicesModel
 
 
 @dataclass
@@ -29,7 +29,7 @@ class Service:
     aliases: list[str] = field(default_factory=list)
 
     @classmethod
-    def to_dto(cls, service: ServicesModel) -> "Service":
+    def to_dto(cls, service: "ServicesModel") -> "Service":
         return cls(
             id=service.id,
             name=service.name,
@@ -63,6 +63,8 @@ class InvoiceItem:
     has_foreign_affairs_seal: bool = False
     dynamic_quantities: dict[str, int] = field(default_factory=dict)  # e.g., {'تعداد ترم': 8}
     remarks: str = ""
+
+    dynamic_price_details: List[Tuple[str, int, int]] = field(default_factory=list)
 
     # Calculated prices from dialog
     translation_price: int = 0
