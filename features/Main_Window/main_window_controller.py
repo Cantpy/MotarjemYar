@@ -64,6 +64,7 @@ class MainWindowController(QObject):
                     customers_engine=self._engines.get('customers'),
                     invoices_engine=self._engines.get('invoices'),
                     services_engine=self._engines.get('services'),
+                    users_engine=self._engines.get('users'),
                     parent=self._view
                 )
                 self.page_controllers["home"] = controller

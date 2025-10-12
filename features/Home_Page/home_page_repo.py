@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, aliased
 from shared.orm_models.invoices_models import IssuedInvoiceModel, InvoiceItemModel
 from shared.orm_models.customer_models import CustomerModel
 from shared.orm_models.services_models import ServicesModel
+from shared.orm_models.users_models import UsersModel, UserProfileModel
 
 from features.Home_Page.home_page_models import DocumentStatistics
 
@@ -125,12 +126,33 @@ class HomePageServicesRepository:
         return {sid: name for sid, name in results}
 
 
+class HomePageUsersRepository:
+    """Stateless repository for user data operations related to the home page."""
+
+    def get_all_translators(self, session: Session) -> List[str]:
+        """
+        Retrieves the full names of all users with the 'translator' role.
+        """
+        results = (
+            session.query(UserProfileModel.full_name)
+            .join(UsersModel, UserProfileModel.user_id == UsersModel.id)
+            .filter(UsersModel.role == 'translator')
+            .order_by(UserProfileModel.full_name)
+            .all()
+        )
+        # The query returns a list of tuples, e.g., [('John Doe',), ('Jane Smith',)].
+        # We need to flatten it into a simple list of strings.
+        return [name for (name,) in results]
+
+
 class HomePageRepository:
     """Facade to aggregate data from multiple repositories for the dashboard."""
 
     def __init__(self, invoices_repo: HomePageInvoicesRepository,
                  customers_repo: HomePageCustomersRepository,
-                 services_repo: HomePageServicesRepository):
+                 services_repo: HomePageServicesRepository,
+                 users_repo: HomePageUsersRepository):
         self.invoices_repo = invoices_repo
         self.customers_repo = customers_repo
         self.services_repo = services_repo
+        self.users_repo = users_repo

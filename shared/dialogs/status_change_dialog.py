@@ -1,7 +1,7 @@
 # shared/dialogs/status_change_dialog
 
 from PySide6.QtWidgets import (QDialog, QFrame, QScrollArea, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-                               QLineEdit)
+                               QComboBox)
 from PySide6.QtCore import Qt, Signal
 
 from features.Home_Page.home_page_models import StatusChangeRequest, InvoiceDTO
@@ -182,11 +182,12 @@ class StatusChangeDialog(QDialog):
 
     status_change_requested = Signal(StatusChangeRequest)
 
-    def __init__(self, invoice: InvoiceDTO, next_status: int, step_text: str, parent=None):
+    def __init__(self, invoice: InvoiceDTO, next_status: int, step_text: str, translators: list = None, parent=None):
         super().__init__(parent)
         self.invoice = invoice
         self.next_status = next_status
         self.step_text = step_text
+        self.translators = translators if translators is not None else []
 
         # Define all delivery steps
         self.delivery_steps = [
@@ -363,7 +364,7 @@ class StatusChangeDialog(QDialog):
         return container
 
     def create_input_section(self) -> QFrame:
-        """Create input section for translator selection."""
+        """Create input section for translator selection using a ComboBox."""
         section = QFrame()
         section.setObjectName("inputSection")
 
@@ -376,19 +377,23 @@ class StatusChangeDialog(QDialog):
         title_label.setObjectName("inputTitle")
 
         # Description
-        desc_label = QLabel("نام مترجم مورد نظر را وارد کنید یا خالی بگذارید تا 'نامشخص' ثبت شود")
+        desc_label = QLabel("مترجم مسئول این فاکتور را از لیست زیر انتخاب کنید.")
         desc_label.setObjectName("inputDescription")
-        # desc_label.setWordWrap(True)
 
-        # Input field
-        self.translator_input = QLineEdit()
-        self.translator_input.setObjectName("modernInput")
-        self.translator_input.setPlaceholderText("نام مترجم...")
-        self.translator_input.setText("نامشخص")
+        # Input field (now a QComboBox)
+        self.translator_combo = QComboBox()
+        self.translator_combo.setObjectName("modernInput") # Can reuse style
+        self.translator_combo.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+
+        if self.translators:
+            self.translator_combo.addItems(self.translators)
+        else:
+            self.translator_combo.addItem("مترجمی یافت نشد")
+            self.translator_combo.setEnabled(False) # Disable if empty
 
         layout.addWidget(title_label)
         layout.addWidget(desc_label)
-        layout.addWidget(self.translator_input)
+        layout.addWidget(self.translator_combo)
 
         return section
 
@@ -419,10 +424,11 @@ class StatusChangeDialog(QDialog):
         """Handle status change confirmation."""
         translator = None
 
-        # Get translator input if this is step 1
+        # Get translator from the combo box if this is the assignment step
         if self.next_status == DeliveryStatus.ASSIGNED:
-            translator = self.translator_input.text().strip()
-            if not translator:
+            translator = self.translator_combo.currentText()
+            # Handle the case where no translators were found
+            if translator == "مترجمی یافت نشد":
                 translator = "نامشخص"
 
         # Create status change request

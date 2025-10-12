@@ -2,7 +2,7 @@
 
 import jdatetime
 from datetime import date, timedelta, datetime
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 import requests
 
 from features.Home_Page.home_page_repo import HomePageRepository
@@ -22,14 +22,21 @@ class HomePageLogic:
     def __init__(self, repository: HomePageRepository,
                  customer_engine: ManagedSessionProvider,
                  invoices_engine: ManagedSessionProvider,
-                 services_engine: ManagedSessionProvider):
+                 services_engine: ManagedSessionProvider,
+                 users_engine: ManagedSessionProvider):
         """Initialize with _repository class and session makers."""
         self._repository = repository
         self._customer_session = customer_engine
         self._invoices_session = invoices_engine
         self._services_session = services_engine
+        self._users_session = users_engine
 
     # --- PUBLIC METHODS ---
+
+    def get_all_translators(self) -> List[str]:
+        """Retrieves a list of all users with the 'translator' role."""
+        with self._users_session() as session:
+            return self._repository.users_repo.get_all_translators(session)
 
     def get_dashboard_statistics(self) -> DashboardStats:
         """Get all dashboard statistics. This is an orchestrating unit of work."""

@@ -155,16 +155,31 @@ class HomePageController(QObject):
 
         next_status, step_text = next_step_info
 
+        # --- MODIFICATION START ---
         # 2. Get current invoice data to show in the dialog
         invoice_dto = self._logic.get_invoice_for_menu(invoice_number)
 
-        # 3. Show the dialog, passing it the clean data
+        # 3. If the next step is assigning a translator, fetch the translator list
+        translators = []
+        if next_status == DeliveryStatus.ASSIGNED:
+            try:
+                translators = self._logic.get_all_translators()
+                if not translators:
+                    # Optional: Show a warning if no translators are found in the system
+                    show_warning_message_box(self._view, "هشدار", "هیچ مترجمی در سیستم ثبت نشده است.")
+            except Exception as e:
+                show_error_message_box(self._view, "خطا", f"خطا در دریافت لیست مترجمین: {e}")
+                return
+
+        # 4. Show the dialog, passing it the clean data and the translator list
         dialog = StatusChangeDialog(
             invoice=invoice_dto,
             next_status=next_status,
             step_text=step_text,
+            translators=translators,
             parent=self._view
         )
+        # --- MODIFICATION END ---
 
         # Connect dialog signals
         dialog.status_change_requested.connect(self._on_status_change_confirmed)
