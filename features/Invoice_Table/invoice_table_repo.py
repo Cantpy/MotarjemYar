@@ -9,7 +9,8 @@ from typing import Optional
 
 from features.Invoice_Table.invoice_table_models import InvoiceSummary
 from shared.orm_models.invoices_models import (IssuedInvoiceModel, InvoiceItemModel, DeletedInvoiceModel,
-                                               InvoiceItemData, InvoiceData, EditedInvoiceModel, EditedInvoiceData)
+                                               InvoiceItemData, InvoiceData, EditedInvoiceModel, EditedInvoiceData,
+                                               DeletedInvoiceData)
 from shared.orm_models.users_models import UsersModel, UserProfileModel
 from shared.orm_models.services_models import ServicesModel, ServiceDynamicPrice
 
@@ -135,7 +136,7 @@ class InvoiceRepository:
 
     # ─────────────────────────────── Deletion (Soft) ─────────────────────────────── #
 
-    def delete_invoice(self, session: Session, invoice_number: str) -> bool:
+    def delete_invoice(self, session: Session, invoice_number: str, deleted_by_user: str) -> bool:
         """
         Moves a single invoice to the deleted_invoices table instead of permanently deleting it.
         This is an atomic operation for one invoice.
@@ -179,7 +180,7 @@ class InvoiceRepository:
                 pdf_file_path=invoice_to_delete.pdf_file_path,
                 remarks=invoice_to_delete.remarks,
                 deleted_at=datetime.utcnow(),
-                deleted_by=getpass.getuser()
+                deleted_by=deleted_by_user
             )
             session.add(deleted_invoice)
 
@@ -317,6 +318,19 @@ class InvoiceRepository:
             return [item.to_dataclass() for item in history_orm]
         except SQLAlchemyError as e:
             print(f"[ERROR] Failed to retrieve edit history for {invoice_number}: {e}")
+            return []
+
+    def get_all_deleted_invoices(self, session: Session) -> list[DeletedInvoiceData]:
+        """Retrieve all deleted invoices, ordered by deletion date."""
+        try:
+            invoices = (
+                session.query(DeletedInvoiceModel)
+                .order_by(DeletedInvoiceModel.deleted_at.desc())
+                .all()
+            )
+            return [invoice.to_dataclass() for invoice in invoices]
+        except SQLAlchemyError as e:
+            print(f"[ERROR] Failed to retrieve deleted invoices: {e}")
             return []
 
 

@@ -8,7 +8,8 @@ from pathlib import Path
 from typing import Any, List, Dict, Optional, Tuple
 
 from features.Invoice_Table.invoice_table_models import InvoiceSummary, InvoiceFilter, ColumnSettings
-from features.Invoice_Table.invoice_table_repo import RepositoryManager, InvoiceData, InvoiceItemData, EditedInvoiceData
+from features.Invoice_Table.invoice_table_repo import (RepositoryManager, InvoiceData, InvoiceItemData,
+                                                       EditedInvoiceData, DeletedInvoiceData)
 from shared.session_provider import ManagedSessionProvider
 from shared.utils.path_utils import get_user_data_path
 
@@ -161,7 +162,7 @@ class InvoiceService:
     # UPDATE / DELETE OPERATIONS
     # ==============================================================
 
-    def delete_invoices(self, invoice_numbers: List[str]) -> List[str]:
+    def delete_invoices(self, invoice_numbers: List[str], deleted_by_user: str) -> List[str]:
         """
         Deletes one or more invoices by processing them one at a time.
         Each deletion is a separate transaction.
@@ -174,7 +175,8 @@ class InvoiceService:
 
         for number in invoice_numbers:
             with self._invoice_session() as session:
-                if not repo.delete_invoice(session, number):
+                # MODIFICATION: Pass the username to the repository method
+                if not repo.delete_invoice(session, number, deleted_by_user):
                     failed_deletions.append(number)
                     logger.error(f"Failed to delete invoice: {number}")
 
@@ -244,6 +246,11 @@ class InvoiceService:
         with self._invoice_session() as session:
             return self._repo_manager.get_invoice_repository().get_edit_history_by_invoice_number(session,
                                                                                                   invoice_number)
+
+    def get_all_deleted_invoices(self) -> List[DeletedInvoiceData]:
+        """Retrieves all invoices from the deleted_invoices table."""
+        with self._invoice_session() as session:
+            return self._repo_manager.get_invoice_repository().get_all_deleted_invoices(session)
 
 
 # =============================================================================

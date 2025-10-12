@@ -7,12 +7,14 @@ from typing import List, Optional
 from dataclasses import asdict
 
 from features.Invoice_Table.invoice_table_view import InvoiceTableView
+from features.Invoice_Table.invoice_table_deleted_invoices_dialog import DeletedInvoicesDialog
 from features.Invoice_Table.invoice_table_summary_dialog import InvoiceSummaryDialog
 from features.Invoice_Table.invoice_table_edit_dialog import EditInvoiceDialog
 from features.Invoice_Table.invoice_table_logic import InvoiceLogic
 from features.Invoice_Table.invoice_table_models import InvoiceData
 
 from shared import show_question_message_box, show_error_message_box, show_information_message_box
+from shared.session_provider import SessionManager
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +63,7 @@ class InvoiceTableController(QObject):
         self._view.select_all_toggled.connect(self._on_select_all_toggled)
         self._view.delete_invoice_requested.connect(self._delete_single_invoice)
         self._view.bulk_delete_requested.connect(self._delete_bulk_invoices)
+        self._view.show_deleted_requested.connect(self._show_deleted_invoices)
         self._view.edit_invoice_requested.connect(self._edit_invoice)
         self._view.deep_edit_invoice_requested.connect(self._handle_deep_edit_request)
         self._view.translator_updated.connect(self._update_translator)
@@ -108,14 +111,24 @@ class InvoiceTableController(QObject):
         visible_count = len(self._filtered_invoices)
         self._view.update_selection_info(selected_count, visible_count)
 
+    def _get_current_user_name(self) -> str:
+        """Retrieves the full name or username of the currently logged-in user."""
+        user_info = SessionManager().get_session()
+        if user_info:
+            return user_info.full_name or user_info.username
+        return "نامشخص"
+
     def _delete_single_invoice(self, invoice_number: str):
         if not invoice_number:
             show_error_message_box(self._view, "خطا", "فاکتور موردنظر یافت نشد.")
             return
 
         def do_delete():
-            # Pass as a list to the unified service method
-            failed_deletions = self._logic.invoice.delete_invoices([invoice_number])
+            # --- MODIFICATION START ---
+            deleter_name = self._get_current_user_name()
+            failed_deletions = self._logic.invoice.delete_invoices([invoice_number], deleter_name)
+            # --- MODIFICATION END ---
+
             if not failed_deletions:
                 show_information_message_box(parent=self._view, title="موفقیت", message="فاکتور با موفقیت حذف شد.")
                 self._refresh_data()
@@ -134,7 +147,10 @@ class InvoiceTableController(QObject):
             return
 
         def do_bulk_delete():
-            failed_deletions = self._logic.invoice.delete_invoices(self._selected_invoice_numbers)
+            # --- MODIFICATION START ---
+            deleter_name = self._get_current_user_name()
+            failed_deletions = self._logic.invoice.delete_invoices(self._selected_invoice_numbers, deleter_name)
+            # --- MODIFICATION END ---
 
             if not failed_deletions:
                 show_information_message_box(self._view,
@@ -301,6 +317,20 @@ class InvoiceTableController(QObject):
         # Create and show the dialog with all the necessary data
         summary_dialog = InvoiceSummaryDialog(invoice_data, invoice_items, edit_history, self._view)
         summary_dialog.exec()
+
+    def _show_deleted_invoices(self):
+        """Fetches all deleted invoices and displays them in a new dialog."""
+        try:
+            deleted_invoices_data = self._logic.invoice.get_all_deleted_invoices()
+            if not deleted_invoices_data:
+                show_information_message_box(self._view, "اطلاعات", "هیچ فاکتور حذف شده‌ای یافت نشد.")
+                return
+
+            dialog = DeletedInvoicesDialog(deleted_invoices_data, self._view)
+            dialog.exec()
+        except Exception as e:
+            logger.error(f"Error showing deleted invoices: {e}")
+            show_error_message_box(self._view, "خطا", f"خطا در نمایش فاکتورهای حذف شده: {e}")
 
     def _handle_deep_edit_request(self, invoice_number: str):
         """Handles the request for a deep edit by fetching all data and emitting it upwards."""

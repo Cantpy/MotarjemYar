@@ -25,6 +25,7 @@ class InvoiceTableView(QWidget):
     export_requested = Signal()
     refresh_requested = Signal()
     summary_requested = Signal()
+    show_deleted_requested = Signal()
 
     # Data/UI Interactions
     search_text_changed = Signal(str)
@@ -49,6 +50,7 @@ class InvoiceTableView(QWidget):
         self.selected_count_label = None
         self.filter_button = None
         self.bulk_delete_btn = None
+        self.deleted_invoices_btn = None
         self.column_checkboxes = []
         self.column_checkboxes_layout = None
         self.checkboxes_visible = False
@@ -74,7 +76,6 @@ class InvoiceTableView(QWidget):
         self.search_bar.textChanged.connect(self.search_text_changed)
         self.table.itemDoubleClicked.connect(self._emit_double_click_request)
 
-        # FIXED: Handle all three states properly (Unchecked=0, PartiallyChecked=1, Checked=2)
         self.select_all_checkbox.stateChanged.connect(self._handle_select_all_state_change)
 
         self.filter_button.clicked.connect(self.toggle_column_filter_requested)
@@ -85,6 +86,7 @@ class InvoiceTableView(QWidget):
         self.edit_invoice_btn.clicked.connect(self._emit_edit_request)
         self.deep_edit_invoice_btn.clicked.connect(self._emit_deep_edit_request)
         self.delete_invoice_btn.clicked.connect(self._emit_delete_request)
+        self.deleted_invoices_btn.clicked.connect(self.show_deleted_requested)
         self.summary_btn.clicked.connect(self.summary_requested)
         self.refresh_btn.clicked.connect(self.refresh_requested)
 
@@ -313,11 +315,12 @@ class InvoiceTableView(QWidget):
         self.add_invoice_btn = QPushButton("افزودن فاکتور")
 
         # --- MODIFIED: Renamed and added the new button ---
-        self.edit_invoice_btn = QPushButton("ویرایش سریع")  # Renamed
-        self.deep_edit_invoice_btn = QPushButton("ویرایش کامل")  # New button
+        self.edit_invoice_btn = QPushButton("ویرایش سریع")
+        self.deep_edit_invoice_btn = QPushButton("ویرایش کامل")
 
         self.delete_invoice_btn = QPushButton("حذف فاکتور")
         self.summary_btn = QPushButton("خلاصه فاکتورها")
+        self.deleted_invoices_btn = QPushButton("مشاهده حذف شده ها")
         self.refresh_btn = QPushButton("🔄 به‌روزرسانی")
 
         self.edit_invoice_btn.setEnabled(False)
@@ -326,9 +329,10 @@ class InvoiceTableView(QWidget):
 
         button_layout.addWidget(self.add_invoice_btn)
         button_layout.addWidget(self.edit_invoice_btn)
-        button_layout.addWidget(self.deep_edit_invoice_btn)  # Add to layout
+        button_layout.addWidget(self.deep_edit_invoice_btn)
         button_layout.addWidget(self.delete_invoice_btn)
         button_layout.addWidget(self.summary_btn)
+        button_layout.addWidget(self.deleted_invoices_btn)
         button_layout.addWidget(self.refresh_btn)
 
         self.layout.addLayout(button_layout)
