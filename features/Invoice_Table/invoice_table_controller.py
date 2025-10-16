@@ -82,9 +82,6 @@ class InvoiceTableController(QObject):
             self._doc_counts = self._logic.invoice.get_document_counts()
             self._translator_names = self._logic.invoice.get_translator_names()
             self._filter_invoices(self._view.search_bar.text())
-            if self._all_invoices:
-                print(f"DEBUG: Type of issue_date is {type(self._all_invoices[0].issue_date)}")
-                print(f"DEBUG: Value is {repr(self._all_invoices[0].issue_date)}")
 
             self._all_invoices.sort(key=lambda inv: (inv.issue_date, inv.id), reverse=False)
             # self._view.clear_search_bar() # Removed to not clear user search on refresh

@@ -117,6 +117,7 @@ class StatusChangeRequest:
     current_status: int
     target_status: int
     translator: Optional[str] = None
+    set_payment_as_paid: bool = False
 
 
 @dataclass

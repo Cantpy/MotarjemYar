@@ -1,9 +1,8 @@
-# motarjemyar/employee_management/employee_management_view.py
+# features/Admin_Panel/employee_management/employee_management_view.py
 
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit,
-                               QTableWidget, QDialog, QTabWidget, QFormLayout, QLineEdit,
-                               QComboBox, QCheckBox, QDialogButtonBox, QSpinBox, QDoubleSpinBox,
-                               QHeaderView, QTableWidgetItem)
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QDialog, QTabWidget,
+                               QFormLayout, QLineEdit, QComboBox, QCheckBox, QDialogButtonBox, QSpinBox,
+                               QDoubleSpinBox, QHeaderView, QTableWidgetItem)
 from PySide6.QtCore import Qt, Signal, QDate
 import qtawesome as qta
 from shared.fonts.font_manager import FontManager
@@ -24,10 +23,16 @@ class UserEditDialog(QDialog):
     def __init__(self, employee_data: EmployeeFullData | None = None, parent=None):
         super().__init__(parent)
         self.is_edit_mode = employee_data is not None
-        self.employee_id = employee_data.employee_id if self.is_edit_mode else None
+
+        if self.is_edit_mode and employee_data:
+            self.employee_id = employee_data.employee_id
+            self.user_id = employee_data.user_id
+        else:
+            self.employee_id = None
+            self.user_id = None
 
         self.setWindowTitle("ویرایش کارمند" if self.is_edit_mode else "ایجاد کارمند جدید")
-        self.setLayoutDirection(Qt.RightToLeft)
+        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         self.setMinimumWidth(550)
         self.setFont(FontManager.get_font(size=11))
 
@@ -46,12 +51,12 @@ class UserEditDialog(QDialog):
         tab_widget.addTab(payroll_info_widget, "اطلاعات قرارداد و حقوق")
 
         # --- Dialog Buttons ---
-        button_box = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
         main_layout.addWidget(button_box)
 
-        if self.is_edit_mode:
+        if self.is_edit_mode and employee_data:
             self.set_data(employee_data)
 
         # Set initial visibility of salary/commission fields
@@ -81,7 +86,8 @@ class UserEditDialog(QDialog):
         widget = QWidget()
         form_layout = QFormLayout(widget)
         self.username_edit = QLineEdit()
-        self.password_edit = QLineEdit(echoMode=QLineEdit.Password)
+        self.password_edit = QLineEdit()
+        self.password_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self.role_combo = QComboBox()
         self.role_combo.addItems(["clerk", "translator", "accountant", "admin"])
         self.is_active_check = QCheckBox("اکانت فعال است")
@@ -158,8 +164,8 @@ class UserEditDialog(QDialog):
             return next((k for k, v in d.items() if v == val), None)
 
         return EmployeeFullData(
-            employee_id=getattr(self, 'employee_id', None),
-            user_id=getattr(self, 'user_id', None),
+            employee_id=self.employee_id,
+            user_id=self.user_id,
             first_name=self.first_name_edit.text(),
             last_name=self.last_name_edit.text(),
             national_id=self.national_id_edit.text(),
@@ -184,7 +190,7 @@ class UserEditDialog(QDialog):
 class UserManagementView(QWidget):
     add_employee_requested = Signal()
     edit_employee_requested = Signal(EmployeeFullData)
-    delete_employee_requested = Signal(str)  # Emits employee_id
+    delete_employee_requested = Signal(str, str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -193,7 +199,8 @@ class UserManagementView(QWidget):
         main_layout.setSpacing(15)
 
         action_layout = QHBoxLayout()
-        self.add_employee_btn = QPushButton(" کارمند جدید", icon=qta.icon('fa5s.user-plus'))
+        self.add_employee_btn = QPushButton(" کارمند جدید")
+        self.add_employee_btn.setIcon(qta.icon('fa5s.user-plus'))
         action_layout.addWidget(self.add_employee_btn)
         action_layout.addStretch()
         main_layout.addLayout(action_layout)
@@ -201,12 +208,18 @@ class UserManagementView(QWidget):
         self.employee_table = QTableWidget()
         self.employee_table.setColumnCount(5)
         self.employee_table.setHorizontalHeaderLabels(["نام کامل", "کد ملی", "تاریخ استخدام", "نوع قرارداد", ""])
-        self.employee_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.employee_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
-        self.employee_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.employee_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.employee_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        self.employee_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         main_layout.addWidget(self.employee_table)
 
-        self.add_employee_btn.clicked.connect(self.add_employee_requested)
+        self.connect_signals()
+
+    def connect_signals(self):
+        """
+        Connects button clicks to the appropriate signals.
+        """
+        self.add_employee_btn.clicked.connect(self._on_add_employee_clicked)
 
     def populate_employee_table(self, employees: list[EmployeeFullData]):
         self.employee_table.clearContents()
@@ -227,7 +240,14 @@ class UserManagementView(QWidget):
             edit_btn = QPushButton(icon=qta.icon('fa5s.edit'))
             delete_btn = QPushButton(icon=qta.icon('fa5s.trash-alt'))
             edit_btn.clicked.connect(lambda chk, e=emp_data: self.edit_employee_requested.emit(e))
-            delete_btn.clicked.connect(lambda chk, e_id=emp_data.employee_id: self.delete_employee_requested.emit(e_id))
+            delete_btn.clicked.connect(lambda chk, e=emp_data: self.delete_employee_requested.
+                                       emit(e.employee_id, e.national_id))
             actions_layout.addWidget(edit_btn)
             actions_layout.addWidget(delete_btn)
             self.employee_table.setCellWidget(row, 4, actions_widget)
+
+    def _on_add_employee_clicked(self):
+        """
+        Emits the signal to request adding a new employee.
+        """
+        self.add_employee_requested.emit()

@@ -10,7 +10,7 @@ from features.Main_Window.main_window_view import MainWindowView
 from features.Main_Window.main_window_logic import MainWindowLogic
 from features.Home_Page.home_page_factory import HomePageFactory
 from features.Invoice_Page.wizard_host.invoice_wizard_factory import InvoiceWizardFactory
-from features.Admin_Panel.host_tab.host_tab_factory import AdminPanelFactory
+from features.Admin_Panel.admin_panel.admin_panel_factory import AdminPanelFactory
 from features.Invoice_Table.invoice_table_factory import InvoiceTableFactory
 from features.Services.tab_manager.tab_manager_factory import ServicesManagementFactory
 from features.Info_Page.info_page_factory import InfoPageFactory
@@ -102,20 +102,22 @@ class MainWindowController(QObject):
         self.page_manager.register("invoice_table", create_invoice_table)
 
         def create_admin_panel():
-            if "users" not in self.page_controllers:
+            if "admin_panel" not in self.page_controllers:
+                # Use the AdminPanelFactory, which creates the tabbed view
                 controller = AdminPanelFactory.create(
-                    users_engine=self._engines.get('users'),
-                    payroll_engine=self._engines.get('payroll'),
-                    expenses_engine=self._engines.get('expenses'),
-                    customers_engine=self._engines.get('customers'),
                     invoices_engine=self._engines.get('invoices'),
+                    customers_engine=self._engines.get('customers'),
                     services_engine=self._engines.get('services'),
+                    expenses_engine=self._engines.get('expenses'),
+                    payroll_engine=self._engines.get('payroll'),
+                    users_engine=self._engines.get('users'),
                     parent=self._view
                 )
-                self.page_controllers["users"] = controller
-            return self.page_controllers["users"]
+                self.page_controllers["admin_panel"] = controller
+            return self.page_controllers["admin_panel"]
 
-        self.page_manager.register("users", create_admin_panel)
+        # Register it with a more descriptive name
+        self.page_manager.register("admin_panel", create_admin_panel)
 
         # --- Other pages converted to the robust factory pattern ---
 
@@ -161,7 +163,7 @@ class MainWindowController(QObject):
         # --- Sidebar Navigation to use the PageManager ---
         self._view.home_button.clicked.connect(lambda: self.page_manager.show("home"))
         self._view.invoice_button.clicked.connect(lambda: self.page_manager.show("invoice"))
-        self._view.large_user_pic.clicked.connect(lambda: self.page_manager.show("users"))
+        self._view.large_user_pic.clicked.connect(lambda: self.page_manager.show("admin_panel"))
         self._view.issued_invoices_button.clicked.connect(lambda: self.page_manager.show('invoice_table'))
         self._view.documents_button.clicked.connect(lambda: self.page_manager.show('services'))
         self._view.help_button.clicked.connect(lambda: self.page_manager.show('info_page'))

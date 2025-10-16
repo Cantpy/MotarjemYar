@@ -1,8 +1,9 @@
 # features/Admin_Panel/admin_dashboard/admin_dashboard_logic.py
 
 from .admin_dashboard_repo import AdminDashboardRepository
-from .admin_dashboard_models import KpiData, AttentionQueueItem, TopPerformer
+from .admin_dashboard_models import KpiData, AttentionQueueItem, TopPerformer, UnpaidCollectedItem
 from shared.utils.persian_tools import to_persian_numbers
+from datetime import datetime
 
 from shared. session_provider import ManagedSessionProvider
 
@@ -17,13 +18,11 @@ class AdminDashboardLogic:
 
     def get_kpi_data(self) -> KpiData:
         with self._invoices_session() as session:
-            # Fetch raw numbers
             revenue_today = self._repo.get_revenue_today(session)
             revenue_month = self._repo.get_revenue_this_month(session)
             outstanding = self._repo.get_total_outstanding(session)
             new_customers = self._repo.get_new_customers_this_month(session)
 
-            # Format and return as a clean KpiData object
             return KpiData(
                 revenue_today=self.format_currency(revenue_today),
                 revenue_month=self.format_currency(revenue_month),
@@ -45,21 +44,19 @@ class AdminDashboardLogic:
                 "clerks": top_clerks
             }
 
-    def get_attention_queue(self) -> list[AttentionQueueItem]:
+    def get_attention_queue(self) -> dict:
         """
         Fetches orders needing attention and enriches them with companion counts.
         """
         with self._invoices_session() as inv_session, self._customers_session() as cust_session:
-            # 1. Get the primary invoice data
             raw_orders = self._repo.get_orders_needing_attention(inv_session)
-            if not raw_orders:
-                return []
+            unpaid_collected = self.get_unpaid_collected_data()
+            if not raw_orders and not unpaid_collected:
+                return {}
 
-            # 2. Extract national IDs to query for companions
             national_ids = [order.national_id for order in raw_orders]
             companion_counts = self._repo.get_companion_counts_for_customers(cust_session, national_ids)
 
-            # 3. Assemble the final, rich list of dataclasses
             attention_items = []
             for order in raw_orders:
                 item = AttentionQueueItem(
@@ -70,11 +67,32 @@ class AdminDashboardLogic:
                     payment_status=order.payment_status,
                     total_amount=order.total_amount,
                     final_amount=order.final_amount,
+                    advance_payment=order.advance_payment,
                     companion_count=companion_counts.get(order.national_id, 0)
                 )
                 attention_items.append(item)
 
-            return attention_items
+            return {
+                "due_orders": attention_items,
+                "unpaid_collected": unpaid_collected
+            }
+
+    def get_unpaid_collected_data(self) -> list[UnpaidCollectedItem]:
+        """Fetches and prepares data for unpaid but collected invoices."""
+        with self._invoices_session() as session:
+            raw_invoices = self._repo.get_unpaid_collected_invoices(session)
+            unpaid_items = []
+            for invoice in raw_invoices:
+                days_diff = (datetime.now() - invoice.collection_date).days if invoice.collection_date else 0
+                item = UnpaidCollectedItem(
+                    invoice_number=invoice.invoice_number,
+                    customer_name=invoice.name,
+                    phone_number=invoice.phone,
+                    amount_due=invoice.final_amount,
+                    days_since_collection=days_diff
+                )
+                unpaid_items.append(item)
+            return unpaid_items
 
     def format_currency(self, amount: float) -> str:
         return f"{amount:,.0f} تومان"

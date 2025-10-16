@@ -593,7 +593,6 @@ class MainInvoicePreviewWidget(QWidget):
         self.control_panel.prev_button.setEnabled(current_page > 1)
         self.control_panel.next_button.setEnabled(current_page < total_pages)
         self.control_panel.issue_button.setEnabled(not is_issued)
-        # Export and print options are usually enabled if an invoice exists
         can_export = invoice is not None
         self.control_panel.export_button.setEnabled(can_export)
 

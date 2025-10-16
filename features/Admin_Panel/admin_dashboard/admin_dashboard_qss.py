@@ -106,12 +106,19 @@ QListWidget {
     outline: none;
 }
 
+/* QListWidget QLabel {
+    color: #212529;
+    background-color: transparent;
+    font-size: 14px; /* Slightly larger base font for list items */
+} */
+
 QListWidget::item {
     background-color: white;
     border: 1px solid #e9ecef;
     border-radius: 6px;
-    padding: 8px;
-    margin: 4px;
+    padding: 12px 15px; /* Increased horizontal padding */
+    margin: 5px;
+    min-height: 150px; /* --- MODIFICATION: Set minimum item height --- */
 }
 
 QListWidget::item:hover {
@@ -137,6 +144,7 @@ QListWidget[objectName="performerList"]::item {
     padding: 10px;
     margin: 3px;
     border-left: 3px solid transparent;
+    min-height: 0; /* Reset min-height for performer list */
 }
 
 QListWidget[objectName="performerList"]::item:hover {
@@ -212,7 +220,6 @@ QScrollBar::sub-line:horizontal {
    Attention Queue Custom Styling
    =================================== */
 
-/* Style for attention queue items with urgency colors */
 QWidget[objectName="attentionItem"] {
     background-color: white;
     border-radius: 6px;
@@ -250,7 +257,6 @@ Medal Colors:
    Responsive Adjustments
    =================================== */
 
-/* Ensure proper spacing and sizing */
 QWidget {
     selection-background-color: #0078d7;
     selection-color: white;
@@ -263,7 +269,6 @@ QWidget {
 QPushButton,
 QListWidget::item,
 QGroupBox {
-    /* Smooth transitions for hover effects */
     transition: all 0.2s ease-in-out;
 }
 
@@ -275,4 +280,4 @@ QGroupBox {
     outline: 2px solid #0078d7;
     outline-offset: 2px;
 }
- """
+"""

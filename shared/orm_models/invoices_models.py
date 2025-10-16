@@ -1,6 +1,6 @@
 # shared/orm_models/invoices_models.py
 
-from sqlalchemy import Integer, Text, DateTime, ForeignKey, CheckConstraint, Index
+from sqlalchemy import Integer, Text, DateTime, ForeignKey, CheckConstraint, Index, event
 from sqlalchemy.orm import Mapped, mapped_column, declarative_base, relationship
 from typing import Optional, List
 from datetime import datetime
@@ -8,10 +8,7 @@ from dataclasses import dataclass
 
 BaseInvoices = declarative_base()
 
-# ---------------------------------------------------------------------
-# 📦 DATA CLASSES
-# ---------------------------------------------------------------------
-
+# ... (rest of the dataclasses remain the same)
 @dataclass
 class InvoiceData:
     id: int
@@ -21,6 +18,8 @@ class InvoiceData:
     phone: str
     issue_date: datetime
     delivery_date: datetime
+    collection_date: Optional[datetime]
+    payment_date: Optional[datetime]
     translator: str
     total_items: int
     total_amount: int
@@ -51,6 +50,8 @@ class DeletedInvoiceData:
     phone: str
     issue_date: datetime
     delivery_date: datetime
+    collection_date: Optional[datetime]
+    payment_date: Optional[datetime]
     translator: str
     total_items: int
     total_amount: int
@@ -104,10 +105,40 @@ class EditedInvoiceData:
     remarks: Optional[str]
 
 
+@dataclass
+class WorkspaceBatchData:
+    id: int
+    batch_number: str
+    office_type: str
+    created_at: datetime
+    sent_by: str
+    received_at: Optional[datetime]
+    status: str
+    remarks: Optional[str]
+
+
+@dataclass
+class WorkspaceBatchItemData:
+    id: int
+    batch_id: int
+    invoice_item_id: int
+    sent_at: datetime
+    approved_at: Optional[datetime]
+    approval_status: str
+    remarks: Optional[str]
+
+
+@dataclass
+class WorkspaceQuotaData:
+    id: int
+    office_type: str
+    max_daily: int
+    max_weekly: int
+    updated_at: datetime
+
 # ---------------------------------------------------------------------
 # 🧱 ORM MODELS
 # ---------------------------------------------------------------------
-
 class IssuedInvoiceModel(BaseInvoices):
     __tablename__ = 'issued_invoices'
 
@@ -120,6 +151,8 @@ class IssuedInvoiceModel(BaseInvoices):
 
     issue_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     delivery_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    collection_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    payment_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     translator: Mapped[str] = mapped_column(Text, nullable=False)
     total_items: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -174,6 +207,8 @@ class IssuedInvoiceModel(BaseInvoices):
             phone=self.phone,
             issue_date=self.issue_date,
             delivery_date=self.delivery_date,
+            collection_date=self.collection_date,
+            payment_date=self.payment_date,
             translator=self.translator,
             total_items=self.total_items,
             total_amount=self.total_amount,
@@ -196,6 +231,14 @@ class IssuedInvoiceModel(BaseInvoices):
         )
 
 
+@event.listens_for(IssuedInvoiceModel, 'before_update', propagate=True)
+def before_update_listener(mapper, connection, target):
+    if target.delivery_status == 4 and target.collection_date is None:
+        target.collection_date = datetime.utcnow()
+    if target.payment_status == 1 and target.payment_date is None:
+        target.payment_date = datetime.utcnow()
+
+
 class DeletedInvoiceModel(BaseInvoices):
     """A table to store invoices that have been deleted."""
     __tablename__ = 'deleted_invoices'
@@ -207,6 +250,8 @@ class DeletedInvoiceModel(BaseInvoices):
     phone: Mapped[str] = mapped_column(Text, nullable=False)
     issue_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     delivery_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    collection_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    payment_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     translator: Mapped[str] = mapped_column(Text, nullable=False)
     total_items: Mapped[int] = mapped_column(Integer, nullable=False)
     total_amount: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -241,6 +286,8 @@ class DeletedInvoiceModel(BaseInvoices):
             phone=self.phone,
             issue_date=self.issue_date,
             delivery_date=self.delivery_date,
+            collection_date=self.collection_date,
+            payment_date=self.payment_date,
             translator=self.translator,
             total_items=self.total_items,
             total_amount=self.total_amount,
@@ -371,4 +418,106 @@ class InvoiceItemModel(BaseInvoices):
             foreign_affairs_seal_price=self.foreign_affairs_seal_price,
             additional_issues_price=self.additional_issues_price,
             total_price=self.total_price,
+        )
+
+
+class WorkspaceBatchModel(BaseInvoices):
+    """
+    Represents a batch of documents sent to an external office (e.g., judiciary or foreign affairs).
+    """
+    __tablename__ = "workspace_batches"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    batch_number: Mapped[str] = mapped_column(Text, nullable=False, unique=True, index=True)
+    office_type: Mapped[str] = mapped_column(Text, nullable=False)  # 'judiciary' | 'foreign_affairs'
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    sent_by: Mapped[str] = mapped_column(Text, nullable=False)
+    received_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    status: Mapped[str] = mapped_column(Text, default="pending")  # 'pending', 'sent', 'approved', 'returned', 'rejected'
+    remarks: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    items: Mapped[List["WorkspaceBatchItemModel"]] = relationship(
+        "WorkspaceBatchItemModel",
+        cascade="all, delete-orphan",
+        back_populates="batch"
+    )
+
+    __table_args__ = (
+        Index('idx_workspace_batches_office_type', 'office_type'),
+        Index('idx_workspace_batches_status', 'status'),
+        Index('idx_workspace_batches_created_at', 'created_at'),
+    )
+
+    def to_dataclass(self) -> WorkspaceBatchData:
+        return WorkspaceBatchData(
+            id=self.id,
+            batch_number=self.batch_number,
+            office_type=self.office_type,
+            created_at=self.created_at,
+            sent_by=self.sent_by,
+            received_at=self.received_at,
+            status=self.status,
+            remarks=self.remarks
+        )
+
+
+class WorkspaceBatchItemModel(BaseInvoices):
+    """
+    Links individual invoice items to workspace batches.
+    Tracks when each item was sent, approved, or rejected.
+    """
+    __tablename__ = "workspace_batch_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    batch_id: Mapped[int] = mapped_column(ForeignKey("workspace_batches.id", ondelete="CASCADE"), nullable=False)
+    invoice_item_id: Mapped[int] = mapped_column(ForeignKey("invoice_items.id", ondelete="CASCADE"), nullable=False)
+    sent_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    approval_status: Mapped[str] = mapped_column(Text, default="pending")  # 'pending', 'approved', 'rejected'
+    remarks: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    batch: Mapped["WorkspaceBatchModel"] = relationship(back_populates="items")
+    invoice_item: Mapped["InvoiceItemModel"] = relationship()  # Read-only link to item details
+
+    __table_args__ = (
+        Index('idx_workspace_batch_items_batch_id', 'batch_id'),
+        Index('idx_workspace_batch_items_status', 'approval_status'),
+        Index('idx_workspace_batch_items_invoice_item', 'invoice_item_id'),
+    )
+
+    def to_dataclass(self) -> WorkspaceBatchItemData:
+        return WorkspaceBatchItemData(
+            id=self.id,
+            batch_id=self.batch_id,
+            invoice_item_id=self.invoice_item_id,
+            sent_at=self.sent_at,
+            approved_at=self.approved_at,
+            approval_status=self.approval_status,
+            remarks=self.remarks
+        )
+
+
+class WorkspaceQuotaModel(BaseInvoices):
+    """
+    Defines quotas for how many documents can be sent to each office (daily/weekly limits).
+    """
+    __tablename__ = "workspace_quotas"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    office_type: Mapped[str] = mapped_column(Text, nullable=False, unique=True)  # judiciary | foreign_affairs
+    max_daily: Mapped[int] = mapped_column(Integer, default=0)
+    max_weekly: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_workspace_quotas_office_type', 'office_type'),
+    )
+
+    def to_dataclass(self) -> WorkspaceQuotaData:
+        return WorkspaceQuotaData(
+            id=self.id,
+            office_type=self.office_type,
+            max_daily=self.max_daily,
+            max_weekly=self.max_weekly,
+            updated_at=self.updated_at
         )

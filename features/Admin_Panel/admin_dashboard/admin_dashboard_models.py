@@ -23,11 +23,22 @@ class AttentionQueueItem:
     payment_status: int
     total_amount: int
     final_amount: int
+    advance_payment: int
     companion_count: int = 0
+
+
+@dataclass
+class UnpaidCollectedItem:
+    """Represents a single item for unpaid but collected invoices."""
+    invoice_number: int
+    customer_name: str
+    phone_number: str
+    amount_due: int
+    days_since_collection: int
 
 
 @dataclass
 class TopPerformer:
     """Represents a single top-performing employee."""
     name: str
-    value: float    # Can be revenue for translators or count for clerks
+    value: float

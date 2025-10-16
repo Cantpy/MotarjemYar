@@ -1,6 +1,5 @@
 # features/Invoice_Table/invoice_table_repo.py
 
-import getpass
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
@@ -343,18 +342,22 @@ class UserRepository:
 
         try:
             # Get active translators with their profiles
-            translators = session.query(UsersModel).join(UserProfileModel).filter(
-                UsersModel.role == 'translator',
-                UsersModel.active == True,
-                UserProfileModel.full_name.isnot(None)
-            ).all()
+            translators = (
+                session.query(UsersModel)
+                .join(UserProfileModel)
+                .filter(
+                    UsersModel.role == 'translator',
+                    UsersModel.active == True,
+                    UserProfileModel.full_name.isnot(None)
+                )
+                .all()
+            )
 
             for translator in translators:
-                if translator.profile and translator.profile.full_name:
-                    translator_names.append(translator.profile.full_name)
+                if translator.user_profile and translator.user_profile.full_name:
+                    translator_names.append(translator.user_profile.full_name)
         except SQLAlchemyError as e:
             print(f"Error loading translator names: {e}")
-            # Fallback names
             translator_names.extend(["مریم", "علی", "رضا"])
 
         return translator_names
@@ -368,7 +371,7 @@ class UserRepository:
                     'username': user.username,
                     'role': user.role,
                     'active': user.active,
-                    'full_name': user.profile.full_name if user.profile else None
+                    'full_name': user.user_profile.full_name if user.user_profile else None
                 }
             return None
         except SQLAlchemyError as e:

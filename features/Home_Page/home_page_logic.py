@@ -183,11 +183,22 @@ class HomePageLogic:
                     # Specific rule for this step
                     return False, "برای این مرحله تعیین مترجم الزامی است."
 
+                # --- MODIFICATION START ---
+                # Determine the payment status to set, if any.
+                # This is only relevant for the final "COLLECTED" step.
+                payment_status_to_set = None
+                if request.target_status == DeliveryStatus.COLLECTED:
+                    payment_status_to_set = 1 if request.set_payment_as_paid else 0
+
                 # === Update the record ===
-                success = self._repository.invoices_repo.update_status(session,
-                                                                       request.invoice_number,
-                                                                       request.target_status,
-                                                                       request.translator)
+                success = self._repository.invoices_repo.update_status(
+                    session,
+                    request.invoice_number,
+                    request.target_status,
+                    request.translator,
+                    payment_status_to_set  # Pass the new payment status
+                )
+                # --- MODIFICATION END ---
 
                 if success:
                     session.commit()

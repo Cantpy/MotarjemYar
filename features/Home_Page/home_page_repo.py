@@ -25,7 +25,7 @@ class HomePageInvoicesRepository:
         ).count()
 
     def get_by_delivery_date_range(
-        self, session: Session, start_date: date, end_date: date, exclude_completed: bool = False
+            self, session: Session, start_date: date, end_date: date, exclude_completed: bool = False
     ) -> List[IssuedInvoiceModel]:
         query = session.query(IssuedInvoiceModel).filter(
             IssuedInvoiceModel.delivery_date.between(start_date, end_date)
@@ -39,13 +39,25 @@ class HomePageInvoicesRepository:
             IssuedInvoiceModel.invoice_number == invoice_number
         ).first()
 
-    def update_status(self, session: Session, invoice_number: str, new_status: int, translator: Optional[str] = None) -> bool:
+    def update_status(self, session: Session, invoice_number: str, new_status: int, translator: Optional[str] = None,
+                      new_payment_status: Optional[int] = None) -> bool:
+        """
+        Updates the delivery status and optionally the payment status of an invoice.
+        """
         invoice = self.get_by_number(session, invoice_number)
         if not invoice:
             return False
+
         invoice.delivery_status = new_status
+
         if translator:
             invoice.translator = translator
+
+        # --- MODIFICATION START ---
+        if new_payment_status is not None:
+            invoice.payment_status = new_payment_status
+        # --- MODIFICATION END ---
+
         return True
 
     def get_document_statistics(self, session: Session) -> DocumentStatistics:
@@ -54,11 +66,11 @@ class HomePageInvoicesRepository:
 
         total_docs = session.query(func.sum(Item.quantity)).scalar() or 0
         in_office_docs = (
-            session.query(func.sum(Item.quantity))
-            .join(Invoice, Item.invoice_number == Invoice.invoice_number)
-            .filter(Invoice.delivery_status != 4)
-            .scalar()
-            or 0
+                session.query(func.sum(Item.quantity))
+                .join(Invoice, Item.invoice_number == Invoice.invoice_number)
+                .filter(Invoice.delivery_status != 4)
+                .scalar()
+                or 0
         )
         delivered_docs = total_docs - in_office_docs
 

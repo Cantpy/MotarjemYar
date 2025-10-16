@@ -1,13 +1,13 @@
 # features/Admin_Panel/admin_dashboard/admin_dashboard_view.py
 
 import qtawesome as qta
-from datetime import date
+from datetime import date, datetime
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QGroupBox,
                                QGridLayout, QListWidget, QListWidgetItem)
 from PySide6.QtCore import Signal, Qt
 
-from features.Admin_Panel.admin_dashboard.admin_dashboard_models import KpiData, AttentionQueueItem
+from features.Admin_Panel.admin_dashboard.admin_dashboard_models import KpiData, AttentionQueueItem, UnpaidCollectedItem
 from features.Admin_Panel.admin_dashboard.admin_dashboard_qss import ADMIN_DASHBOARD_STYLES
 
 from shared.utils.persian_tools import to_persian_jalali_string, to_persian_numbers
@@ -43,7 +43,7 @@ class AdminDashboardView(QWidget):
 
         # --- Main Column (Left) ---
         main_column = QVBoxLayout()
-        content_layout.addLayout(main_column, 7)  # 70% width
+        content_layout.addLayout(main_column, 7)
 
         # KPI Cards
         kpi_layout = QGridLayout()
@@ -93,77 +93,91 @@ class AdminDashboardView(QWidget):
         self.kpi_outstanding.findChild(QLabel, "statValue").setText(to_persian_numbers(data.outstanding))
         self.kpi_new_customers.findChild(QLabel, "statValue").setText(to_persian_numbers(data.new_customers))
 
-    def populate_attention_queue(self, orders: list[AttentionQueueItem]):
+    def populate_attention_queue(self, data: dict):
         """Builds the rich, multi-line list items for the attention queue."""
         self.attention_list.clear()
         today = date.today()
 
-        for order in orders:
-            # --- 1. Construct the main text line with companion info ---
-            main_text = order.customer_name
+        due_orders = data.get("due_orders", [])
+        unpaid_collected = data.get("unpaid_collected", [])
+
+        for order in due_orders:
+            main_text = f"فاکتور {to_persian_numbers(order.invoice_number)}: {order.customer_name}"
             if order.companion_count > 0:
                 main_text += f" و {to_persian_numbers(order.companion_count)} همراه"
 
-            # --- 2. Construct the secondary details line ---
             details = []
-            # Delivery Status
-            if order.delivery_date < today:
-                details.append("<font color='#d9534f'> (دیرکرد)</font>")
-            elif order.delivery_date == today:
-                details.append("<font color='#f0ad4e'> (موعد امروز)</font>")
-            else:  # Due tomorrow
-                details.append(f" (موعد: {to_persian_jalali_string(order.delivery_date)})")
+            delivery_date = order.delivery_date
+            if isinstance(delivery_date, datetime):
+                delivery_date = delivery_date.date()
 
-            # Payment Status
-            if order.payment_status == 0:  # Unpaid
-                remaining_amount = order.total_amount - (
-                            order.final_amount - order.total_amount)  # A bit of _logic to get remaining
-                details.append(
-                    f"<font color='#d9534f'> (پرداخت نشده - {to_persian_numbers(f'{remaining_amount:,.0f}')} تومان)</font>")
+            if delivery_date < today:
+                details.append("<font color='#d9534f'> (دیرکرد)</font>")
+            elif delivery_date == today:
+                details.append("<font color='#f0ad4e'> (موعد امروز)</font>")
+            else:
+                details.append(f" (موعد: {to_persian_jalali_string(delivery_date)})")
+
+            if order.payment_status == 0:
+                remaining_amount = order.final_amount - order.advance_payment
+                if remaining_amount > 0:
+                    details.append(
+                        f"<font color='#d9534f'> (پرداخت نشده - {to_persian_numbers(f'{remaining_amount:,.0f}')} تومان)</font>")
+                else:
+                    details.append("<font color='green'> (پرداخت شده)</font>")
             else:
                 details.append("<font color='green'> (پرداخت شده)</font>")
 
-            # --- 3. Combine into a single rich text string for the item ---
-            # We use a QListWidgetItem and a custom widget to hold two labels for better alignment.
-            item_widget = QWidget()
-            item_layout = QVBoxLayout(item_widget)
-            item_layout.setContentsMargins(5, 5, 5, 5)
-            item_layout.setSpacing(2)
+            self._add_attention_item(main_text, "".join(details), delivery_date < today)
 
-            main_label = QLabel(main_text)
-            # main_label.setFont(FontManager.get_font(size=11, bold=True))
+        for item in unpaid_collected:
+            main_text = (f"فاکتور {to_persian_numbers(item.invoice_number)}: "
+                         f"{item.customer_name} - {to_persian_numbers(item.phone_number)}")
+            details = f"<font color='#d9534f'>عدم تسویه مبلغ {to_persian_numbers(f'{item.amount_due:,.0f}')} تومان</font>"
+            if item.days_since_collection > 0:
+                details += f" <font color='#d9534f'> (عدم پرداخت در {to_persian_numbers(item.days_since_collection)} روز گذشته)</font>"
+            self._add_attention_item(main_text, details, True)
 
-            details_label = QLabel("".join(details))
-            # details_label.setFont(FontManager.get_font(size=9))
+    def _add_attention_item(self, main_text: str, details_text: str, is_urgent: bool):
+        item_widget = QWidget()
+        item_layout = QVBoxLayout(item_widget)
+        item_layout.setContentsMargins(5, 8, 5, 8)
+        item_layout.setSpacing(4)
 
-            item_layout.addWidget(main_label)
-            item_layout.addWidget(details_label)
-            item_widget.setLayout(item_layout)
+        main_label = QLabel(main_text)
+        details_label = QLabel(details_text)
+        details_label.setWordWrap(True)
 
-            list_item = QListWidgetItem(self.attention_list)
-            list_item.setSizeHint(item_widget.sizeHint())
-            self.attention_list.addItem(list_item)
-            self.attention_list.setItemWidget(list_item, item_widget)
+        # --- MODIFICATION: More explicit inline styling ---
+        details_label.setStyleSheet("font-size: 14px; color: #495057;") # Muted color for details
 
-            # Set the color of the main text based on urgency
-            if order.delivery_date < today:
-                main_label.setStyleSheet("color: #d9534f;")
-            elif order.delivery_date == today:
-                main_label.setStyleSheet("color: #f0ad4e;")
+        if is_urgent:
+            main_label.setStyleSheet("color: #d9534f; font-weight: bold; font-size: 16px;")
+        else:
+            # Explicitly set the non-urgent color to prevent issues
+            main_label.setStyleSheet("color: #212529; font-weight: bold; font-size: 16px;")
+
+        item_layout.addStretch()
+        item_layout.addWidget(main_label)
+        item_layout.addWidget(details_label)
+        item_layout.addStretch()
+
+        list_item = QListWidgetItem()
+        list_item.setSizeHint(item_widget.sizeHint())
+
+        self.attention_list.addItem(list_item)
+        self.attention_list.setItemWidget(list_item, item_widget)
 
     def populate_top_performers(self, performers_data: dict):
         self.top_translators_list.clear()
         self.top_clerks_list.clear()
 
-        # Populate translators list
         for i, translator in enumerate(performers_data.get("translators", []), 1):
             icon = qta.icon('fa5s.trophy', color=['#FFD700', '#C0C0C0', '#CD7F32'][i - 1] if i <= 3 else '#808080')
-            # --- FIX: Update text to show document count ---
             item_text = f"{translator.name} - {to_persian_numbers(int(translator.value))} سند"
             list_item = QListWidgetItem(icon, item_text)
             self.top_translators_list.addItem(list_item)
 
-        # Populate clerks list
         for i, clerk in enumerate(performers_data.get("clerks", []), 1):
             icon = qta.icon('fa5s.medal', color=['#0078D7', '#17a2b8', '#5bc0de'][i - 1] if i <= 3 else '#808080')
             item_text = f"{clerk.name} - {to_persian_numbers(int(clerk.value))} فاکتور"

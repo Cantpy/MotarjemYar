@@ -1,4 +1,4 @@
-# features/Home_Page/home_page_settings_view.py
+# features/Home_Page/home_page_controller.py
 
 from PySide6.QtCore import QObject, Slot, QPoint
 from PySide6.QtWidgets import QWidget, QMenu
@@ -192,8 +192,37 @@ class HomePageController(QObject):
         Handles the actual status change after the user confirms in the dialog.
         This is the single point of action.
         """
+        # --- MODIFICATION START ---
+        # If the target status is the final 'COLLECTED' step, ask for payment confirmation.
+        if request.target_status == DeliveryStatus.COLLECTED:
+            show_question_message_box(
+                parent=self._view,
+                title="تایید پرداخت",
+                message="آیا مشتری هزینه فاکتور را به طور کامل پرداخت کرده است؟",
+                button_1="بله، پرداخت شده",
+                yes_func=lambda: self._execute_status_change(request, paid=True),
+                button_2="انصراف",
+                button_3="خیر، ولی تحویل داده شد",
+                action_func=lambda: self._execute_status_change(request, paid=False)
+            )
+        else:
+            # For all other status changes, payment status is not relevant.
+            self._execute_status_change(request, paid=False)
+        # --- MODIFICATION END ---
+
+    def _execute_status_change(self, request: StatusChangeRequest, paid: bool):
+        """
+        Private helper to perform the status change after all user choices are made.
+
+        Args:
+            request: The original StatusChangeRequest DTO from the dialog.
+            paid: A boolean indicating if the invoice was paid, only relevant for the final step.
+        """
         try:
-            # REFACTORED: A single call to the _logic layer's unit of work.
+            # Set the flag on the request DTO based on the user's input
+            request.set_payment_as_paid = paid
+
+            # A single call to the _logic layer's unit of work.
             success, message = self._logic.change_invoice_status(request)
 
             if success:
