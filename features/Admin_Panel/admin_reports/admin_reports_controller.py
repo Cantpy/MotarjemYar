@@ -24,8 +24,6 @@ class FinancialReportsController:
         self._view.previous_year_requested.connect(self._previous_year)
         self._view.export_requested.connect(self._handle_export)
 
-        self.load_report_data()
-
     def load_report_data(self):
         try:
             data = self._logic.get_full_report_data(self._current_year)
@@ -218,3 +216,7 @@ class AdminReportsController:
     def get_view(self) -> AdminReportsView:
         """Returns the main container _view for the entire Reports tab."""
         return self._view
+
+    def load_data(self):
+        """"""
+        self.financial_controller.load_report_data()

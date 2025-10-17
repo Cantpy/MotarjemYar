@@ -27,14 +27,15 @@ class AdminReportsLogic:
               self._services_session() as srv_sess,
               self._expenses_session() as exp_sess):
             rev_by_month_g = self._repo.get_revenue_by_month(inv_sess, year)
+            print(f'logic  - revenue by month: {rev_by_month_g}')
             manual_exp_by_month_g = self._repo.get_manual_expenses_by_month(exp_sess, year)
+            print(f'logic - manual expense by month gregorian: {manual_exp_by_month_g}')
             invoice_exp_by_month_g = self._repo.get_invoice_based_expenses_by_month(inv_sess, srv_sess, year)
+            print(f'invoice expenses by month gregorian: {invoice_exp_by_month_g}')
 
         # Process and combine data for all 12 months
         revenues, expenses, profits = [], [], []
         for month_g in range(1, 13):
-            j_month = jdatetime.date.fromgregorian(month=month_g, day=1, year=2024).month  # Get Jalali month
-
             # Revenue
             revenue = rev_by_month_g.get(month_g, 0.0)
             revenues.append(revenue)
@@ -91,6 +92,10 @@ class AdminReportsLogic:
         # --- Sheet 1: درآمد (Revenue) ---
         revenue_data = []
         for inv in invoices:
+
+            total_jud_seals = sum(item.has_judiciary_seal for item in inv.items)
+            total_fa_seals = sum(item.has_foreign_affairs_seal for item in inv.items)
+
             revenue_data.append({
                 "شماره فاکتور": inv.invoice_number,
                 "تاریخ صدور": jdatetime.date.fromgregorian(date=inv.issue_date).strftime('%Y/%m/%d'),
@@ -101,8 +106,8 @@ class AdminReportsLogic:
                 "مبلغ کل": inv.total_amount,
                 "مبلغ نهایی": inv.final_amount,
                 "وضعیت پرداخت": "پرداخت شده" if inv.payment_status == 1 else "پرداخت نشده",
-                "مهر دادگستری": inv.total_judiciary_count,
-                "مهر خارجه": inv.total_foreign_affairs_count,
+                "مهر دادگستری": total_jud_seals,
+                "مهر خارجه": total_fa_seals,
             })
         df_revenue = pd.DataFrame(revenue_data)
 

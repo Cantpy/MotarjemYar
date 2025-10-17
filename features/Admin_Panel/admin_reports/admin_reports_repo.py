@@ -1,13 +1,13 @@
-# motarjemyar/admin_reports/admin_reports_repo.py
+# features/Admin_Panel/admin_reports/admin_reports_repo.py
 
-from sqlalchemy import func, extract
+from sqlalchemy import func, extract, case
 from sqlalchemy.orm import Session
 from datetime import date, timedelta
 import jdatetime
 from shared.orm_models.invoices_models import IssuedInvoiceModel, InvoiceItemModel
 from shared.orm_models.services_models import FixedPricesModel
 from shared.orm_models.expenses_models import ExpenseModel
-from shared.orm_models.customer_models import CustomerModel, CompanionModel
+from shared.orm_models.customer_models import CompanionModel
 from shared.orm_models.services_models import ServicesModel
 
 
@@ -34,17 +34,31 @@ class AdminReportsRepository:
     # --- METHODS FOR YEAR-SPECIFIC DATA ---
 
     def get_revenue_by_month(self, session: Session, year: int) -> dict:
-        """Fetches aggregated paid revenue for each month of a specific Jalali year."""
+        """
+        Fetches aggregated revenue for each month of a specific Jalali year.
+        - For fully paid invoices (status=1), it sums the `final_amount`.
+        - For unpaid invoices (status=0), it sums the `advance_payment`.
+        """
         start_date, end_date = self._get_gregorian_date_range_for_jalali_year(year)
 
-        # The query _logic is already correct
+        # --- MODIFIED: Use a CASE statement for conditional summing ---
+        total_revenue_expression = func.sum(
+            case(
+                (IssuedInvoiceModel.payment_status == 1, IssuedInvoiceModel.final_amount),
+                (IssuedInvoiceModel.payment_status == 0, IssuedInvoiceModel.advance_payment),
+                else_=0
+            )
+        ).label('total_revenue')
+
         revenue_data = session.query(
             extract('month', IssuedInvoiceModel.issue_date).label('gregorian_month'),
-            func.sum(IssuedInvoiceModel.final_amount).label('total_revenue')
+            total_revenue_expression
         ).filter(
-            IssuedInvoiceModel.payment_status == 1,
+            # The filter no longer needs to check payment_status, as the CASE handles it.
             IssuedInvoiceModel.issue_date.between(start_date, end_date)
-        ).group_by(extract('month', IssuedInvoiceModel.issue_date)).all()
+        ).group_by(
+            extract('month', IssuedInvoiceModel.issue_date)
+        ).all()
 
         # Return a dictionary mapping the Gregorian month number to the total revenue
         return {row.gregorian_month: row.total_revenue for row in revenue_data}
@@ -62,6 +76,8 @@ class AdminReportsRepository:
     def get_manual_expenses_by_month(self, session: Session, year: int) -> dict:
         """Fetches expenses like rent and salaries from the Expenses.db."""
         start_date, end_date = self._get_gregorian_date_range_for_jalali_year(year)
+
+        print(f'start date and end date for manual monthly expenses: {start_date}, {end_date}')
         results = session.query(
             extract('month', ExpenseModel.expense_date).label('month'),
             func.sum(ExpenseModel.amount).label('total')
@@ -73,11 +89,13 @@ class AdminReportsRepository:
         """Calculates expenses related to seals."""
         start_date, end_date = self._get_gregorian_date_range_for_jalali_year(year)
 
+        print(f'start date and end date for invoice based expenses" {start_date}, {end_date}')
+
         # 1. Get seal prices from services.db
         jud_seal_price = services_session.query(FixedPricesModel.price).filter_by(
-            label_name='judiciary_seal').scalar() or 0
+            name='judiciary_seal').scalar() or 0
         fa_seal_price = services_session.query(FixedPricesModel.price).filter_by(
-            label_name='foreign_affairs_seal').scalar() or 0
+            name='foreign_affairs_seal').scalar() or 0
 
         # 2. Get monthly counts of seals from invoices.db
         results = (

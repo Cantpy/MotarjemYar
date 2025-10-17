@@ -49,6 +49,8 @@ class AdminReportsFactory:
         # 2. Instantiate the Controller, which connects everything
         controller = AdminReportsController(view, logic)
 
+        controller.load_data()
+
         return controller
 
 

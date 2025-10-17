@@ -66,7 +66,7 @@ class AdminDashboardRepository:
         Calculates total outstanding amount from unpaid invoices.
         This is the sum of (final_amount - advance_payment) for all unpaid invoices.
         """
-        total = session.query(func.sum(IssuedInvoiceModel.final_amount - IssuedInvoiceModel.advance_payment)).filter(
+        total = session.query(func.sum(IssuedInvoiceModel.final_amount)).filter(
             IssuedInvoiceModel.payment_status == 0
         ).scalar()
         return total or 0.0
