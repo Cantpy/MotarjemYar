@@ -150,15 +150,37 @@ class AdminReportsLogic:
 
     # --- METHODS FOR ADVANCED SEARCH ---
 
-    def find_unpaid_invoices(self, start_date: date, end_date: date) -> list:
+    def find_unpaid_invoices(self, start_date: date, end_date: date) -> list[list]:
+        """
+        Fetches unpaid invoices and returns the data as a list of lists,
+        ready for the controller.
+        """
         with self._invoices_session() as session:
-            return self._repo.find_unpaid_invoices_in_range(session, start_date, end_date)
+            invoices = self._repo.find_unpaid_invoices_in_range(session, start_date, end_date)
+            # Process the data while the session is still open
+            results = [
+                [inv.invoice_number, inv.name, inv.issue_date, inv.final_amount, inv.phone]
+                for inv in invoices
+            ]
+            return results
 
-    def find_invoices_by_document_names(self, doc_names: list[str]) -> list:
+    def find_invoices_by_document_names(self, doc_names: list[str]) -> list[list]:
+        """
+        Fetches invoices by document names and returns the data as a list of lists.
+        """
         with self._invoices_session() as session:
-            return self._repo.find_invoices_by_document_names(session, doc_names)
+            invoices = self._repo.find_invoices_by_document_names(session, doc_names)
+            # Process the data while the session is still open
+            results = [
+                [inv.invoice_number, inv.name, inv.national_id, inv.issue_date, inv.total_amount]
+                for inv in invoices
+            ]
+            return results
 
     def find_frequent_customers(self, min_visits: int, start_date: date = None, end_date: date = None) -> list:
+        """
+        Fetches customers who have visited more than min_visits times within the optional date range.
+        """
         with self._invoices_session() as session:
             return self._repo.find_frequent_customers(session, min_visits, start_date, end_date)
 

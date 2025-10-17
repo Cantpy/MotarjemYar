@@ -12,7 +12,7 @@ QGroupBox {
 
 QGroupBox::title {
     subcontrol-origin: margin;
-    subcontrol-position: top right;
+    subcontrol-position: top center;
     padding: 0 10px;
     background-color: #F0F2F5; /* Match the window background */
     color: #0078D7;

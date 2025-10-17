@@ -12,16 +12,15 @@ from shared.orm_models.services_models import ServicesModel
 
 
 class AdminReportsRepository:
-
+    """
+    Stateless repository for fetching and aggregating data for admin financial reports.
+    """
     def _get_gregorian_date_range_for_jalali_year(self, year: int) -> tuple[date, date]:
         """Converts a Jalali year into Gregorian start and end dates."""
 
         # The start of the year is always Farvardin 1st
         start_of_year_j = jdatetime.date(year, 1, 1)
 
-        # Go to the start of the NEXT year and subtract one day
-        # This is the most reliable way to find the last day of the current year,
-        # as it automatically accounts for leap years.
         start_of_next_year_j = jdatetime.date(year + 1, 1, 1)
         end_of_year_j = start_of_next_year_j - timedelta(days=1)
 
@@ -77,7 +76,6 @@ class AdminReportsRepository:
         """Fetches expenses like rent and salaries from the Expenses.db."""
         start_date, end_date = self._get_gregorian_date_range_for_jalali_year(year)
 
-        print(f'start date and end date for manual monthly expenses: {start_date}, {end_date}')
         results = session.query(
             extract('month', ExpenseModel.expense_date).label('month'),
             func.sum(ExpenseModel.amount).label('total')
@@ -88,8 +86,6 @@ class AdminReportsRepository:
                                             year: int) -> dict:
         """Calculates expenses related to seals."""
         start_date, end_date = self._get_gregorian_date_range_for_jalali_year(year)
-
-        print(f'start date and end date for invoice based expenses" {start_date}, {end_date}')
 
         # 1. Get seal prices from services.db
         jud_seal_price = services_session.query(FixedPricesModel.price).filter_by(
@@ -168,7 +164,7 @@ class AdminReportsRepository:
         """
         # The .any() clause is a clean way to check for existence in a one-to-many relationship
         return session.query(IssuedInvoiceModel).filter(
-            IssuedInvoiceModel.invoice_items.any(InvoiceItemModel.item_name.in_(doc_names))
+            IssuedInvoiceModel.items.any(InvoiceItemModel.service_name.in_(doc_names))
         ).distinct().all()
 
     def find_frequent_customers(self, session: Session, min_visits: int, start_date: date = None,
@@ -198,68 +194,3 @@ class AdminReportsRepository:
     def get_all_service_names(self, session: Session) -> list:
         """Fetches all unique service names from the services table."""
         return session.query(ServicesModel.name).distinct().all()
-
-
-    # --- Stat Cards Methods ---
-
-    # def get_outstanding_amount_for_year(self, session: Session, year: int) -> float:
-    #     start_date, end_date = self._get_gregorian_date_range_for_jalali_year(year)
-    #     total = session.query(
-    #         func.sum(IssuedInvoiceModel.total_amount)
-    #     ).filter(
-    #         IssuedInvoiceModel.payment_status == 0,
-    #         IssuedInvoiceModel.issue_date.between(start_date, end_date)
-    #     ).scalar()
-    #     return total or 0.0
-    #
-    # def get_pending_delivery_count_for_year(self, session: Session, year: int) -> int:
-    #     start_date, end_date = self._get_gregorian_date_range_for_jalali_year(year)
-    #     count = session.query(
-    #         func.count(IssuedInvoiceModel.id)
-    #     ).filter(
-    #         IssuedInvoiceModel.delivery_status != 4,  # 4 is assumed to be 'Delivered'
-    #         IssuedInvoiceModel.issue_date.between(start_date, end_date)
-    #     ).scalar()
-    #     return count or 0
-    #
-    # def get_new_customers_for_year(self, session: Session, year: int) -> int:
-    #     """Finds customers whose first-ever invoice was in the specified year."""
-    #     start_date, end_date = self._get_gregorian_date_range_for_jalali_year(year)
-    #
-    #     # Customers who had an invoice in the target year
-    #     customers_in_year_q = session.query(IssuedInvoiceModel.national_id.distinct()).filter(
-    #         IssuedInvoiceModel.issue_date.between(start_date, end_date)
-    #     )
-    #     customers_in_year = {row[0] for row in customers_in_year_q}
-    #
-    #     # Customers who had an invoice BEFORE the target year
-    #     past_customers_q = session.query(IssuedInvoiceModel.national_id.distinct()).filter(
-    #         IssuedInvoiceModel.issue_date < start_date
-    #     )
-    #     past_customers = {row[0] for row in past_customers_q}
-    #
-    #     # New customers are those in this year's set but not in the past set
-    #     new_customer_count = len(customers_in_year - past_customers)
-    #     return new_customer_count
-    #
-    # def get_revenue_for_year(self, session: Session, year: int) -> list[RevenueDataPoint]:
-    #     """
-    #     Fetches aggregated paid revenue for each month of a specific Jalali year.
-    #     """
-    #     start_date_g, end_date_g = self._get_gregorian_date_range_for_jalali_year(year)
-    #
-    #     revenue_data = session.query(
-    #         extract('month', IssuedInvoiceModel.issue_date).label('gregorian_month'),
-    #         extract('year', IssuedInvoiceModel.issue_date).label('gregorian_year'),
-    #         func.sum(IssuedInvoiceModel.final_amount).label('total_revenue')
-    #     ).filter(
-    #         IssuedInvoiceModel.payment_status == 1,
-    #         IssuedInvoiceModel.issue_date.between(start_date_g, end_date_g)
-    #     ).group_by('gregorian_year', 'gregorian_month').all()
-    #
-    #     return [
-    #         RevenueDataPoint(
-    #             month_start_date=date(row.gregorian_year, row.gregorian_month, 1),
-    #             total_revenue=row.total_revenue
-    #         ) for row in revenue_data
-    #     ]

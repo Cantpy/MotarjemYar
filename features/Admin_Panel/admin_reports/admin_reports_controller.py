@@ -81,14 +81,12 @@ class AdvancedSearchController:
     def __init__(self, view, logic):
         self._view = view
         self._logic = logic
-        self._view.search_requested.connect(self.perform_search)
         self._parser = DescriptiveSearchParser()
 
         self._current_results = []
         self._current_headers = []
 
         self._connect_signals()
-        # Fetch completer data and set it up in the _view ---
         self._setup_completer()
 
     def _connect_signals(self):
@@ -125,11 +123,13 @@ class AdvancedSearchController:
 
         try:
             if search_type == 'unpaid':
+                # 'data' is now already a list of lists: [[inv_num, name, date, amount, phone], ...]
                 data = self._logic.find_unpaid_invoices(criteria['start_date'], criteria['end_date'])
                 headers = ["شماره فاکتور", "نام مشتری", "تاریخ صدور", "مبلغ پرداخت نشده", "تلفن"]
+                # Just apply formatting to the existing list
                 results = [
-                    [inv.invoice_number, inv.name, inv.issue_date, f"{inv.total_amount:,.0f}", inv.phone]
-                    for inv in data
+                    [row[0], row[1], row[2], f"{row[3]:,.0f}", row[4]]
+                    for row in data
                 ]
 
             elif search_type == 'docs':
@@ -142,17 +142,17 @@ class AdvancedSearchController:
                 data = self._logic.find_invoices_by_document_names(doc_names)
                 headers = ["شماره فاکتور", "نام مشتری", "کد ملی", "تاریخ صدور", "مبلغ کل"]
                 results = [
-                    [inv.invoice_number, inv.name, inv.national_id, inv.issue_date, f"{inv.total_amount:,.0f}"]
-                    for inv in data
+                    [row[0], row[1], row[2], row[3], f"{row[4]:,.0f}"]
+                    for row in data
                 ]
 
             elif search_type == 'frequent':
+                # This part was already correct and needs no changes
                 min_visits = criteria.get('min_visits')
                 start_date = criteria.get('start_date')
                 end_date = criteria.get('end_date')
                 data = self._logic.find_frequent_customers(min_visits, start_date, end_date)
                 headers = ["نام مشتری", "کد ملی", "تعداد مراجعه"]
-                # Data is already in the correct tuple format
                 results = [[row.name, row.national_id, row.visit_count] for row in data]
 
             self._current_results = results

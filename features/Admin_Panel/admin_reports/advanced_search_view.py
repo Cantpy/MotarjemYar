@@ -1,9 +1,9 @@
-# motarjemyar/admin_reports/advanced_search_view.py
+# features/Admin_Panel/admin_reports/advanced_search_view.py
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QTableWidgetItem,
-                               QFrame, QGridLayout, QDateEdit, QLineEdit, QSpinBox,
-                               QTableWidget, QHeaderView, QRadioButton, QGroupBox, QCompleter)
-from PySide6.QtCore import Qt, Signal, QDate
+                               QGridLayout, QLineEdit, QSpinBox, QTableWidget, QHeaderView, QRadioButton,
+                               QGroupBox, QCompleter)
+from PySide6.QtCore import Qt, Signal
 import qtawesome as qta
 from shared.fonts.font_manager import FontManager
 from shared import show_warning_message_box
@@ -20,7 +20,7 @@ class AdvancedSearchView(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setObjectName("AdvancedSearchView")  # For QSS styling
+        self.setObjectName("AdvancedSearchView")
         self.setFont(FontManager.get_font(size=11))
 
         main_layout = QVBoxLayout(self)
@@ -30,8 +30,9 @@ class AdvancedSearchView(QWidget):
         # --- Descriptive Search Box ---
         desc_groupbox = QGroupBox("جستجوی توصیفی (هوشمند)")
         desc_layout = QHBoxLayout(desc_groupbox)
-        self.desc_search_edit = QLineEdit(
-            placeholderText="درخواست خود را به فارسی تایپ کنید... مثال: مشتریان بدهکار امسال")
+        self.desc_search_edit = QLineEdit()
+        self.desc_search_edit.setPlaceholderText("درخواست خود را به فارسی تایپ کنید... مثال: مشتریان بدهکار امسال /"
+                                                 " مشتریان با سند شناسنامه / مشتریان با بیش از 5 مراجعه")
         self.desc_search_btn = QPushButton(icon=qta.icon('fa5s.search'))
         desc_layout.addWidget(self.desc_search_edit)
         desc_layout.addWidget(self.desc_search_btn)
@@ -66,13 +67,16 @@ class AdvancedSearchView(QWidget):
 
         self.docs_inputs = QWidget()
         docs_layout = QGridLayout(self.docs_inputs)
-        self.doc_names_edit = QLineEdit(placeholderText="شروع به تایپ کنید (مثال: شناسنامه, کارت ملی)")
+        self.doc_names_edit = QLineEdit()
+        self.doc_names_edit.setPlaceholderText("شروع به تایپ کنید (مثال: شناسنامه, کارت ملی)")
         docs_layout.addWidget(QLabel("نام اسناد (با کاما جدا کنید):"), 0, 0)
         docs_layout.addWidget(self.doc_names_edit, 0, 1)
 
         self.frequent_inputs = QWidget()
         frequent_layout = QGridLayout(self.frequent_inputs)
-        self.min_visits_spinbox = QSpinBox(minimum=2, value=3)
+        self.min_visits_spinbox = QSpinBox()
+        self.min_visits_spinbox.setMinimum(2)
+        self.min_visits_spinbox.setValue(3)
         self.min_visits_spinbox.setFixedWidth(80)
         frequent_layout.addWidget(QLabel("حداقل تعداد مراجعه:"), 0, 0)
         frequent_layout.addWidget(self.min_visits_spinbox, 0, 1)
@@ -82,18 +86,21 @@ class AdvancedSearchView(QWidget):
         structured_layout.addWidget(self.docs_inputs)
         structured_layout.addWidget(self.frequent_inputs)
 
-        self.search_btn = QPushButton(" جستجو", icon=qta.icon('fa5s.search', color='white'))
+        self.search_btn = QPushButton(" جستجو")
+        self.search_btn.setIcon(qta.icon('fa5s.search', color='white'))
         self.search_btn.setStyleSheet("""
             QPushButton { background-color: #0078D7; color: white; padding: 8px 20px; border-radius: 5px; }
             QPushButton:hover { background-color: #005A9E; }
         """)
-        structured_layout.addWidget(self.search_btn, alignment=Qt.AlignLeft)
+        structured_layout.addWidget(self.search_btn, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # --- Action Buttons with QSS Object Names ---
         action_layout = QHBoxLayout()
-        self.clear_btn = QPushButton(" پاک کردن فرم", icon=qta.icon('fa5s.eraser', color='white'))
+        self.clear_btn = QPushButton(" پاک کردن فرم")
+        self.clear_btn.setIcon(qta.icon('fa5s.eraser', color='white'))
         self.clear_btn.setObjectName("clearButton")
-        self.export_btn = QPushButton(" خروجی اکسل", icon=qta.icon('fa5s.file-excel', color='white'))
+        self.export_btn = QPushButton(" خروجی اکسل")
+        self.export_btn.setIcon(qta.icon('fa5s.file-excel', color='white'))
         self.export_btn.setObjectName("exportButton")
         self.export_btn.setEnabled(False)
         action_layout.addWidget(self.clear_btn)
@@ -116,6 +123,8 @@ class AdvancedSearchView(QWidget):
         self.export_btn.clicked.connect(self.export_table_requested)
         self._update_input_visibility()  # Set initial UI state
 
+        self.setStyleSheet(ADVANCED_SEARCH_QSS)
+
     def _update_input_visibility(self):
         """Hides and shows input fields based on the selected search type."""
         self.unpaid_inputs.setVisible(self.rb_unpaid.isChecked())
@@ -125,8 +134,8 @@ class AdvancedSearchView(QWidget):
     def set_document_completer(self, service_names: list[str]):
         """Sets up the auto-completer for the document names line edit."""
         completer = QCompleter(service_names)
-        completer.setCaseSensitivity(Qt.CaseInsensitive)
-        completer.setFilterMode(Qt.MatchContains)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchFlag.MatchContains)
         self.doc_names_edit.setCompleter(completer)
 
     def _update_input_states(self):
@@ -142,11 +151,8 @@ class AdvancedSearchView(QWidget):
         if self.rb_unpaid.isChecked():
             criteria['type'] = 'unpaid'
 
-            # --- FIX: Use the get_selected_data() method from your new widget ---
-            # I'm assuming your new DataDatePicker has a method like this to get the date.
-            # If the method is named differently (e.g., .getDate()), please adjust.
-            start_date_obj = self.start_date_edit.get_selected_data()
-            end_date_obj = self.end_date_edit.get_selected_data()
+            start_date_obj = self.start_date_edit.get_date()
+            end_date_obj = self.end_date_edit.get_date()
 
             # Add validation
             if start_date_obj and end_date_obj:
@@ -215,5 +221,5 @@ class AdvancedSearchView(QWidget):
 
                 self.results_table.setItem(row_idx, col_idx, QTableWidgetItem(display_text))
 
-        self.results_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.results_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.export_btn.setEnabled(len(data) > 0)
