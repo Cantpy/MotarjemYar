@@ -195,7 +195,7 @@ class StatusChangeDialog(QDialog):
             {"status": DeliveryStatus.ASSIGNED, "title": "در حال ترجمه",
              "desc": "انتخاب و تخصیص مترجم برای این فاکتور"},
             {"status": DeliveryStatus.TRANSLATED, "title": "در انتظار تاییدات",
-             "desc": "ترجمه انجام شد، در انتظار تاییدات (دادگستری، امور خارجه، و یا مترجم)"},
+             "desc": "ترجمه انجام شد، در انتظار تاییدات (دادگستری، امور خارجه، و یا مترجم مسئول)"},
             {"status": DeliveryStatus.READY, "title": "آماده برای تحویل",
              "desc": "تمامی مدارک ترجمه و تایید شده، در انتظار دریافت فاکتور توسط مشتری"},
             {"status": DeliveryStatus.COLLECTED, "title": "تحویل داده شد",

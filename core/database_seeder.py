@@ -1,161 +1,346 @@
-# core/database_seeder.py
+"""
+Centralized and production-ready database seeder for all engines.
+Handles users, services, payroll, and configuration constants.
+"""
+
+from __future__ import annotations
 
 import bcrypt
+from decimal import Decimal
+from typing import Dict
 from sqlalchemy import Engine
-from sqlalchemy.orm import sessionmaker
-from shared.orm_models.users_models import UsersModel, UserProfileModel
-from shared.orm_models.services_models import FixedPricesModel, ServicesModel
+from sqlalchemy.orm import sessionmaker, Session
 
+from shared.orm_models.users_models import UsersModel
+from shared.orm_models.services_models import FixedPricesModel, ServicesModel
+from shared.orm_models.payroll_models import SystemConstantModel, SalaryComponentModel, TaxBracketModel
+from shared import get_resource_path
+from shared.session_provider import ManagedSessionProvider
+
+# Application-specific imports
 from features.Services.tab_manager.tab_manager_logic import ExcelImportLogic
 from features.Services.documents.documents_logic import ServicesLogic
 from features.Services.documents.documents_repo import ServiceRepository
 from features.Services.other_services.other_services_logic import OtherServicesLogic
 from features.Services.other_services.other_services_repo import OtherServicesRepository
 
-from shared import get_resource_path
-from shared.session_provider import ManagedSessionProvider
-
 
 class DatabaseSeeder:
-    """
-    Responsible for populating the databases with initial or default data.
-    """
-    def __init__(self, engines: dict[str, Engine]):
+    """Orchestrates seeding of all application databases."""
+
+    def __init__(self, engines: Dict[str, Engine]):
         self.engines = engines
 
-    def seed_initial_data(self, is_demo_mode: bool = False):
-        print("Seeding initial application data...")
+    # ------------------------------------------------------------------
+    # PUBLIC INTERFACE
+    # ------------------------------------------------------------------
+
+    def seed_initial_data(self, is_demo_mode: bool = False) -> None:
+        """Seeds all initial data across subsystems."""
+        print("🚀 Starting initial database seeding...")
+
         if is_demo_mode:
             self._seed_default_user()
+
         self._seed_fixed_prices()
         self._seed_services_from_excel()
-        print("Data seeding complete.")
+        self._seed_payroll_system_constants()
+        self._seed_salary_components()
+        self._seed_tax_brackets()
 
-    def _seed_services_from_excel(self):
-        """
-        Seeds the services database from a predefined Excel file.
-        This process is idempotent and will not run if data already exists.
-        """
-        print("Checking if services seeding is required...")
-        services_engine = self.engines.get('services')
-        if not services_engine:
-            print("Warning: 'services' engine not found. Skipping Excel seeding.")
+        print("✅ Data seeding complete.")
+
+    # ------------------------------------------------------------------
+    # PRIVATE HELPERS
+    # ------------------------------------------------------------------
+
+    def _get_session(self, engine_name: str) -> Session | None:
+        """Get a new SQLAlchemy session for the given engine name."""
+        engine = self.engines.get(engine_name)
+        if not engine:
+            print(f"⚠️ Engine '{engine_name}' not found. Skipping.")
+            return None
+        return sessionmaker(bind=engine)()
+
+    def _safe_commit(self, session: Session) -> None:
+        try:
+            session.commit()
+        except Exception as e:
+            print(f"❌ Commit failed: {e}")
+            session.rollback()
+
+    # ------------------------------------------------------------------
+    # USER SEEDING
+    # ------------------------------------------------------------------
+
+    def _seed_default_user(self) -> None:
+        """Create a default demo user if none exists."""
+        print("🧪 Seeding default demo user (testuser)...")
+
+        session = self._get_session("users")
+        if not session:
             return
 
-        managed_services_engine = ManagedSessionProvider(services_engine)
-        Session = sessionmaker(bind=services_engine)
-        session = Session()
-
         try:
-            # 1. Idempotency Check: Don't seed if data already exists
-            service_count = session.query(ServicesModel).count()
-            if service_count > 0:
-                print("Services table already populated. Skipping seeding from Excel.")
+            if session.query(UsersModel).filter_by(username="testuser").first():
+                print("⚙️ Default user already exists.")
                 return
 
-            # 2. Locate the Excel file
-            # This path assumes the 'core' directory is one level down from the project root
-            excel_path = get_resource_path("assets", "services_datasheet.xlsx")
-            if not excel_path.exists():
-                print(f"Warning: Initial services file not found at '{excel_path}'. Skipping.")
-                return
+            password = "password123"
+            hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
 
-            print(f"Seeding services from '{excel_path}'...")
+            user = UsersModel(
+                employee_id="EMP-DEMO-0001",
+                username="testuser",
+                password_hash=hashed,
+                role="translator",
+                active=1,
+                display_name="کاربر آزمایشی",
+                avatar_path=None,
+            )
 
-            # 3. Instantiate the dependency chain
-            services_repo = ServiceRepository()
-            other_services_repo = OtherServicesRepository()
-
-            # Your logic classes need a session factory, so we pass the Session class
-            services_logic = ServicesLogic(repo=services_repo, services_engine=managed_services_engine)
-            other_services_logic = OtherServicesLogic(repository=other_services_repo,
-                                                      services_engine=managed_services_engine)
-
-            importer = ExcelImportLogic(services_logic, other_services_logic)
-
-            # 4. Run the import
-            results = importer.import_from_excel_file(str(excel_path))
-
-            # 5. Log the results
-            for sheet, result in results.items():
-                if result.failed_count > 0:
-                    print(f"  - WARNING on sheet '{sheet}': {result.failed_count} rows failed to import.")
-                    for error in result.errors:
-                        print(f"    - ERROR: {error}")
-                else:
-                    print(f"  - Sheet '{sheet}': {result.success_count} services successfully seeded.")
-
-        except Exception as e:
-            print(f"FATAL: An error occurred during service seeding from Excel: {e}")
+            session.add(user)
+            self._safe_commit(session)
+            print("✅ Default demo user created.")
         finally:
             session.close()
 
-    def _seed_fixed_prices(self):
-        """Seeds fixed prices into the appropriate database."""
-        services_engine = self.engines.get('services')
-        if not services_engine:
-            print("Warning: 'services' engine not found. Skipping fixed prices seeding.")
+    # ------------------------------------------------------------------
+    # SERVICES SEEDING
+    # ------------------------------------------------------------------
+
+    def _seed_services_from_excel(self) -> None:
+        """Seed the services DB from an Excel file if empty."""
+        print("📦 Checking Services.db for seeding requirements...")
+
+        session = self._get_session("services")
+        if not session:
             return
 
-        Session = sessionmaker(bind=services_engine)
-        session = Session()
+        try:
+            if session.query(ServicesModel).count() > 0:
+                print("⚙️ Services already populated. Skipping Excel import.")
+                return
 
-        fixed_prices = [
-            {"name": "کپی برابر اصل", "price": 5000},
-            {"name": "ثبت در سامانه", "price": 30000},
-            {"name": "مهر دادگستری", "price": 150000},
-            {"name": "مهر امور خارجه", "price": 15000},
-            {"name": "نسخه اضافی", "price": 12000},
+            excel_path = get_resource_path("assets", "services_datasheet.xlsx")
+            if not excel_path.exists():
+                print(f"⚠️ Excel file not found at {excel_path}")
+                return
+
+            managed_engine = ManagedSessionProvider(self.engines["services"])
+            services_logic = ServicesLogic(ServiceRepository(), managed_engine)
+            other_services_logic = OtherServicesLogic(OtherServicesRepository(), managed_engine)
+            importer = ExcelImportLogic(services_logic, other_services_logic)
+
+            print(f"📊 Importing services from: {excel_path}")
+            results = importer.import_from_excel_file(str(excel_path))
+
+            for sheet, result in results.items():
+                status = "✅" if result.failed_count == 0 else "⚠️"
+                print(f"{status} {sheet}: {result.success_count} rows, {result.failed_count} failed.")
+
+        except Exception as e:
+            print(f"❌ Error during Excel import: {e}")
+        finally:
+            session.close()
+
+    def _seed_fixed_prices(self) -> None:
+        """Seed fixed service prices."""
+        print("💰 Seeding fixed prices...")
+
+        session = self._get_session("services")
+        if not session:
+            return
+
+        prices = [
+            ("کپی برابر اصل", 5000),
+            ("ثبت در سامانه", 30000),
+            ("مهر دادگستری", 150000),
+            ("مهر امور خارجه", 15000),
+            ("نسخه اضافی", 12000),
         ]
 
         try:
-            existing_names = {fp.name for fp in session.query(FixedPricesModel.name).all()}
+            existing = {fp.name for fp in session.query(FixedPricesModel.name).all()}
             added = 0
-
-            for fp in fixed_prices:
-                if fp["name"] not in existing_names:
-                    new_price = FixedPricesModel(name=fp["name"], price=fp["price"])
-                    session.add(new_price)
+            for name, price in prices:
+                if name not in existing:
+                    session.add(FixedPricesModel(name=name, price=price))
                     added += 1
 
-            if added > 0:
-                session.commit()
-                print(f"{added} fixed prices added successfully.")
+            if added:
+                self._safe_commit(session)
+                print(f"✅ Added {added} fixed prices.")
             else:
-                print("No new fixed prices to add (already seeded).")
-
-        except Exception as e:
-            print(f"Error seeding fixed prices: {e}")
-            session.rollback()
+                print("⚙️ No new fixed prices to add.")
         finally:
             session.close()
 
-    def _seed_default_user(self):
-        """Creates a default 'testuser' for development and testing in demo mode."""
-        print("Demo mode enabled: Seeding 'testuser'...")
-        users_engine = self.engines.get('users')
-        if not users_engine:
-            print("Warning: 'users' engine not found. Skipping user seeding.")
+    # ------------------------------------------------------------------
+    # PAYROLL SEEDING
+    # ------------------------------------------------------------------
+
+    def _seed_payroll_system_constants(self) -> None:
+        """Seed government-mandated constants and system configuration values."""
+        print("🏛️ Seeding payroll system constants...")
+
+        session = self._get_session("payroll")
+        if not session:
             return
 
-        Session = sessionmaker(bind=users_engine)
-        session = Session()
+        try:
+            if session.query(SystemConstantModel).count() > 0:
+                print("⚙️ System constants already exist. Skipping.")
+                return
+
+            constants = [
+                # Year 1404 configuration
+                SystemConstantModel(
+                    year=1404,
+                    code="MIN_MONTHLY_WAGE_RIAL_1404",
+                    name="حداقل دستمزد ماهانه (ریال)",
+                    value=Decimal("111200000"),
+                    unit="ریال",
+                    description="حداقل حقوق پایه مصوب سال 1404 بر اساس وزارت کار"
+                ),
+                SystemConstantModel(
+                    year=1404,
+                    code="SSO_EMPLOYEE_PCT",
+                    name="درصد سهم بیمه کارگر",
+                    value=Decimal("7.0"),
+                    unit="percent",
+                    description="درصد سهم بیمه تامین اجتماعی برای کارگر"
+                ),
+                SystemConstantModel(
+                    year=1404,
+                    code="SSO_EMPLOYER_PCT",
+                    name="درصد سهم بیمه کارفرما",
+                    value=Decimal("23.0"),
+                    unit="percent",
+                    description="درصد سهم بیمه تامین اجتماعی برای کارفرما"
+                ),
+                SystemConstantModel(
+                    year=1404,
+                    code="SSO_BASE_CEILING_RIAL_1404",
+                    name="سقف دستمزد مشمول بیمه",
+                    value=Decimal("548500000"),
+                    unit="ریال",
+                    description="حداکثر پایه حقوق مشمول بیمه تامین اجتماعی در سال 1404"
+                ),
+            ]
+
+            session.add_all(constants)
+            self._safe_commit(session)
+            print("✅ Payroll system constants seeded.")
+        finally:
+            session.close()
+
+    def _seed_salary_components(self) -> None:
+        """Seed standard earning and deduction components for payroll slips."""
+        print("🧾 Seeding salary components...")
+
+        session = self._get_session("payroll")
+        if not session:
+            return
 
         try:
-            user_exists = session.query(UsersModel).filter_by(username="testuser").first()
-            if not user_exists:
-                password = "password123"
-                hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-                new_user = UsersModel(username="testuser", password_hash=hashed_password, role="translator", active=1)
-                session.add(new_user)
-                session.flush()
+            if session.query(SalaryComponentModel).count() > 0:
+                print("⚙️ Salary components already exist. Skipping.")
+                return
 
-                new_profile = UserProfileModel(user_id=new_user.id, full_name="کاربر آزمایشی", role_fa="مترجم")
-                session.add(new_profile)
-                session.commit()
-                print("Default user 'testuser' created.")
-        except Exception as e:
-            print(f"Error seeding default user: {e}")
-            session.rollback()
+            components = [
+                SalaryComponentModel(
+                    name="base_salary",
+                    display_name="حقوق پایه",
+                    type="Earning",
+                    is_taxable_for_income_tax=True,
+                    is_deductible_for_taxable_income=False,
+                    is_base_for_insurance_calculation=True
+                ),
+                SalaryComponentModel(
+                    name="overtime_pay",
+                    display_name="اضافه‌کار",
+                    type="Earning",
+                    is_taxable_for_income_tax=True,
+                    is_deductible_for_taxable_income=False,
+                    is_base_for_insurance_calculation=True
+                ),
+                SalaryComponentModel(
+                    name="transport_allowance",
+                    display_name="حق ایاب و ذهاب",
+                    type="Earning",
+                    is_taxable_for_income_tax=False,
+                    is_deductible_for_taxable_income=False,
+                    is_base_for_insurance_calculation=False
+                ),
+                SalaryComponentModel(
+                    name="meal_allowance",
+                    display_name="بن کارگری / حق خواروبار",
+                    type="Earning",
+                    is_taxable_for_income_tax=False,
+                    is_deductible_for_taxable_income=False,
+                    is_base_for_insurance_calculation=False
+                ),
+                SalaryComponentModel(
+                    name="income_tax",
+                    display_name="مالیات بر درآمد",
+                    type="Deduction",
+                    is_taxable_for_income_tax=False,
+                    is_deductible_for_taxable_income=True,
+                    is_base_for_insurance_calculation=False
+                ),
+                SalaryComponentModel(
+                    name="insurance_contribution",
+                    display_name="حق بیمه",
+                    type="Deduction",
+                    is_taxable_for_income_tax=False,
+                    is_deductible_for_taxable_income=True,
+                    is_base_for_insurance_calculation=False
+                ),
+            ]
+
+            session.add_all(components)
+            self._safe_commit(session)
+            print("✅ Salary components seeded.")
+        finally:
+            session.close()
+
+    def _seed_tax_brackets(self) -> None:
+        """Seed progressive income tax brackets for the year 1404."""
+        print("📈 Seeding tax brackets...")
+
+        session = self._get_session("payroll")
+        if not session:
+            return
+
+        try:
+            if session.query(TaxBracketModel).count() > 0:
+                print("⚙️ Tax brackets already exist. Skipping.")
+                return
+
+            brackets = [
+                TaxBracketModel(
+                    year=1404,
+                    lower_bound_rials=Decimal("0"),
+                    upper_bound_rials=Decimal("720000000"),
+                    rate=Decimal("0.10"),
+                ),
+                TaxBracketModel(
+                    year=1404,
+                    lower_bound_rials=Decimal("720000001"),
+                    upper_bound_rials=Decimal("1200000000"),
+                    rate=Decimal("0.15"),
+                ),
+                TaxBracketModel(
+                    year=1404,
+                    lower_bound_rials=Decimal("1200000001"),
+                    upper_bound_rials=None,  # No upper limit
+                    rate=Decimal("0.20"),
+                ),
+            ]
+
+            session.add_all(brackets)
+            self._safe_commit(session)
+            print("✅ Tax brackets seeded.")
         finally:
             session.close()

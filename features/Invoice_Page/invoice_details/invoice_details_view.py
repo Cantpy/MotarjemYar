@@ -445,7 +445,7 @@ class InvoiceDetailsWidget(QWidget):
     def display_static_info(self, customer, office_info, user_info):
         """Populates the non-editable fields once at the beginning."""
         # Invoice Info
-        self.user_label.setText(user_info.full_name)
+        self.user_label.setText(user_info.display_name)
 
         # Customer Info
         self.customer_name.setText(customer.name)

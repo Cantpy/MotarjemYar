@@ -36,21 +36,10 @@ class TranslationOfficeDTO:
 class AdminUserDTO:
     """DTO for the initial admin user's credentials and security info."""
     username: str
+    display_name: str
     password: str
     password_confirm: str
     security_question_1: str
     security_answer_1: str
     security_question_2: str
     security_answer_2: str
-
-
-@dataclass
-class AdminProfileDTO:
-    user_id: int
-    full_name: str
-    national_id: str
-    role_fa: str = "مدیر سیستم"
-    email: str | None = None
-    phone: str | None = None
-    address: str | None = None
-    bio: str | None = None

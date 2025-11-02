@@ -1,7 +1,6 @@
-# Admin_Panel/wage_calculator/wage_calculator_styles.py
+# features/Admin_Panel/wage_calculator/wage_calculator_styles.py
 
-WAGE_CALCULATOR_STYLES="""
-
+WAGE_CALCULATOR_STYLES = """
 
 /* --- Styles for Wage Calculator Page --- */
 
@@ -28,6 +27,17 @@ WageCalculatorView QPushButton#runPayrollButton {
 }
 WageCalculatorView QPushButton#runPayrollButton:hover {
     background-color: #218838;
+}
+
+WageCalculatorView QPushButton#refreshButton {
+    font-weight: bold;
+    padding: 8px 15px;
+    border-radius: 5px;
+    background-color: #0078D7;
+    color: white;
+}
+WageCalculatorView QPushButton#refreshButton:hover {
+    background-color: #005A9E;
 }
 
 /* Main employee table styling */

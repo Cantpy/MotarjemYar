@@ -7,6 +7,8 @@ from features.Admin_Panel.admin_panel.admin_panel_view import AdminPanelView
 # Import the factories for each sub-feature
 from features.Admin_Panel.admin_dashboard.admin_dashboard_factory import AdminDashboardFactory
 from features.Admin_Panel.admin_reports.admin_reports_factory import AdminReportsFactory
+# --- MODIFIED: Import the new UsersManagementFactory ---
+from features.Admin_Panel.users_management.users_management_factory import UsersManagementFactory
 from features.Admin_Panel.employee_management.employee_management_factory import EmployeeManagementFactory
 from features.Admin_Panel.wage_calculator.wage_calculator_factory import WageCalculatorFactory
 
@@ -53,11 +55,22 @@ class AdminPanelController:
         except Exception as e:
             print(f"Failed to create Admin Reports tab: {e}")
 
-        # --- 3. Employee Management Tab ---
+        # --- NEW: 3. User Management Tab (Added before Employee Management) ---
+        try:
+            users_controller = UsersManagementFactory.create(
+                users_engine=self._engines['users'],
+                payroll_engine=self._engines['payroll'],
+                parent=self._view
+            )
+            self._sub_controllers['users_management'] = users_controller
+            self._view.add_feature_tab(users_controller.get_view(), 'fa5s.users', "مدیریت کاربران")
+        except Exception as e:
+            print(f"Failed to create User Management tab: {e}")
+
+        # --- 4. Employee Management Tab (Was 3) ---
         try:
             employee_controller = EmployeeManagementFactory.create(
                 payroll_engine=self._engines['payroll'],
-                users_engine=self._engines['users'],
                 parent=self._view
             )
             self._sub_controllers['employee_management'] = employee_controller
@@ -65,15 +78,16 @@ class AdminPanelController:
         except Exception as e:
             print(f"Failed to create Employee Management tab: {e}")
 
-        # --- 4. Wage Calculator Tab ---
+        # --- 5. Wage Calculator Tab (Was 4) ---
         try:
             wage_controller = WageCalculatorFactory.create(
                 payroll_engine=self._engines['payroll'],
                 invoices_engine=self._engines['invoices'],
+                users_engine=self._engines['users'],
                 parent=self._view
             )
             self._sub_controllers['wage_calculator'] = wage_controller
-            self._view.add_feature_tab(wage_controller.get_view(), 'fa5s.calculator', "محاسبه حقوق")
+            self._view.add_feature_tab(wage_controller.get_view(), 'fa5s.calculator', "محاسبه حقوق و دستمزد ")
         except Exception as e:
             print(f"Failed to create Wage Calculator tab: {e}")
 

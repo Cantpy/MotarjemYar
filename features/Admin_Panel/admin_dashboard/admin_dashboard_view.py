@@ -74,7 +74,7 @@ class AdminDashboardView(QWidget):
         sidebar_column.addWidget(performers_group)
 
         # Top Translators
-        performers_layout.addWidget(QLabel("مترجم‌ها (بر اساس درآمد)"))
+        performers_layout.addWidget(QLabel("مترجم‌ها (بر اساس تعداد اسناد)"))
         self.top_translators_list = QListWidget()
         self.top_translators_list.setObjectName("performerList")
         performers_layout.addWidget(self.top_translators_list)

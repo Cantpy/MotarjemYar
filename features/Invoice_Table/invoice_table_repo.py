@@ -1,4 +1,6 @@
+# ============================================================================
 # features/Invoice_Table/invoice_table_repo.py
+# ============================================================================
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -7,10 +9,13 @@ from datetime import datetime
 from typing import Optional
 
 from features.Invoice_Table.invoice_table_models import InvoiceSummary
-from shared.orm_models.invoices_models import (IssuedInvoiceModel, InvoiceItemModel, DeletedInvoiceModel,
-                                               InvoiceItemData, InvoiceData, EditedInvoiceModel, EditedInvoiceData,
-                                               DeletedInvoiceData)
-from shared.orm_models.users_models import UsersModel, UserProfileModel
+from shared.orm_models.invoices_models import (
+    IssuedInvoiceModel, InvoiceItemModel, DeletedInvoiceModel,
+    InvoiceItemData, InvoiceData, EditedInvoiceModel, EditedInvoiceData,
+    DeletedInvoiceData
+)
+from shared.orm_models.users_models import UsersModel
+from shared.orm_models.payroll_models import EmployeeModel
 from shared.orm_models.services_models import ServicesModel, ServiceDynamicPrice
 
 
@@ -42,7 +47,7 @@ class InvoiceRepository:
             return None
 
     def get_invoice_and_items(
-        self, session: Session, invoice_number: str
+            self, session: Session, invoice_number: str
     ) -> tuple[Optional[InvoiceData], list[InvoiceItemData]]:
         """Retrieve an invoice and its items together."""
         try:
@@ -72,7 +77,7 @@ class InvoiceRepository:
     # ─────────────────────────────── Services & Prices ─────────────────────────────── #
 
     def get_services_and_dynamic_prices(
-        self, session: Session, service_ids: set[int], dynamic_price_ids: set[int]
+            self, session: Session, service_ids: set[int], dynamic_price_ids: set[int]
     ) -> tuple[dict[int, str], dict[int, str]]:
         """Batch-fetch service and dynamic price names from the services database."""
         try:
@@ -141,7 +146,6 @@ class InvoiceRepository:
         This is an atomic operation for one invoice.
         """
         try:
-            # Step 1: Retrieve the full invoice object to be deleted
             invoice_to_delete = session.query(IssuedInvoiceModel).filter(
                 IssuedInvoiceModel.invoice_number == invoice_number
             ).first()
@@ -150,8 +154,6 @@ class InvoiceRepository:
                 print(f"Invoice {invoice_number} not found for deletion.")
                 return False
 
-            # Step 2: Create a DeletedInvoiceModel instance
-            # --- UPDATED: Now copies all new financial fields ---
             deleted_invoice = DeletedInvoiceModel(
                 invoice_number=invoice_to_delete.invoice_number,
                 name=invoice_to_delete.name,
@@ -182,11 +184,7 @@ class InvoiceRepository:
                 deleted_by=deleted_by_user
             )
             session.add(deleted_invoice)
-
-            # Step 3: Delete the original invoice
             session.delete(invoice_to_delete)
-
-            # Step 4: Commit the transaction for this single invoice
             session.commit()
             return True
         except SQLAlchemyError as e:
@@ -334,86 +332,105 @@ class InvoiceRepository:
 
 
 class UserRepository:
-    """Repository for user-related database operations"""
+    """
+    Repository for user-related database operations.
+    Now fetches employee data from payroll DB for translator names.
+    """
 
-    def get_translator_names(self, session: Session) -> list[str]:
-        """Get list of translator names"""
+    def get_translator_names(
+            self,
+            users_session: Session,
+            payroll_session: Session
+    ) -> list[str]:
+        """
+        Get list of translator display names.
+        Fetches from users DB, but could also enrich from payroll DB if needed.
+        """
         translator_names = ["نامشخص"]
 
         try:
-            # Get active translators with their profiles
+            # Get active translators
             translators = (
-                session.query(UsersModel)
-                .join(UserProfileModel)
+                users_session.query(UsersModel)
                 .filter(
                     UsersModel.role == 'translator',
-                    UsersModel.active == True,
-                    UserProfileModel.full_name.isnot(None)
+                    UsersModel.active == 1
                 )
                 .all()
             )
 
             for translator in translators:
-                if translator.user_profile and translator.user_profile.full_name:
-                    translator_names.append(translator.user_profile.full_name)
+                # Use display_name from users table
+                if translator.display_name:
+                    translator_names.append(translator.display_name)
+
         except SQLAlchemyError as e:
             print(f"Error loading translator names: {e}")
             translator_names.extend(["مریم", "علی", "رضا"])
 
         return translator_names
 
-    def get_user_by_username(self, session: Session, username: str) -> dict[str, object] | None:
-        """Get user data by username"""
+    def get_user_with_employee_details(
+            self,
+            users_session: Session,
+            payroll_session: Session,
+            username: str
+    ) -> dict[str, object] | None:
+        """
+        Get user data with employee details from payroll DB.
+        """
         try:
-            user = session.query(UsersModel).filter(UsersModel.username == username).first()
-            if user:
-                return {
-                    'username': user.username,
-                    'role': user.role,
-                    'active': user.active,
-                    'full_name': user.user_profile.full_name if user.user_profile else None
-                }
-            return None
+            user = users_session.query(UsersModel).filter(
+                UsersModel.username == username
+            ).first()
+
+            if not user:
+                return None
+
+            # Fetch employee details from payroll DB
+            employee = None
+            if user.employee_id:
+                employee = payroll_session.query(EmployeeModel).filter(
+                    EmployeeModel.employee_id == user.employee_id
+                ).first()
+
+            return {
+                'username': user.username,
+                'role': user.role,
+                'active': user.active,
+                'display_name': user.display_name,
+                'avatar_path': user.avatar_path,
+                'employee_id': user.employee_id,
+                # Employee details from payroll DB
+                'display_name': employee.full_name if employee else None,
+                'email': employee.email if employee else None,
+                'phone': employee.phone_number if employee else None,
+                'national_id': employee.national_id if employee else None,
+            }
         except SQLAlchemyError as e:
             print(f"Error getting user {username}: {e}")
             return None
 
-    def create_user(self, session: Session, username: str, role: str, full_name: str = None) -> bool:
-        """Create a new user with profile"""
+    def update_display_name(
+            self,
+            users_session: Session,
+            username: str,
+            new_display_name: str
+    ) -> bool:
+        """Update user's display name."""
         try:
-            # Create user
-            user = UsersModel(username=username, role=role)
-            session.add(user)
-            session.flush()  # To get the user ID
-
-            # Create profile if full_name provided
-            if full_name:
-                profile = UserProfileModel(username=username, full_name=full_name)
-                session.add(profile)
-
-            session.commit()
-            return True
-        except SQLAlchemyError as e:
-            print(f"Error creating user: {e}")
-            return False
-
-    def update_user_profile(self, session: Session, username: str, full_name: str) -> bool:
-        """Update user profile"""
-        try:
-            profile = session.query(UserProfileModel).filter(
-                UserProfileModel.username == username
+            user = users_session.query(UsersModel).filter(
+                UsersModel.username == username
             ).first()
 
-            if profile:
-                profile.full_name = full_name
-            else:
-                profile = UserProfileModel(username=username, full_name=full_name)
-                session.add(profile)
-
-            session.commit()
-            return True
+            if user:
+                user.display_name = new_display_name
+                users_session.commit()
+                return True
+            return False
         except SQLAlchemyError as e:
-            print(f"Error updating user profile: {e}")
+            users_session.rollback()
+            print(f"Error updating display name: {e}")
             return False
 
 
@@ -425,9 +442,9 @@ class RepositoryManager:
         self.user_repo = UserRepository()
 
     def get_invoice_repository(self) -> InvoiceRepository:
-        """Get invoice _repository instance"""
+        """Get invoice repository instance"""
         return self.invoice_repo
 
     def get_user_repository(self) -> UserRepository:
-        """Get user _repository instance"""
+        """Get user repository instance"""
         return self.user_repo

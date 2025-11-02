@@ -83,6 +83,7 @@ class MainWindowView(QMainWindow):
     help_button_clicked = Signal()
     settings_button_clicked = Signal()
     user_profile_clicked = Signal()
+    logout_button_clicked = Signal()
 
     def __init__(self):
         super().__init__()
@@ -200,6 +201,7 @@ class MainWindowView(QMainWindow):
         self.workspace_button, self.workspace_text_button, self.workspace_groupbox = self._create_nav_button("میز کار")
         self.help_button, self.help_text_button, self.help_groupBox = self._create_nav_button("راهنما")
         self.settings_button, self.settings_text_button, self.settings_groupBox = self._create_nav_button("تنظیمات")
+        self.logout_button, self.logout_text_button, self.logout_groupBox = self._create_nav_button("خروج")
 
         # --- Main Content Area ---
         self.stackedWidget = QStackedWidget()
@@ -278,6 +280,7 @@ class MainWindowView(QMainWindow):
         sidebar_layout.addSpacerItem(QSpacerItem(13, 108, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
         sidebar_layout.addWidget(self.help_groupBox)
         sidebar_layout.addWidget(self.settings_groupBox)
+        sidebar_layout.addWidget(self.logout_groupBox)
 
         # --- Main Content Layout ---
         self.stackedWidget.addWidget(self.page_home)
@@ -318,6 +321,7 @@ class MainWindowView(QMainWindow):
         set_nav_icon(self.reports_button, icons.home_icon)  # TODO: Add an icon for reports
         set_nav_icon(self.help_button, icons.help_icon)
         set_nav_icon(self.settings_button, icons.settings_icon)
+        set_nav_icon(self.logout_button, icons.logout_icon)
 
         # --- 4. Set the Icon for the Toggle Button ---
         self.sidebar_toggle_button.setIcon(QIcon(str(icons.help_icon)))
@@ -340,6 +344,7 @@ class MainWindowView(QMainWindow):
         self.reports_text_button.clicked.connect(self.reports_button_clicked.emit)
         self.help_text_button.clicked.connect(self.help_button_clicked.emit)
         self.settings_text_button.clicked.connect(self.settings_button_clicked.emit)
+        self.logout_text_button.clicked.connect(self.logout_button_clicked.emit)
 
         # User profile clickable labels
         self.large_user_pic.clicked.connect(self.user_profile_clicked.emit)
@@ -552,6 +557,7 @@ class MainWindowView(QMainWindow):
         self.reports_text_button.setVisible(visible)
         self.help_text_button.setVisible(visible)
         self.settings_text_button.setVisible(visible)
+        self.logout_text_button.setVisible(visible)
 
         # Also hide the user name/role text
         self.user_name_label.setVisible(visible)

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, aliased
 from shared.orm_models.invoices_models import IssuedInvoiceModel, InvoiceItemModel
 from shared.orm_models.customer_models import CustomerModel
 from shared.orm_models.services_models import ServicesModel
-from shared.orm_models.users_models import UsersModel, UserProfileModel
+from shared.orm_models.users_models import UsersModel
 
 from features.Home_Page.home_page_models import DocumentStatistics
 
@@ -53,10 +53,8 @@ class HomePageInvoicesRepository:
         if translator:
             invoice.translator = translator
 
-        # --- MODIFICATION START ---
         if new_payment_status is not None:
             invoice.payment_status = new_payment_status
-        # --- MODIFICATION END ---
 
         return True
 
@@ -143,13 +141,12 @@ class HomePageUsersRepository:
 
     def get_all_translators(self, session: Session) -> List[str]:
         """
-        Retrieves the full names of all users with the 'translator' role.
+        Retrieves the display names of all users with the 'translator' role.
         """
         results = (
-            session.query(UserProfileModel.full_name)
-            .join(UsersModel, UserProfileModel.user_id == UsersModel.id)
+            session.query(UsersModel.display_name)
             .filter(UsersModel.role == 'translator')
-            .order_by(UserProfileModel.full_name)
+            .order_by(UsersModel.display_name)
             .all()
         )
         # The query returns a list of tuples, e.g., [('John Doe',), ('Jane Smith',)].

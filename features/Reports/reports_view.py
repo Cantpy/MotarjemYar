@@ -264,7 +264,7 @@ class ReportsView(QWidget):
         df_display = df.copy()
         df_display['total_time_on_app_hours'] = df_display['total_time_on_app_hours'].round(2)
         df_display = df_display.rename(columns={
-            "username": "نام کاربری", "full_name": "نام کامل",
+            "username": "نام کاربری", "display_name": "نام کامل",
             "invoice_count": "فاکتورهای صادر شده", "total_time_on_app_hours": "زمان فعالیت (ساعت)"
         })
         self.user_table.setModel(PandasModel(df_display))

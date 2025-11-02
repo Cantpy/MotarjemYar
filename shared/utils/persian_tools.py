@@ -45,3 +45,68 @@ def get_persian_delivery_status(status: DeliveryStatus) -> str:
         DeliveryStatus.COLLECTED: "تحویل داده شده"
     }
     return status_map.get(status, "نامشخص")
+
+
+def number_to_words_fa(n):
+    """Converts an integer number to Persian words."""
+    if n == 0:
+        return 'صفر'
+
+    ones = ['', 'یک', 'دو', 'سه', 'چهار', 'پنج', 'شش', 'هفت', 'هشت', 'نه']
+    tens = ['', 'ده', 'بیست', 'سی', 'چهل', 'پنجاه', 'شصت', 'هفتاد', 'هشتاد', 'نود']
+    teens = ['ده', 'یازده', 'دوازده', 'سیزده', 'چهارده', 'پانزده', 'شانزده', 'هفده', 'هجده', 'نوزده']
+    hundreds = ['', 'یکصد', 'دویست', 'سیصد', 'چهارصد', 'پانصد', 'ششصد', 'هفتصد', 'هشتصد', 'نهصد']
+    thousands = ['', 'هزار', 'میلیون', 'میلیارد', 'تریلیون']
+
+    def get_word(num_str):
+        num = int(num_str)
+        if num == 0:
+            return ''
+
+        parts = []
+        if len(num_str) == 3:
+            h, t, o = int(num_str[0]), int(num_str[1]), int(num_str[2])
+            if h > 0:
+                parts.append(hundreds[h])
+            if t == 1:
+                parts.append(teens[o])
+            else:
+                if t > 1:
+                    parts.append(tens[t])
+                if o > 0:
+                    parts.append(ones[o])
+        elif len(num_str) == 2:
+            t, o = int(num_str[0]), int(num_str[1])
+            if t == 1:
+                parts.append(teens[o])
+            else:
+                if t > 1:
+                    parts.append(tens[t])
+                if o > 0:
+                    parts.append(ones[o])
+        elif len(num_str) == 1:
+            o = int(num_str[0])
+            if o > 0:
+                parts.append(ones[o])
+
+        return ' و '.join(parts)
+
+    s = str(int(n))
+    if len(s) > 15:
+        return "عدد بسیار بزرگ است"
+
+    groups = []
+    while len(s) > 0:
+        groups.append(s[-3:])
+        s = s[:-3]
+
+    word_parts = []
+    for i in range(len(groups) - 1, -1, -1):
+        group_word = get_word(groups[i])
+        if group_word:
+            part = group_word
+            if i > 0:
+                part += ' ' + thousands[i]
+            word_parts.append(part)
+
+    return ' و '.join(word_parts)

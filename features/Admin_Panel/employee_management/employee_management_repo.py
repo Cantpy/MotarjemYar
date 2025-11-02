@@ -1,9 +1,8 @@
 # features/Admin_Panel/employee_management/employee_management_repo.py
 
-from typing import List, Type
 from sqlalchemy.orm import Session, joinedload
-from shared.orm_models.users_models import UsersModel, UserProfileModel
-from shared.orm_models.payroll_models import EmployeeModel, EmployeePayrollProfileModel
+from shared.orm_models.payroll_models import (EmployeeModel, EmployeePayrollProfileModel,
+                                              DeletedEmployeeModel, EditedEmployeeLogModel)
 
 
 class EmployeeManagementRepository:
@@ -18,80 +17,54 @@ class EmployeeManagementRepository:
             joinedload(EmployeeModel.payroll_profile)
         ).order_by(EmployeeModel.last_name).all()
 
-    def get_users_map(self, users_session: Session, national_ids: list[str]) -> dict:
-        """
-        Fetches UsersModel objects for a list of national IDs and returns a
-        map of {national_id: UsersModel}.
-        """
-        if not national_ids:
-            return {}
-        users = users_session.query(UsersModel).options(
-            joinedload(UsersModel.user_profile)
-        ).filter(
-            UsersModel.user_profile.has(UserProfileModel.national_id.in_(national_ids))
-        ).all()
-        return {u.user_profile.national_id: u for u in users if u.user_profile}
-
-    def save_new_employee_and_user(self, payroll_session: Session, users_session: Session, employee: EmployeeModel,
-                                   user: UsersModel, profile: UserProfileModel):
-        """Saves a new employee and user across two databases in a coordinated transaction."""
+    def save_new_employee(self, payroll_session: Session, employee: EmployeeModel):
+        """Saves a new employee and their payroll profile to the database."""
         try:
-            users_session.add(user)
-            users_session.flush()
-            profile.user_id = user.id
-            users_session.add(profile)
-
             payroll_session.add(employee)
-
-            users_session.commit()
             payroll_session.commit()
         except Exception:
-            users_session.rollback()
             payroll_session.rollback()
             raise
 
-    # --- FIX: This method now correctly accepts both sessions and all necessary data dictionaries ---
-    def update_employee_and_user(self, payroll_session: Session, users_session: Session,
-                                 employee_id: str, user_id: int,
-                                 employee_changes: dict, user_changes: dict,
-                                 profile_changes: dict, payroll_profile_changes: dict):
-        """Updates records for a single employee across both databases."""
+    def update_employee(self, payroll_session: Session, employee_id: str,
+                        employee_changes: dict, payroll_profile_changes: dict,
+                        edit_logs: list[EditedEmployeeLogModel]):
+        """Updates records for a single employee in the payroll database."""
         try:
-            # Update Payroll.db
+            if edit_logs:
+                payroll_session.add_all(edit_logs)
+
             payroll_session.query(EmployeeModel).filter_by(employee_id=employee_id).update(employee_changes)
             payroll_session.query(EmployeePayrollProfileModel).filter_by(employee_id=employee_id).update(
                 payroll_profile_changes)
 
-            # Update Users.db
-            users_session.query(UsersModel).filter_by(id=user_id).update(user_changes)
-            users_session.query(UserProfileModel).filter_by(user_id=user_id).update(profile_changes)
-
             payroll_session.commit()
-            users_session.commit()
         except Exception:
             payroll_session.rollback()
-            users_session.rollback()
             raise
 
-    # --- FIX: This method now correctly accepts both sessions and the linking national_id ---
-    def delete_employee_and_user(self, payroll_session: Session, users_session: Session,
-                                 employee_id: str, national_id: str):
-        """Deletes an employee from Payroll.db and their linked user from Users.db."""
+    def archive_employee(self, payroll_session: Session,
+                         employee_to_delete: EmployeeModel,
+                         deleted_by: str):
+        """Moves an employee to the deleted table."""
         try:
-            # Delete from Payroll.db (cascade will handle the payroll profile)
-            payroll_session.query(EmployeeModel).filter_by(employee_id=employee_id).delete()
-
-            # Find the user by the shared national_id and delete them
-            # The cascade on the UsersModel will handle the user_profile
-            user_to_delete = users_session.query(UsersModel).join(UserProfileModel).filter(
-                UserProfileModel.national_id == national_id
-            ).first()
-            if user_to_delete:
-                users_session.delete(user_to_delete)
-
+            deleted_record = DeletedEmployeeModel(...)
+            payroll_session.add(deleted_record)
+            payroll_session.delete(employee_to_delete)
             payroll_session.commit()
-            users_session.commit()
         except Exception:
             payroll_session.rollback()
-            users_session.rollback()
             raise
+
+    def get_employee_by_id(self, payroll_session: Session, employee_id: str) -> EmployeeModel | None:
+        return payroll_session.query(EmployeeModel).options(
+            joinedload(EmployeeModel.payroll_profile)
+        ).filter(EmployeeModel.employee_id == employee_id).first()
+
+    def get_employee_by_national_id(self, payroll_session: Session, national_id: str) -> EmployeeModel | None:
+        return payroll_session.query(EmployeeModel).options(joinedload(EmployeeModel.payroll_profile)).filter(
+            EmployeeModel.national_id == national_id).first()
+
+    def get_employee_by_code(self, payroll_session: Session, employee_code: str) -> EmployeeModel | None:
+        return payroll_session.query(EmployeeModel).options(joinedload(EmployeeModel.payroll_profile)).filter(
+            EmployeeModel.employee_code == employee_code).first()

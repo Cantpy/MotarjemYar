@@ -1,10 +1,12 @@
-# _repo.py
+# features/Reports/reports_repo.py
+
 from sqlalchemy import func, case
 from sqlalchemy.orm import Session
-from datetime import date, timedelta
-from shared.orm_models.invoices_models import BaseInvoices, IssuedInvoiceModel
-from shared.orm_models.customer_models import BaseCustomers, CustomerModel
-from shared.orm_models.users_models import BaseUsers, UsersModel, LoginLogsModel, UserProfileModel
+from datetime import date
+from shared.orm_models.invoices_models import IssuedInvoiceModel
+from shared.orm_models.customer_models import CustomerModel
+
+from shared.orm_models.users_models import UsersModel, LoginLogsModel
 from typing import List
 
 
@@ -65,7 +67,7 @@ class ReportsRepo:
 
     def get_user_activity(self, start_date: date, end_date: date) -> List[dict]:
         """ Fetches user activity including invoices issued and time spent in the app. """
-        # Subquery for invoice counts
+        # Subquery for invoice counts remains the same
         invoice_subquery = self.session.query(
             IssuedInvoiceModel.username,
             func.count(IssuedInvoiceModel.id).label('invoice_count')
@@ -73,23 +75,22 @@ class ReportsRepo:
             IssuedInvoiceModel.issue_date.between(start_date, end_date)
         ).group_by(IssuedInvoiceModel.username).subquery()
 
-        # Subquery for time on app
+        # Subquery for time on app is updated to join LoginLogsModel with UsersModel
+        # to get the username, as LoginLogsModel now uses user_id.
         time_subquery = self.session.query(
-            LoginLogsModel.username,
+            UsersModel.username,
             func.sum(LoginLogsModel.time_on_app).label('total_seconds')
+        ).join(
+            UsersModel, LoginLogsModel.user_id == UsersModel.id
         ).filter(
-            # Assuming login_time is stored as string in ISO format.
-            # For robustness, this should be a proper DATETIME column.
             func.date(LoginLogsModel.login_time).between(start_date, end_date)
-        ).group_by(LoginLogsModel.username).subquery()
+        ).group_by(UsersModel.username).subquery()
 
         query = self.session.query(
             UsersModel.username,
-            UserProfileModel.full_name,
+            UsersModel.display_name.label('display_name'), # Use display_name instead of display_name from profile
             func.coalesce(invoice_subquery.c.invoice_count, 0).label('invoice_count'),
             func.coalesce(time_subquery.c.total_seconds, 0).label('total_time_on_app_seconds')
-        ).outerjoin(
-            UserProfileModel, UsersModel.username == UserProfileModel.username
         ).outerjoin(
             invoice_subquery, UsersModel.username == invoice_subquery.c.username
         ).outerjoin(

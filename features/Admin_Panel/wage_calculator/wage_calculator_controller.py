@@ -1,10 +1,15 @@
-# Admin_Panel/wage_calculator/wage_calculator_controller.py
+# features/Admin_Panel/wage_calculator/wage_calculator_controller.py
 
 import jdatetime
-from PySide6.QtWidgets import QMessageBox, QDialog
+from PySide6.QtWidgets import QMessageBox, QDialog, QVBoxLayout
+
 from features.Admin_Panel.wage_calculator.wage_calculator_view import WageCalculatorView
 from features.Admin_Panel.wage_calculator.wage_calculator_logic import WageCalculatorLogic
+from features.Admin_Panel.wage_calculator_preview.wage_calculator_preview_controller import \
+    WageCalculatorPreviewController
 from features.Admin_Panel.wage_calculator_preview.wage_calculator_preview_view import WageCalculatorPreviewDialog
+from features.Admin_Panel.wage_calculator_preview.salary_slip_viewer import SalarySlipViewer
+from shared import show_error_message_box
 
 
 class WageCalculatorController:
@@ -17,7 +22,8 @@ class WageCalculatorController:
 
         self._view.period_changed.connect(self._on_period_changed)
         self._view.run_payroll_requested.connect(self._on_run_payroll_requested)
-        self._view.employee_selected.connect(self._on_employee_selected)
+        self._view.view_payslip_requested.connect(self._on_view_payslip_requested)
+        self._view.refresh_requested.connect(self.load_page_data)
 
         self.load_page_data()
 
@@ -35,40 +41,47 @@ class WageCalculatorController:
 
     def _on_run_payroll_requested(self):
         """
-        Handles the entire 'Run Payroll' workflow.
-        This is the correct location for this _logic.
+        Handles the 'Run Payroll' workflow by launching the preview and generation dialog.
         """
         try:
-            # 1. Get the full list of employees from the _logic layer.
             employees = self._logic.get_employee_list()
-
-            # 2. Perform validation within the controller.
             if not employees:
                 QMessageBox.warning(self._view, "هشدار", "هیچ کارمند فعالی برای محاسبه حقوق وجود ندارد.")
                 return
 
-            # 3. Create and show the dialog to get overtime hours.
-            dialog = WageCalculatorPreviewDialog(employees, self._view)
-            dialog.exec()
-            # if dialog.exec() == QDialog.Accepted:
-                # overtime_data = dialog.get_overtime_data()
-                #
-                # # 4. Execute the pay run with the collected data.
-                # self._logic.execute_pay_run(self._current_year, self._current_month, overtime_data)
-                #
-                # # 5. Refresh the page to show the new results.
-                # self.load_page_data()
-                # QMessageBox.information(self._view, "موفقیت",
-                #                         "محاسبه حقوق برای دوره انتخابی با موفقیت انجام و ذخیره شد.")
+            # The preview dialog and its controller manage the entire generation process
+            preview_view = WageCalculatorPreviewDialog(employees, self._view)
+            preview_controller = WageCalculatorPreviewController(preview_view, self._logic)
+
+            # The dialog is executed. If it's accepted, it means the payslip was saved.
+            result = preview_controller.exec()
+            if result == QDialog.Accepted:
+                self.load_page_data()  # Refresh the main table to show the new record
 
         except Exception as e:
-            QMessageBox.critical(self._view, "خطا", f"خطایی در حین اجرای محاسبه حقوق رخ داد:\n{e}")
+            show_error_message_box(self._view, "خطا", f"خطایی در حین اجرای محاسبه حقوق رخ داد:\n{e}")
 
-    def _on_employee_selected(self, payroll_id: str):
+    def _on_view_payslip_requested(self, payroll_id: str):
+        """
+        Shows the details of an existing, saved payslip in a new pop-up dialog.
+        """
+        if not payroll_id:
+            return
         try:
             details = self._logic.get_payslip_data_for_preview(payroll_id)
             if details:
-                self._view.display_payslip_details(details)
+                # Create a new dialog to show the payslip
+                dialog = QDialog(self._view)
+                dialog.setWindowTitle(f"فیش حقوقی - {details.employee_name}")
+                dialog.setMinimumSize(850, 750)
+
+                layout = QVBoxLayout(dialog)
+                viewer = SalarySlipViewer()
+                viewer.populate(details)
+                layout.addWidget(viewer)
+
+                dialog.exec()
+
         except Exception as e:
             QMessageBox.critical(self._view, "خطا", f"خطایی در نمایش جزئیات فیش حقوقی رخ داد:\n{e}")
 

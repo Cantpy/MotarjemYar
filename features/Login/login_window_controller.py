@@ -29,7 +29,6 @@ class LoginController(QObject):
     def _connect_signals(self):
         """Connects the _view's action signals to the controller's handlers."""
         self._view.login_attempted.connect(self._handle_login_request)
-        self._view.password_visibility_toggled.connect(self._handle_password_toggle)
         self._view.reset_form_requested.connect(self._handle_reset_form_request)
 
     # Handler methods for View's signals (these are the 'slots' for user actions)
@@ -69,15 +68,6 @@ class LoginController(QObject):
             self.login_successful.emit(user_dto)
         else:
             self._view.reset_form_ui()
-
-    @Slot(int)
-    def _handle_password_toggle(self, current_echo_mode: int) -> None:
-        """
-        Receives the toggle request from the _view and instructs the _view
-        on how to update its UI state.
-        """
-        # The controller's _logic is simple: tell the _view to do the UI work.
-        self._view.toggle_password_visibility_ui(current_echo_mode)
 
     def _handle_reset_form_request(self) -> None:
         """

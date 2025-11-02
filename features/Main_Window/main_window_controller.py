@@ -1,6 +1,6 @@
 # features/Main_Window/main_window_controller.py
 
-from PySide6.QtCore import QObject
+from PySide6.QtCore import QObject, Signal
 from sqlalchemy.engine import Engine
 
 from core.navigation import PageManager
@@ -25,6 +25,7 @@ class MainWindowController(QObject):
     Controller for the main application window.
     Connects user actions from the _view to the application's business _logic.
     """
+    logout_requested = Signal()
 
     def __init__(self, view: "MainWindowView", logic: "MainWindowLogic", username: str, engines: dict[str, Engine]):
         super().__init__()
@@ -169,8 +170,7 @@ class MainWindowController(QObject):
         self._view.help_button.clicked.connect(lambda: self.page_manager.show('info_page'))
         self._view.workspace_button.clicked.connect(lambda: self.page_manager.show('workspace'))
         self._view.settings_button_clicked.connect(self._on_settings_button_clicked)
-
-        # --- FIX: The connection logic is now inside the factory functions, so we remove it from here ---
+        self._view.logout_button_clicked.connect(self.logout_requested.emit)
 
         # --- Titlebar Click ---
         self._view.close_button_clicked.connect(self._on_close_button_clicked)

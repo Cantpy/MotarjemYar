@@ -3,8 +3,7 @@
 from PySide6.QtWidgets import (QWizard, QWizardPage, QVBoxLayout, QLabel, QLineEdit, QFormLayout, QMessageBox,
                                QGridLayout, QCheckBox, QComboBox)
 from PySide6.QtCore import Signal, Qt
-from features.Setup_Wizard.setup_wizard_models import (LicenseDTO, TranslationOfficeDTO, AdminUserDTO,
-                                                       AdminProfileDTO, WizardStep)
+from features.Setup_Wizard.setup_wizard_models import LicenseDTO, TranslationOfficeDTO, AdminUserDTO, WizardStep
 
 from typing import Callable
 
@@ -21,6 +20,9 @@ SECURITY_QUESTIONS = [
 
 
 class LicensePage(QWizardPage):
+    """
+    Page for entering and validating the license key.
+    """
     submit_license = Signal(LicenseDTO)
 
     def __init__(self, validator: Callable[[LicenseDTO], bool], parent=None):
@@ -47,6 +49,9 @@ class LicensePage(QWizardPage):
 
 
 class OfficeDataPage(QWizardPage):
+    """
+    Page for entering translation office data.
+    """
     submit_office_data = Signal(TranslationOfficeDTO)
 
     def __init__(self, validator: Callable[[TranslationOfficeDTO], bool], parent=None):
@@ -111,7 +116,10 @@ class OfficeDataPage(QWizardPage):
 
 
 class AdminUserPage(QWizardPage):
-    def __init__(self, validator: Callable[[AdminUserDTO, AdminProfileDTO], bool], parent=None):
+    """
+    Page for creating the initial admin user with security settings.
+    """
+    def __init__(self, validator: Callable[[AdminUserDTO], bool], parent=None):
         super().__init__(parent)
         self._validator = validator
         self.setTitle("ایجاد کاربر مدیر و تنظیمات امنیتی")
@@ -121,6 +129,7 @@ class AdminUserPage(QWizardPage):
 
         # --- Create Widgets ---
         self.username_edit = QLineEdit()
+        self.display_name_edit = QLineEdit()
         self.password_edit = QLineEdit()
         self.password_confirm_edit = QLineEdit()
         self.show_password_checkbox = QCheckBox("نمایش رمز عبور")
@@ -130,46 +139,34 @@ class AdminUserPage(QWizardPage):
         self.question2_combo = QComboBox()
         self.answer2_edit = QLineEdit()
 
-        self.full_name_edit = QLineEdit()
-        self.national_id_edit = QLineEdit()
-        self.email_edit = QLineEdit()
-
         # --- Configure Widgets ---
         self.username_edit.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.password_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self.password_confirm_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        self.email_edit.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         self.question1_combo.addItems(SECURITY_QUESTIONS)
         self.question2_combo.addItems(SECURITY_QUESTIONS)
-        self.question2_combo.setCurrentIndex(1)  # Start with a different default question
+        self.question2_combo.setCurrentIndex(1)
 
         # --- Layout ---
         layout = QFormLayout(self)
 
         layout.addRow("نام کاربری (*):", self.username_edit)
+        layout.addRow("نام نمایشی (*):", self.display_name_edit)
         layout.addRow("رمز عبور (*):", self.password_edit)
         layout.addRow("تکرار رمز عبور (*):", self.password_confirm_edit)
         layout.addRow("", self.show_password_checkbox)
 
-        # Add a separator or label for clarity
         layout.addRow(QLabel("--- سوالات امنیتی (برای بازیابی رمز عبور) ---"))
         layout.addRow("سوال امنیتی ۱ (*):", self.question1_combo)
         layout.addRow("پاسخ سوال ۱ (*):", self.answer1_edit)
         layout.addRow("سوال امنیتی ۲ (*):", self.question2_combo)
         layout.addRow("پاسخ سوال ۲ (*):", self.answer2_edit)
 
-        layout.addRow(QLabel("--- اطلاعات پروفایل (اختیاری) ---"))
-        layout.addRow("نام کامل:", self.full_name_edit)
-        layout.addRow("کد ملی:", self.national_id_edit)
-        layout.addRow("ایمیل:", self.email_edit)
-
         # --- Connect Signals ---
         self.show_password_checkbox.toggled.connect(self._on_toggle_password_visibility)
 
     def _on_toggle_password_visibility(self, is_checked: bool):
-        """Toggles the echo mode of the password fields based on the checkbox state."""
-        # --- FIX 3: The logic is now simpler and more robust ---
         mode = QLineEdit.EchoMode.Normal if is_checked else QLineEdit.EchoMode.Password
         self.password_edit.setEchoMode(mode)
         self.password_confirm_edit.setEchoMode(mode)
@@ -178,6 +175,7 @@ class AdminUserPage(QWizardPage):
         """Gathers all data from the form and passes it to the validator."""
         user_dto = AdminUserDTO(
             username=self.username_edit.text().strip(),
+            display_name=self.display_name_edit.text().strip(),
             password=self.password_edit.text(),
             password_confirm=self.password_confirm_edit.text(),
             security_question_1=self.question1_combo.currentText(),
@@ -185,18 +183,15 @@ class AdminUserPage(QWizardPage):
             security_question_2=self.question2_combo.currentText(),
             security_answer_2=self.answer2_edit.text().strip()
         )
-        profile_dto = AdminProfileDTO(
-            user_id=0,
-            full_name=self.full_name_edit.text().strip() or None,
-            national_id=self.national_id_edit.text().strip() or None,
-            email=self.email_edit.text().strip() or None
-        )
-        return self._validator(user_dto, profile_dto)
+        return self._validator(user_dto)
 
 
 # --- Main Wizard View with RTL Configuration ---
 
 class SetupWizardView(QWizard):
+    """
+    The main setup wizard view that orchestrates the pages and handles RTL layout.
+    """
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("راه اندازی اولیه نرم افزار")
@@ -236,7 +231,6 @@ class SetupWizardView(QWizard):
     @staticmethod
     def show_error_on_page(page_widget: QWizardPage, message: str):
         """Displays a translated and RTL-aware error message to the user."""
-        # --- RTL Change: Configure the message box for RTL ---
         msg_box = QMessageBox(page_widget)
         msg_box.setWindowTitle("خطا")
         msg_box.setText(message)

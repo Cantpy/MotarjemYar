@@ -12,7 +12,8 @@ class SetupWizardFactory:
     """Factory for creating and wiring the Setup Wizard package."""
 
     @staticmethod
-    def create(user_db_engine: Engine, license_db_engine: Engine, parent=None) -> SetupWizardController:
+    def create(user_db_engine: Engine,
+               license_db_engine: Engine, parent=None) -> SetupWizardController:
         """
         Creates a fully configured Setup Wizard module by assembling its components.
         """
@@ -20,7 +21,8 @@ class SetupWizardFactory:
         license_session = ManagedSessionProvider(engine=license_db_engine)
 
         repo = SetupWizardRepository()
-        logic = SetupWizardLogic(repo=repo, user_db_session=user_session, license_db_session=license_session)
+        logic = SetupWizardLogic(repo=repo, user_db_session=user_session,
+                                 license_db_session=license_session)
 
         # --- Create the view first, but don't wire it yet ---
         view = SetupWizardView(parent=parent)

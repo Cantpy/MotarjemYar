@@ -173,8 +173,8 @@ class ApplicationManager:
         #    The code will pause here until the user finishes or cancels.
         result_code = wizard_view.exec()
 
-        # 5. Return True only if the user clicked "Finish".
-        return result_code == QDialog.Accepted
+        # 5. Return True only if the user clicks "Finish".
+        return result_code == QDialog.DialogCode.Accepted
 
     def show_login(self):
         """Creates and shows the login window feature using its factory."""
@@ -208,11 +208,38 @@ class ApplicationManager:
 
         self.active_controller = MainWindowFactory.create(engines=self.engines, username=user_dto.username)
         self.active_controller.initialize_with_user(user_dto.username)
+        self.active_controller.logout_requested.connect(self.on_logout_requested)
 
         main_view = self.active_controller.get_view()
         splash.close()
         main_view.show()
         self.timer.checkpoint("Main window displayed")
+
+    @Slot()
+    def on_logout_requested(self):
+        """
+        Handles the full logout process and transitions back to the login screen.
+        """
+        self.timer.checkpoint("Logout requested by user")
+
+        # 1. Perform the logout logic
+        users_engine = self.engines.get('users')
+        if not users_engine:
+            print("ERROR: Cannot log out, 'users' engine not found.")
+            return
+
+        # Create a temporary service to perform the logout actions
+        temp_login_controller = LoginWindowFactory.create(engine=users_engine)
+        temp_login_controller._logic.perform_full_logout()
+
+        # 2. Close the main window
+        if self.active_controller:
+            self.active_controller.get_view().close()
+            self.active_controller = None
+            self.timer.checkpoint("Main window closed")
+
+        # 3. Transition back to the login screen
+        self.show_login()
 
     def _create_splash_screen(self) -> QWidget:
         # This implementation is fine.

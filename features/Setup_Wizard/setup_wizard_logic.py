@@ -1,7 +1,7 @@
 # features/Setup_Wizard/setup_wizard_logic.py
 
-from features.Setup_Wizard.setup_wizard_models import (WizardStep, LicenseDTO, TranslationOfficeDTO,
-                                                       AdminUserDTO, AdminProfileDTO)
+# CHANGE: AdminProfileDTO removed
+from features.Setup_Wizard.setup_wizard_models import (WizardStep, LicenseDTO, TranslationOfficeDTO, AdminUserDTO)
 from features.Setup_Wizard.setup_wizard_repo import SetupWizardRepository
 from shared.session_provider import ManagedSessionProvider
 
@@ -9,7 +9,8 @@ from shared.session_provider import ManagedSessionProvider
 class SetupWizardLogic:
     """Business logic for the first-time setup wizard."""
 
-    def __init__(self, repo: SetupWizardRepository, user_db_session: ManagedSessionProvider,
+    def __init__(self, repo: SetupWizardRepository,
+                 user_db_session: ManagedSessionProvider,
                  license_db_session: ManagedSessionProvider):
         self._repo = repo
         self._user_db_session = user_db_session
@@ -87,10 +88,14 @@ class SetupWizardLogic:
             print(f'saving data to the database under key: {self._validated_license_key}')
             self._repo.save_translation_office(session, office_dto, self._validated_license_key)
 
-    def process_admin_and_profile_step(self, user_dto: AdminUserDTO, profile_dto: AdminProfileDTO | None) -> None:
-        """Validates and saves admin user and optional profile."""
-        if not user_dto.username or len(user_dto.password) < 8:
-            raise ValueError("نام کاربری نمی‌تواند خالی باشد و رمز عبور باید حداقل ۸ کاراکتر باشد.")
+    # CHANGE: Simplified method signature and logic.
+    def process_admin_and_profile_step(self, user_dto: AdminUserDTO) -> None:
+        """Validates and saves the admin user."""
+        # CHANGE: Added display_name to the validation check.
+        if not user_dto.username or not user_dto.display_name or len(user_dto.password) < 8:
+            raise ValueError("نام کاربری و نام نمایشی نمی‌تواند خالی باشد و رمز عبور باید حداقل ۸ کاراکتر باشد.")
 
-        with self._user_db_session() as session:
-            self._repo.save_admin_user_and_profile(session, user_dto, profile_dto)
+        # CHANGE: Removed payroll_session from the context manager.
+        with self._user_db_session() as user_session:
+            # CHANGE: Call the new, simplified repository method.
+            self._repo.save_admin_user(user_session, user_dto)

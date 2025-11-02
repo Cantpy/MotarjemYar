@@ -71,9 +71,10 @@ def populate_payroll_db(payroll_session: Session):
             national_id=person['nid'],
             hire_date=date.today() - timedelta(days=random.randint(30, 1000)),
             payroll_profile=EmployeePayrollProfileModel(
-                payment_type=person['payment'],
-                custom_daily_payment_rials=Decimal(person.get('salary_rials', 0)),
-                commission_rate=Decimal(person.get('rate', 0)),
+                employment_type=person['payment'],
+                base_salary_rials=Decimal(person.get('salary_rials', 0)),
+                hourly_rate_rials=Decimal(person.get('hourly_rate', 0)),
+                commission_rate_pct=Decimal(person.get('rate', 0)),
                 marital_status=random.choice(['Single', 'Married']),
                 children_count=random.randint(0, 2)
             )

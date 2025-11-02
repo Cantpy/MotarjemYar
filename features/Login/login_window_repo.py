@@ -12,17 +12,27 @@ class LoginRepository:
     """
     Repository for user authentication and management.
     """
-    def get_user_by_username(self, session: Session, username: str) -> UsersModel | None:
-        """Fetch a user by username, eagerly loading their profile."""
+    def get_user_by_username(self, session, username: str) -> UsersModel | None:
+        """
+        Fetch a user by username, optionally eager-loading related data
+        like login logs and security questions.
+        """
         try:
-            user = (session.query(UsersModel).options(joinedload(UsersModel.user_profile))
-                    .filter_by(username=username).first())
+            user = (
+                session.query(UsersModel)
+                .options(
+                    joinedload(UsersModel.login_logs),
+                    joinedload(UsersModel.security_questions),
+                )
+                .filter(UsersModel.username == username)
+                .first()
+            )
             return user
         except SQLAlchemyError as e:
-            print(f"SQLAlchemyError in get_user_by_username: {e}")
+            print(f"[DB Error] get_user_by_username failed: {e}")
             raise
         except Exception as e:
-            print(f"Unexpected error in get_user_by_username: {e}")
+            print(f"[Unexpected Error] get_user_by_username failed: {e}")
             raise
 
     def update_user_token(self, session: Session,
@@ -48,7 +58,7 @@ class LoginRepository:
             user = (session.query(UsersModel).options(joinedload(UsersModel.user_profile)).
                     filter_by(username=username).first())
             if user and user.user_profile:  # Changed to user_profile
-                return user.user_profile.full_name or "کاربر میهمان"
+                return user.user_profile.display_name or "کاربر میهمان"
             return "کاربر میهمان"
         except SQLAlchemyError as e:
             print(f"SQLAlchemyError in get_user_full_name: {e}")

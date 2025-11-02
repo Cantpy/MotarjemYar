@@ -2,9 +2,9 @@
 
 from features.Setup_Wizard.setup_wizard_logic import SetupWizardLogic
 from features.Setup_Wizard.setup_wizard_view import SetupWizardView
-from features.Setup_Wizard.setup_wizard_models import LicenseDTO, TranslationOfficeDTO, AdminUserDTO, AdminProfileDTO
+from features.Setup_Wizard.setup_wizard_models import LicenseDTO, TranslationOfficeDTO, AdminUserDTO
 
-from shared import show_information_message_box, show_error_message_box
+from shared import show_information_message_box
 
 
 class SetupWizardController:
@@ -23,6 +23,7 @@ class SetupWizardController:
             admin_validator=self._validate_and_process_admin
         )
 
+    # ... (get_view and prepare_wizard are unchanged) ...
     def get_view(self) -> SetupWizardView:
         """Exposes the view widget."""
         return self._view
@@ -39,6 +40,7 @@ class SetupWizardController:
             return True
         return False
 
+    # ... (_validate_and_process_license and _validate_and_process_office are unchanged) ...
     def _validate_and_process_license(self, dto: LicenseDTO) -> bool:
         """Synchronous validation function for the License Page."""
         try:
@@ -48,6 +50,7 @@ class SetupWizardController:
             self._view.show_error_on_page(self._view.license_page, str(e))
             return False
         except Exception as e:
+            print(f'validate and process license error: {e}')
             self._view.show_error_on_page(self._view.license_page, f"یک خطای پیشبینی نشده رخ داد: {e}")
             return False
 
@@ -61,15 +64,19 @@ class SetupWizardController:
             self._view.show_error_on_page(self._view.office_page, f"یک خطای پیشبینی نشده رخ داد: {e}")
             return False
 
-    def _validate_and_process_admin(self, user_dto: AdminUserDTO, profile_dto: AdminProfileDTO) -> bool:
+    # CHANGE: Simplified the method signature.
+    def _validate_and_process_admin(self, user_dto: AdminUserDTO) -> bool:
         """Synchronous validation function for the Admin Page."""
         try:
-            self._logic.process_admin_and_profile_step(user_dto, profile_dto)
+            # CHANGE: The logic method is now called with only the user_dto.
+            self._logic.process_admin_and_profile_step(user_dto)
             return True
         except ValueError as e:
+            print(f'validate and process admin error: {e}')
             self._view.show_error_on_page(self._view.admin_page, str(e))
             return False
         except Exception as e:
+            print(f'validate and process admin unexpected error: {e}')
             self._view.show_error_on_page(self._view.admin_page, f"یک خطای پیشبینی نشده رخ داد: {e}")
             return False
 

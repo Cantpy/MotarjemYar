@@ -14,7 +14,6 @@ class LoginWidget(QWidget):
     capturing user input, and emitting signals for the controller to handle.
     """
     login_attempted = Signal(str, str, bool)
-    password_visibility_toggled = Signal(int)
     reset_form_requested = Signal()
 
     def __init__(self):
@@ -153,13 +152,12 @@ class LoginWidget(QWidget):
         self.setStyleSheet(LOGIN_WINDOW_STYLES)
 
     def setup_connections(self):
-        """Setup signal connections to the controller's methods."""
+        """Setup signal connections."""
         self.login_btn.clicked.connect(self._on_login_button_clicked)
-        self.show_password_btn.clicked.connect(self._on_show_password_button_clicked)
+        self.show_password_btn.clicked.connect(self._toggle_password_visibility)
         self.username_input.returnPressed.connect(self._on_login_button_clicked)
         self.password_input.returnPressed.connect(self._on_login_button_clicked)
 
-    # Methods for the Controller to call to update the UI (View remains "dumb")
     def _on_login_button_clicked(self) -> None:
         """Collects login data and emits the login_attempted signal."""
         username = self.username_input.text().strip()
@@ -167,9 +165,17 @@ class LoginWidget(QWidget):
         ischecked = self.remember_me_checkbox.isChecked()
         self.login_attempted.emit(username, password, ischecked)
 
-    def _on_show_password_button_clicked(self) -> None:
-        """Emits the password_visibility_toggled signal."""
-        self.password_visibility_toggled.emit(self.password_input.echoMode())
+    def _toggle_password_visibility(self) -> None:
+        """
+        Toggles the visibility of the password input field.
+        This is a pure UI operation and is handled entirely within the view.
+        """
+        if self.password_input.echoMode() == QLineEdit.Password:
+            self.password_input.setEchoMode(QLineEdit.Normal)
+            self.show_password_btn.setText("مخفی")
+        else:
+            self.password_input.setEchoMode(QLineEdit.Password)
+            self.show_password_btn.setText("نمایش")
 
     def login_successful_ui(self, full_name: str, role_text: str) -> None:
         """Updates the UI to reflect a successful login."""
@@ -186,18 +192,6 @@ class LoginWidget(QWidget):
         self.login_text.setObjectName("login_text")  # Reset to default style object name
         self.login_text.setStyleSheet(LOGIN_FAILED_STYLES)  # Reset style
         self.role_label.hide()
-
-    def toggle_password_visibility_ui(self, current_echo_mode: int) -> None:
-        """
-        PUBLIC SLOT: Toggles the visibility of the password input field.
-        This method contains all the UI update _logic.
-        """
-        if current_echo_mode == QLineEdit.Password:
-            self.password_input.setEchoMode(QLineEdit.Normal)
-            self.show_password_btn.setText("مخفی")
-        else:
-            self.password_input.setEchoMode(QLineEdit.Password)
-            self.show_password_btn.setText("نمایش")
 
     def disable_login_button(self, text: str) -> None:
         """Disables the login button and sets its text."""

@@ -3,7 +3,7 @@
 from sqlalchemy.engine import Engine
 from sqlalchemy import create_engine
 from pathlib import Path
-from config.config import DATABASE_BASES
+from config.config import DATABASE_BASES, DATABASE_PATHS
 
 
 class DatabaseInitializer:

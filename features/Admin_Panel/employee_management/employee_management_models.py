@@ -1,14 +1,16 @@
 # Admin_Panel/employee_management/employee_management_models.py
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
 
 @dataclass
 class EmployeeFullData:
-    """A DTO for transferring all Employee data between UI and _logic."""
-    employee_id: str | None = None
+    """A DTO for transferring Employee data. Does NOT contain user/login info."""
+    employee_id: str | None = None  # This now acts as the link to the UsersModel
+    employee_code: str = ""
+
     # Personal Info (from EmployeeModel)
     first_name: str = ""
     last_name: str = ""
@@ -17,16 +19,11 @@ class EmployeeFullData:
     hire_date: date | None = None
     email: str = ""
     phone_number: str = ""
+
     # Payroll Info (from EmployeePayrollProfileModel)
-    payment_type: str = "Full-time"
-    custom_daily_payment_rials: Decimal = Decimal(0)
-    commission_rate: Decimal = Decimal(0)
+    employment_type: str = "full_time"
+    base_salary_rials: Decimal = Decimal(0)
+    hourly_rate_rials: Decimal = Decimal(0)
+    commission_rate_pct: Decimal = Decimal(0)
     marital_status: str = "Single"
     children_count: int = 0
-
-    # Users.db -> UsersModel
-    user_id: int | None = None
-    username: str = ""
-    password: str = ""  # For creation/update
-    role: str = "clerk"
-    is_active: bool = True

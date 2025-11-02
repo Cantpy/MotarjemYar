@@ -54,10 +54,23 @@ class LoginService:
             # If there's no user, just make sure the file is gone.
             self.auth_file_repo.clear_remember_me()
 
+    def _translate_role_to_farsi(self, role: str) -> str:
+        translations = {
+            "admin": "مدیر سیستم",
+            "translator": "مترجم",
+            "clerk": "کارمند دفتری",
+            "accountant": "حسابدار",
+        }
+        return translations.get(role, "کاربر")
+
     def authenticate_user(self, login_dto: UserLoginDTO) -> tuple[bool, str, Optional[LoggedInUserDTO]]:
         """
-        Authenticates a user, now with spam protection and lockout logic.
+        Authenticates a user using the new Users domain structure.
+        Includes account lockout protection and active status checks.
         """
+        from datetime import datetime
+        import bcrypt
+
         with self._users_session() as session:
             try:
                 user = self.repo.get_user_by_username(session, login_dto.username)
@@ -70,67 +83,64 @@ class LoginService:
                 if user.lockout_until_utc and user.lockout_until_utc > datetime.utcnow():
                     time_remaining = user.lockout_until_utc - datetime.utcnow()
                     minutes_left = round(time_remaining.total_seconds() / 60)
-                    message = (f"حساب کاربری به دلیل تلاش‌های ناموفق متعدد قفل شده است."
-                               f" لطفاً بعد از {minutes_left} دقیقه دوباره امتحان کنید.")
+                    message = (
+                        f"حساب کاربری به دلیل تلاش‌های ناموفق متعدد قفل شده است. "
+                        f"لطفاً بعد از {minutes_left} دقیقه دوباره امتحان کنید."
+                    )
                     return False, message, None
 
                 # --- STEP 3: Check if user is active ---
                 if user.active == 0:
                     return False, "حساب کاربری غیرفعال است.", None
 
-                # --- STEP 4: Verify the password ---
-                password_is_valid = bcrypt.checkpw(login_dto.password.encode('utf-8'), user.password_hash)
+                # --- STEP 4: Verify password ---
+                password_is_valid = bcrypt.checkpw(
+                    login_dto.password.encode("utf-8"), user.password_hash
+                )
 
                 if password_is_valid:
-                    # --- SUCCESS PATH ---
-                    # If the user had previous failed attempts, reset them.
+                    # ✅ SUCCESS: Reset failed login attempts
                     self.repo.reset_login_attempts(session, user)
                     session.commit()
 
-                    # Build and return the successful user DTO
-                    profile = user.user_profile
                     logged_in_user = LoggedInUserDTO(
                         username=user.username,
                         role=user.role,
-                        role_fa=profile.role_fa if profile else None,
-                        full_name=profile.full_name if profile else None
+                        role_fa=self._translate_role_to_farsi(user.role),
+                        full_name=user.display_name,
                     )
                     return True, "ورود موفق!", logged_in_user
+
                 else:
-                    # --- FAILURE PATH ---
-                    # Record the failed attempt in the database.
+                    # ❌ FAILURE: Record the failed attempt
                     self.repo.record_failed_login(session, user)
                     session.commit()
-
-                    # Return the generic error message. Do not reveal how many attempts are left.
                     return False, "نام کاربری یا رمز عبور اشتباه است.", None
 
             except (SQLAlchemyError, ValueError) as e:
                 session.rollback()
-                print(f"Authentication Error: {e}")
+                print(f"[Authentication Error] {e}")
                 return False, "خطا در فرآیند احراز هویت.", None
 
     def check_and_auto_login(self) -> tuple[bool, Optional[LoggedInUserDTO]]:
-        """Checks for and performs auto-login."""
-        # REFACTORED: Uses the settings _repository
+        """Checks for and performs auto-login under the new Users domain."""
         settings = self.auth_file_repo.load_remember_me()
         if not (settings and settings.remember_me and settings.username and settings.token):
             return False, None
 
         if self._verify_remember_token(settings.username, settings.token):
-            # If token is valid, get the full user DTO
             with self._users_session() as session:
                 user = self.repo.get_user_by_username(session, settings.username)
                 if user and user.active == 1:
-                    profile = user.user_profile
                     return True, LoggedInUserDTO(
-                        username=user.username, role=user.role,
-                        role_fa=profile.role_fa if profile else None,
-                        full_name=profile.full_name if profile else None,
-                        is_remembered=True
+                        username=user.username,
+                        role=user.role,
+                        role_fa=self._translate_role_to_farsi(user.role),
+                        full_name=user.display_name,
+                        is_remembered=True,
                     )
 
-        # If we reach here, auto-login failed. Clear the invalid settings.
+        # If we reach here, token is invalid — cleanup.
         self.auth_file_repo.clear_remember_me()
         return False, None
 
@@ -148,21 +158,30 @@ class LoginService:
             return bcrypt.checkpw(token.encode('utf-8'), user.token_hash)
 
     def _setup_remember_me(self, username: str):
-        """Generates and saves a remember-me token to the DB and settings file."""
+        """
+        Generates and saves a remember-me token in both DB and settings file,
+        compatible with the refactored Users domain.
+        """
+        import bcrypt, secrets
+        from datetime import datetime, timedelta
+
         token = secrets.token_urlsafe(32)
-        token_hash = bcrypt.hashpw(token.encode('utf-8'), bcrypt.gensalt())
+        token_hash = bcrypt.hashpw(token.encode("utf-8"), bcrypt.gensalt())
         expires_at = (datetime.now() + timedelta(days=30)).isoformat()
 
-        # Orchestrate the two save operations
         with self._users_session() as session:
+            # Save the hashed token in the database
             self.repo.update_user_token(session, username, token_hash, expires_at)
             session.commit()
 
             user = self.repo.get_user_by_username(session, username)
-            full_name = user.user_profile.full_name if user.user_profile else ""
+            full_name = user.display_name if user else ""
 
         settings_dto = RememberSettingsDTO(
-            remember_me=True, username=username, token=token, full_name=full_name
+            remember_me=True,
+            username=username,
+            token=token,
+            full_name=full_name,
         )
         self.auth_file_repo.save_remember_me(settings_dto)
 
@@ -242,3 +261,29 @@ class LoginService:
         # 3. Delete the session file
         self.auth_file_repo.clear_session()
         print("--- Session ended successfully. ---")
+
+    def perform_full_logout(self) -> None:
+        """
+        Orchestrates all actions for a complete user logout.
+        1. Ends the current session (updates DB log, deletes session file).
+        2. Clears any 'remember me' tokens (from DB and settings file).
+        """
+        print("--- Performing full logout... ---")
+        # First, load session data to know which user to log out.
+        session_data = self.auth_file_repo.load_session()
+
+        # End the session (updates logout time in DB and deletes the session file)
+        self.end_session()
+
+        # If we knew who was logged in from the session file,
+        # also clear their "remember me" data.
+        if session_data and session_data.username:
+            print(f"Clearing 'remember me' token for {session_data.username}.")
+            self.logout(session_data.username)
+        else:
+            # As a safeguard, if there was no session file but maybe a
+            # stray remember_me file, clear that too.
+            print("No session file found, but clearing remember_me file as a precaution.")
+            self.auth_file_repo.clear_remember_me()
+
+        print("--- Full logout completed. ---")

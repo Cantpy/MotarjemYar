@@ -16,24 +16,21 @@ class EmployeeManagementFactory:
     It follows the clean pattern of receiving its dependencies.
     """
     @staticmethod
-    def create(payroll_engine: Engine, users_engine: Engine, parent=None) -> UserManagementController:
+    def create(payroll_engine: Engine, parent=None) -> UserManagementController:
         """
         Creates a fully configured CustomerInfo module by assembling its components.
 
         Args:
             payroll_engine: The SQLAlchemy engine for the payroll database.
-            users_engine: The SQLAlchemy engine for the users database.
             parent: The parent widget.
         Returns:
             AdminDashboardController: The fully wired controller instance.
         """
         payroll_session_provider = ManagedSessionProvider(engine=payroll_engine)
-        users_session_provider = ManagedSessionProvider(engine=users_engine)
         # 1. Instantiate the layers, injecting dependencies
         repo = EmployeeManagementRepository()
         logic = UserManagementLogic(repository=repo,
-                                    payroll_engine=payroll_session_provider,
-                                    users_engine=users_session_provider)
+                                    payroll_engine=payroll_session_provider)
         view = UserManagementView(parent=parent)
 
         # 2. Instantiate the Controller, which connects everything
@@ -46,6 +43,6 @@ if __name__ == '__main__':
     from shared.testing.launch_feature import launch_feature_for_ui_test
     launch_feature_for_ui_test(
         factory_class=EmployeeManagementFactory,
-        required_engines={'payroll': 'payroll_engine', 'users': 'users_engine'},
+        required_engines={'payroll': 'payroll_engine'},
         use_memory_db=True
     )
