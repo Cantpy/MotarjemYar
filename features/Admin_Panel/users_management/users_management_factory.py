@@ -13,16 +13,15 @@ class UsersManagementFactory:
     Factory for creating the User Management feature.
     """
     @staticmethod
-    def create(users_engine: Engine, payroll_engine: Engine, parent=None) -> UsersManagementController:
+    def create(users_engine: Engine, parent=None) -> UsersManagementController:
         """
         Creates and wires all components for the User Management feature.
         """
         users_session = ManagedSessionProvider(engine=users_engine)
-        payroll_session = ManagedSessionProvider(engine=payroll_engine)
         repo = UserManagementRepository()
         logic = UserManagementLogic(repository=repo, users_engine=users_session)
         view = UsersManagementView(parent=parent)
-        controller = UsersManagementController(view, logic, payroll_engine)
+        controller = UsersManagementController(view, logic)
         return controller
 
 

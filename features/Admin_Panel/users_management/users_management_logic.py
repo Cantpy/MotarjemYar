@@ -1,7 +1,6 @@
 # features/Admin_Panel/users_management/users_management_logic.py
 
 import bcrypt
-import uuid
 from datetime import date
 from shared.session_provider import ManagedSessionProvider
 from features.Admin_Panel.employee_management import employee_management_validator as validator
@@ -18,7 +17,6 @@ class UserManagementLogic:
     def _validate_user_data(self, data: UserData, is_edit: bool):
         """Validates user data and raises a ValueError on failure."""
         errors = []
-        # MODIFIED: Use display_name and remove national_id validation
         checks = {
             "نام نمایشی": validator.validate_required_field(data.display_name, "نام نمایشی"),
             "نام کاربری": validator.validate_username(data.username),
@@ -37,14 +35,13 @@ class UserManagementLogic:
             users_orm = self._repo.get_all_users(session)
             user_list = []
             for u in users_orm:
-                # MODIFIED: Adapt DTO creation to the new UsersModel schema
+                # === MODIFIED: DTO no longer includes employee_id ===
                 user_list.append(UserData(
                     user_id=u.id,
                     username=u.username,
                     role=u.role,
                     is_active=bool(u.active),
                     start_date=date.fromisoformat(str(u.start_date)) if u.start_date else None,
-                    employee_id=u.employee_id,
                     display_name=u.display_name
                 ))
             return user_list
@@ -53,7 +50,6 @@ class UserManagementLogic:
         """Creates or updates a user record and returns the resulting DTO."""
         is_edit = data.get("user_id") is not None
 
-        # MODIFIED: Convert dict to a UserData DTO without national_id and with display_name
         user_dto = UserData(
             user_id=data.get("user_id"),
             username=data.get("username"),
@@ -66,36 +62,32 @@ class UserManagementLogic:
         self._validate_user_data(user_dto, is_edit)
 
         if is_edit:
-            return self._update_user(user_dto, editor_username)
+            self._update_user(user_dto, editor_username)
+            return user_dto
         else:
             return self._create_user(user_dto)
 
     def _create_user(self, data: UserData) -> UserData:
         """Logic for creating a new user."""
         hashed_password = bcrypt.hashpw(data.password.encode('utf-8'), bcrypt.gensalt())
-        new_employee_id = str(uuid.uuid4())
 
-        # MODIFIED: Create UsersModel directly with display_name
         user_orm = UsersModel(
             username=data.username,
             password_hash=hashed_password,
             role=data.role,
             active=1 if data.is_active else 0,
             start_date=date.today().isoformat(),
-            employee_id=new_employee_id,
             display_name=data.display_name
         )
 
         with self._users_session() as session:
             if self._repo.get_user_by_username(session, data.username):
                 raise ValueError(f"نام کاربری '{data.username}' قبلا استفاده شده است.")
-            # MODIFIED: Removed national_id check and UserProfileModel creation
-            saved_user_orm = self._repo.save_new_user(session, user_orm)
 
-            # Return a DTO representing the newly created user
-            data.user_id = saved_user_orm.id
-            data.employee_id = saved_user_orm.employee_id
-            data.password = ""  # Clear password
+            self._repo.save_new_user(session, user_orm)
+
+            data.user_id = user_orm.id
+            data.password = ""
             return data
 
     def _update_user(self, data: UserData, editor_username: str):
@@ -107,7 +99,6 @@ class UserManagementLogic:
 
             edit_logs = []
             user_changes = {}
-            # MODIFIED: Removed profile_changes dictionary
 
             if current_user.display_name != data.display_name:
                 edit_logs.append(EditedUsersLogModel(user_id=data.user_id, editor_username=editor_username,
@@ -134,7 +125,6 @@ class UserManagementLogic:
                 user_changes['password_hash'] = new_hash
 
             if user_changes:
-                # MODIFIED: Removed profile_changes from the repo call
                 self._repo.update_user(session, data.user_id, user_changes, edit_logs)
 
     def delete_user(self, user_id: int, deleted_by_username: str):
@@ -146,6 +136,4 @@ class UserManagementLogic:
             if user_to_delete.username == deleted_by_username:
                 raise ValueError("شما نمی‌توانید حساب کاربری خود را حذف کنید.")
 
-            # Note: The repository's archive_user method must also be updated
-            # to read from user_to_delete.display_name instead of a user_profile.
             self._repo.archive_user(session, user_to_delete, deleted_by_username)

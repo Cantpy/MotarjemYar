@@ -1,26 +1,27 @@
 # features/Admin_Panel/admin_panel/admin_panel_controller.py
 
+from PySide6.QtCore import QObject
+
 from sqlalchemy.engine import Engine
 
 from features.Admin_Panel.admin_panel.admin_panel_view import AdminPanelView
 
-# Import the factories for each sub-feature
 from features.Admin_Panel.admin_dashboard.admin_dashboard_factory import AdminDashboardFactory
 from features.Admin_Panel.admin_reports.admin_reports_factory import AdminReportsFactory
-# --- MODIFIED: Import the new UsersManagementFactory ---
 from features.Admin_Panel.users_management.users_management_factory import UsersManagementFactory
 from features.Admin_Panel.employee_management.employee_management_factory import EmployeeManagementFactory
 from features.Admin_Panel.wage_calculator.wage_calculator_factory import WageCalculatorFactory
 
 
-class AdminPanelController:
+class AdminPanelController(QObject):
     """
     Orchestrates the creation and display of all admin sub-features within a tabbed view.
     """
     def __init__(self, view: AdminPanelView, engines: dict[str, Engine]):
+        super().__init__()
         self._view = view
         self._engines = engines
-        self._sub_controllers = {}  # To keep references to the created controllers
+        self._sub_controllers = {}
 
         self._create_tabs()
 
@@ -59,7 +60,6 @@ class AdminPanelController:
         try:
             users_controller = UsersManagementFactory.create(
                 users_engine=self._engines['users'],
-                payroll_engine=self._engines['payroll'],
                 parent=self._view
             )
             self._sub_controllers['users_management'] = users_controller

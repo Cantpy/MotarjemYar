@@ -68,7 +68,6 @@ class SetupWizardRepository:
             password_hash = bcrypt.hashpw(user_dto.password.encode('utf-8'), bcrypt.gensalt())
 
             new_user = UsersModel(
-                employee_id=user_dto.username,
                 username=user_dto.username,
                 password_hash=password_hash,
                 role='admin',

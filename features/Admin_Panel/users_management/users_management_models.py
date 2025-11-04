@@ -8,13 +8,12 @@ from datetime import date
 class UserData:
     """
     A DTO for transferring user data between the UI, logic, and repo layers.
-    It does not contain payroll information.
+    It is self-contained within the users' domain.
     """
     user_id: int | None = None
     username: str = ""
-    password: str = ""  # Only used for creation or updating
+    password: str = ""
     role: str = "clerk"
     is_active: bool = True
     start_date: date | None = None
-    employee_id: str | None = None  # Link to the payroll system
     display_name: str = ""

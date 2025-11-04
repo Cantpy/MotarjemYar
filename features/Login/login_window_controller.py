@@ -1,6 +1,6 @@
 # features/Login/login_window_controller.py
 
-from PySide6.QtCore import QTimer, QObject, Signal, Slot
+from PySide6.QtCore import QTimer, QObject, Signal
 from features.Login.login_window_view import LoginWidget
 from features.Login.login_window_logic import LoginService
 from features.Login.login_window_models import UserLoginDTO

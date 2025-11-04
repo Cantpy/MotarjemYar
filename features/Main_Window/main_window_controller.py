@@ -1,9 +1,8 @@
 # features/Main_Window/main_window_controller.py
-
 from PySide6.QtCore import QObject, Signal
 from sqlalchemy.engine import Engine
 
-from core.navigation import PageManager
+from core.navigation import PageManager, PageLifetime
 from config.config_manager import ConfigManager
 
 from features.Main_Window.main_window_view import MainWindowView
@@ -21,15 +20,11 @@ from shared import show_error_message_box, get_resource_path
 
 
 class MainWindowController(QObject):
-    """
-    Controller for the main application window.
-    Connects user actions from the _view to the application's business _logic.
-    """
     logout_requested = Signal()
 
-    def __init__(self, view: "MainWindowView", logic: "MainWindowLogic", username: str, engines: dict[str, Engine]):
+    def __init__(self, view: "MainWindowView", logic: "MainWindowLogic",
+                 username: str, engines: dict[str, Engine]):
         super().__init__()
-
         self._view = view
         self._logic = logic
         self._username = username
@@ -49,138 +44,124 @@ class MainWindowController(QObject):
         self._connect_signals()
         self.initialize_with_user(username)
 
+        # Optionally preload heavy pages silently
+        self.page_manager.preload("admin_panel", delay_ms=2000)
+
     def get_view(self):
-        """Returns the main window widget to be shown."""
         return self._view
 
+    # ---------------------------------------------------------------------
+    # Register pages with their lifetime policies
+    # ---------------------------------------------------------------------
     def _register_pages(self):
-        """
-        Register all page controllers with the PageManager.
-        The factory function is responsible for creating, caching, and connecting the controller.
-        """
+        """Register all page controllers with caching policies."""
 
-        def create_home_page():
-            if "home" not in self.page_controllers:
-                controller = HomePageFactory.create(
-                    customers_engine=self._engines.get('customers'),
-                    invoices_engine=self._engines.get('invoices'),
-                    services_engine=self._engines.get('services'),
-                    users_engine=self._engines.get('users'),
-                    parent=self._view
-                )
-                self.page_controllers["home"] = controller
-            return self.page_controllers["home"]
+        # --- Dynamic / frequently updated pages ---
+        self.page_manager.register(
+            "home",
+            lambda: HomePageFactory.create(
+                customers_engine=self._engines.get('customers'),
+                invoices_engine=self._engines.get('invoices'),
+                services_engine=self._engines.get('services'),
+                users_engine=self._engines.get('users'),
+                parent=self._view),
+            lifetime=PageLifetime.REFRESH_ON_SHOW
+        )
 
-        self.page_manager.register("home", create_home_page)
+        self.page_manager.register(
+            "invoice_table",
+            lambda: self._create_invoice_table_controller(),
+            lifetime=PageLifetime.REFRESH_ON_SHOW
+        )
 
-        def create_invoice_wizard():
-            if "invoice" not in self.page_controllers:
-                controller = InvoiceWizardFactory.create(
-                    customer_engine=self._engines.get('customers'),
-                    invoices_engine=self._engines.get('invoices'),
-                    services_engine=self._engines.get('services'),
-                    users_engine=self._engines.get('users'),
-                    parent=self._view
-                )
-                self.page_controllers["invoice"] = controller
-            return self.page_controllers["invoice"]
+        self.page_manager.register(
+            "services",
+            lambda: ServicesManagementFactory.create(
+                services_engine=self._engines.get('services'),
+                parent=self._view),
+            lifetime=PageLifetime.REFRESH_ON_SHOW
+        )
 
-        self.page_manager.register("invoice", create_invoice_wizard)
+        # --- Persistent pages (stateful or heavy) ---
+        self.page_manager.register(
+            "invoice",
+            lambda: InvoiceWizardFactory.create(
+                customer_engine=self._engines.get('customers'),
+                invoices_engine=self._engines.get('invoices'),
+                services_engine=self._engines.get('services'),
+                users_engine=self._engines.get('users'),
+                parent=self._view),
+            lifetime=PageLifetime.KEEP_ALIVE
+        )
 
-        def create_invoice_table():
-            if "invoice_table" not in self.page_controllers:
-                controller = InvoiceTableFactory.create(
-                    invoices_engine=self._engines.get('invoices'),
-                    users_engine=self._engines.get('users'),
-                    services_engine=self._engines.get('services'),
-                    parent=self._view
-                )
-                # --- FIX: Connect the signal here, at the moment of creation ---
-                controller.request_deep_edit_navigation.connect(self._on_request_deep_edit)
-                self.page_controllers["invoice_table"] = controller
-            return self.page_controllers["invoice_table"]
+        self.page_manager.register(
+            "admin_panel",
+            lambda: AdminPanelFactory.create(
+                invoices_engine=self._engines.get('invoices'),
+                customers_engine=self._engines.get('customers'),
+                services_engine=self._engines.get('services'),
+                expenses_engine=self._engines.get('expenses'),
+                payroll_engine=self._engines.get('payroll'),
+                users_engine=self._engines.get('users'),
+                parent=self._view),
+            lifetime=PageLifetime.TIMEOUT
+        )
 
-        self.page_manager.register("invoice_table", create_invoice_table)
+        self.page_manager.register(
+            "info_page",
+            lambda: InfoPageFactory.create(
+                info_page_engine=self._engines.get('info_page'),
+                parent=self._view),
+            lifetime=PageLifetime.KEEP_ALIVE
+        )
 
-        def create_admin_panel():
-            if "admin_panel" not in self.page_controllers:
-                # Use the AdminPanelFactory, which creates the tabbed view
-                controller = AdminPanelFactory.create(
-                    invoices_engine=self._engines.get('invoices'),
-                    customers_engine=self._engines.get('customers'),
-                    services_engine=self._engines.get('services'),
-                    expenses_engine=self._engines.get('expenses'),
-                    payroll_engine=self._engines.get('payroll'),
-                    users_engine=self._engines.get('users'),
-                    parent=self._view
-                )
-                self.page_controllers["admin_panel"] = controller
-            return self.page_controllers["admin_panel"]
+        self.page_manager.register(
+            "workspace",
+            lambda: WorkspaceFactory.create(
+                self._engines.get('users'),
+                self._engines.get('workspace'),
+                self._logic.get_user_profile_for_view(self._username).id,
+                self.broker_host,
+                self._view),
+            lifetime=PageLifetime.KEEP_ALIVE
+        )
 
-        # Register it with a more descriptive name
-        self.page_manager.register("admin_panel", create_admin_panel)
+        print("Page factories registered with lifetime policies.")
 
-        # --- Other pages converted to the robust factory pattern ---
+    # ---------------------------------------------------------------------
+    # Helper to connect invoice table deep edit navigation
+    # ---------------------------------------------------------------------
+    def _create_invoice_table_controller(self):
+        controller = InvoiceTableFactory.create(
+            invoices_engine=self._engines.get('invoices'),
+            users_engine=self._engines.get('users'),
+            services_engine=self._engines.get('services'),
+            parent=self._view
+        )
+        controller.request_deep_edit_navigation.connect(self._on_request_deep_edit)
+        return controller
 
-        def create_services_management():
-            if "services" not in self.page_controllers:
-                controller = ServicesManagementFactory.create(
-                    services_engine=self._engines.get('services'),
-                    parent=self._view
-                )
-                self.page_controllers["services"] = controller
-            return self.page_controllers["services"]
-
-        self.page_manager.register("services", create_services_management)
-
-        def create_info_page():
-            if "info_page" not in self.page_controllers:
-                controller = InfoPageFactory.create(
-                    info_page_engine=self._engines.get('info_page'),
-                    parent=self._view
-                )
-                self.page_controllers["info_page"] = controller
-            return self.page_controllers["info_page"]
-
-        self.page_manager.register('info_page', create_info_page)
-
-        def create_workspace():
-            if "workspace" not in self.page_controllers:
-                controller = WorkspaceFactory.create(
-                    self._engines.get('users'),
-                    self._engines.get('workspace'),
-                    self._logic.get_user_profile_for_view(self._username).id,
-                    self.broker_host,
-                    self._view
-                )
-                self.page_controllers["workspace"] = controller
-            return self.page_controllers["workspace"]
-
-        self.page_manager.register('workspace', create_workspace)
-        print("Page factories registered with PageManager.")
-
+    # ---------------------------------------------------------------------
+    # Signal Connections
+    # ---------------------------------------------------------------------
     def _connect_signals(self):
-        """Connect signals from the main window's view to slots in this controller."""
-        # --- Sidebar Navigation to use the PageManager ---
-        self._view.home_button.clicked.connect(lambda: self.page_manager.show("home"))
-        self._view.invoice_button.clicked.connect(lambda: self.page_manager.show("invoice"))
-        self._view.large_user_pic.clicked.connect(lambda: self.page_manager.show("admin_panel"))
-        self._view.issued_invoices_button.clicked.connect(lambda: self.page_manager.show('invoice_table'))
-        self._view.documents_button.clicked.connect(lambda: self.page_manager.show('services'))
-        self._view.help_button.clicked.connect(lambda: self.page_manager.show('info_page'))
-        self._view.workspace_button.clicked.connect(lambda: self.page_manager.show('workspace'))
-        self._view.settings_button_clicked.connect(self._on_settings_button_clicked)
-        self._view.logout_button_clicked.connect(self.logout_requested.emit)
+        v = self._view
+        v.home_button.clicked.connect(lambda: self.page_manager.show("home"))
+        v.invoice_button.clicked.connect(lambda: self.page_manager.show("invoice"))
+        v.large_user_pic.clicked.connect(lambda: self.page_manager.show("admin_panel"))
+        v.issued_invoices_button.clicked.connect(lambda: self.page_manager.show('invoice_table'))
+        v.documents_button.clicked.connect(lambda: self.page_manager.show('services'))
+        v.help_button.clicked.connect(lambda: self.page_manager.show('info_page'))
+        v.workspace_button.clicked.connect(lambda: self.page_manager.show('workspace'))
+        v.settings_button_clicked.connect(self._on_settings_button_clicked)
+        v.logout_button_clicked.connect(self.logout_requested.emit)
 
-        # --- Titlebar Click ---
-        self._view.close_button_clicked.connect(self._on_close_button_clicked)
-        self._view.minimize_button_clicked.connect(self._view.showMinimized)
-        self._view.maximize_button_clicked.connect(self._toggle_maximize)
+        v.close_button_clicked.connect(self._on_close_button_clicked)
+        v.minimize_button_clicked.connect(v.showMinimized)
+        v.maximize_button_clicked.connect(self._toggle_maximize)
 
+    # ---------------------------------------------------------------------
     def initialize_with_user(self, username: str):
-        """
-        Fetches user data and shows the initial page.
-        """
         user_dto = self._logic.get_user_profile_for_view(username)
         if user_dto:
             self._view.update_user_profile(user_dto)
@@ -189,19 +170,13 @@ class MainWindowController(QObject):
         self.page_manager.show("home")
 
     def _on_request_deep_edit(self, invoice_data: InvoiceData, items_data: list[InvoiceItemData]):
-        """
-        Receives the signal from the invoice table and orchestrates the navigation
-        and data passing to the invoice wizard.
-        """
-        print(f"MainWindow: Received request to deep edit {invoice_data.invoice_number}. Navigating...")
-
+        print(f"MainWindow: Deep edit requested for {invoice_data.invoice_number}")
         self.page_manager.show("invoice")
-        invoice_wizard_controller = self.page_controllers.get("invoice")
-
+        invoice_wizard_controller = self.page_manager.get_controller("invoice")
         if invoice_wizard_controller:
             invoice_wizard_controller.start_deep_edit_session(invoice_data, items_data)
         else:
-            show_error_message_box(self._view, "خطای برنامه", "کنترلر صفحه صدور فاکتور یافت نشد.")
+            show_error_message_box(self._view, "Application Error", "Invoice wizard controller not found.")
 
     def _toggle_maximize(self):
         if self._view.isMaximized():
@@ -210,14 +185,8 @@ class MainWindowController(QObject):
             self._view.showMaximized()
 
     def _on_settings_button_clicked(self):
-        """Handle the user clicking the 'Settings' button."""
         print("Controller: Settings button clicked.")
-        # Assuming you will create a 'settings' page
-        # self.page_manager.show("settings")
+        # Future: self.page_manager.show("settings")
 
     def _on_close_button_clicked(self):
-        """
-        Handles the user clicking the 'X' button in the title bar.
-        Instructs the _view to begin its close confirmation process.
-        """
         self._view.handle_close_request()
