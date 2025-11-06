@@ -51,7 +51,10 @@ class HomePageLogic:
         with self._invoices_session() as invoice_session:
             # 1. Get raw data (with IDs) from the invoices DB
             total_invoices = self._repository.invoices_repo.get_total_count(invoice_session)
-            today_invoices = self._repository.invoices_repo.get_today_count(invoice_session, date.today())
+            print(f'Total invoices: {total_invoices}')
+            today_invoices = self._repository.invoices_repo.get_today_count(invoice_session, datetime.today())
+            print(f'Today invoices: {today_invoices}')
+            print(f'Today: {date.today()}')
             doc_stats = self._repository.invoices_repo.get_document_statistics(invoice_session)
             most_repeated_raw = self._repository.invoices_repo.get_most_repeated_doc(invoice_session)
             most_repeated_month_raw = self._repository.invoices_repo.get_most_repeated_doc_month(invoice_session)

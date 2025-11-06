@@ -1,7 +1,7 @@
 # features/Home_Page/home_page_repo.py
 
 from typing import List, Optional, Tuple, Dict
-from datetime import date
+from datetime import date, datetime
 from sqlalchemy import func, extract, asc
 from sqlalchemy.orm import Session, aliased
 
@@ -20,9 +20,21 @@ class HomePageInvoicesRepository:
         return session.query(IssuedInvoiceModel).count()
 
     def get_today_count(self, session: Session, today: date) -> int:
-        return session.query(IssuedInvoiceModel).filter(
-            IssuedInvoiceModel.issue_date == today
-        ).count()
+        """
+        Count invoices where issue_date falls within today's date range,
+        ignoring the time part.
+        """
+        start_of_day = datetime.combine(today, datetime.min.time())
+        end_of_day = datetime.combine(today, datetime.max.time())
+
+        return (
+            session.query(IssuedInvoiceModel)
+            .filter(
+                IssuedInvoiceModel.issue_date >= start_of_day,
+                IssuedInvoiceModel.issue_date <= end_of_day,
+            )
+            .count()
+        )
 
     def get_by_delivery_date_range(
             self, session: Session, start_date: date, end_date: date, exclude_completed: bool = False

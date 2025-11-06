@@ -93,15 +93,28 @@ class MainWindowView(QMainWindow):
         self.SIDEBAR_COLLAPSED_WIDTH = 70  # Just enough for icons
         self.is_sidebar_expanded = True  # Start expanded by default
 
-        # --- 1. Add State Variables for Resizing and Dragging ---
-        self.DEFAULT_NORMAL_SIZE = QSize(1200, 800)
+        # --- Adaptive Sizing ---
+        screen_geometry = QApplication.primaryScreen().availableGeometry()
+        screen_width = screen_geometry.width()
+        screen_height = screen_geometry.height()
+
+        # Define base ratios (relative to a 1920x1080 baseline)
+        BASE_WIDTH = 1920
+        BASE_HEIGHT = 1080
+        width_ratio = screen_width / BASE_WIDTH
+        height_ratio = screen_height / BASE_HEIGHT
+
+        # Scale base window size adaptively
+        scaled_width = int(1200 * width_ratio)
+        scaled_height = int(800 * height_ratio)
+        self.DEFAULT_NORMAL_SIZE = QSize(scaled_width, scaled_height)
+
         self.is_maximized = False
         self.normal_geometry = None
 
-        self.normal_geometry = QRect(
-            (self.screen().availableGeometry().center() - QPoint(*self.DEFAULT_NORMAL_SIZE.toTuple()) / 2),
-            self.DEFAULT_NORMAL_SIZE
-        )
+        screen_center = QApplication.primaryScreen().availableGeometry().center()
+        half_size = QPoint(self.DEFAULT_NORMAL_SIZE.width() // 2, self.DEFAULT_NORMAL_SIZE.height() // 2)
+        self.normal_geometry = QRect(screen_center - half_size, self.DEFAULT_NORMAL_SIZE)
 
         # For dragging the window
         self.drag_start_position = None
@@ -125,6 +138,28 @@ class MainWindowView(QMainWindow):
         self.titlebar_widget.setMouseTracking(True)
 
         self.sidebar_frame.setMinimumWidth(self.SIDEBAR_EXPANDED_WIDTH)
+        self.initial_size = self.size()
+        print(f"[INIT] Initial window size: {self.initial_size.width()}x{self.initial_size.height()}")
+
+        # --- Adaptive Font Scaling ---
+        font = self.font()
+        dpi = QApplication.primaryScreen().logicalDotsPerInch()
+        scale_factor = dpi / 96  # 96 DPI is typical baseline
+        font.setPointSizeF(font.pointSizeF() * scale_factor)
+        self.setFont(font)
+
+    def resizeEvent(self, event):
+        new_size = event.size()
+        aspect_ratio = 1200 / 800
+        expected_height = int(new_size.width() / aspect_ratio)
+
+        # Prevent height distortion if user resizes too much
+        if abs(expected_height - new_size.height()) > 50:
+            self.resize(new_size.width(), expected_height)
+
+        print(f"[RESIZE] Old: {event.oldSize().width()}x{event.oldSize().height()} → "
+              f"New: {new_size.width()}x{new_size.height()}")
+        super().resizeEvent(event)
 
     # --- Public Methods (API for the Controller) ---
     def handle_close_request(self):
