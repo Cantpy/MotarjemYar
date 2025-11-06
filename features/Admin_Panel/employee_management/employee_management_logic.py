@@ -1,11 +1,12 @@
-# Admin_Panel/employee_management/employee_management_logic.py
+# features/Admin_Panel/employee_management/employee_management_logic.py
 
 from datetime import date
 from decimal import Decimal
-from features.Admin_Panel.employee_management.employee_management_models import EmployeeFullData
+from features.Admin_Panel.employee_management.employee_management_models import EmployeeFullData, EmployeeEditLogData
 from features.Admin_Panel.employee_management.employee_management_repo import EmployeeManagementRepository
 from features.Admin_Panel.employee_management import employee_management_validator as validator
-from shared.orm_models.payroll_models import (EmployeeModel, EmployeePayrollProfileModel, EmploymentType)
+from shared.orm_models.payroll_models import (EmployeeModel, EmployeePayrollProfileModel, EmploymentType,
+                                              EmployeeRoleModel)
 from shared.session_provider import ManagedSessionProvider, SessionManager
 
 
@@ -29,14 +30,15 @@ class UserManagementLogic:
         """Runs all validations for employee data."""
         errors = []
 
-        # MODIFIED: Sanitize national ID before validation
         national_id_to_validate = self._sanitize_persian_numerals(data.national_id)
+        insurance_number_to_validate = self._sanitize_persian_numerals(data.insurance_number)
 
         validation_checks = {
             "نام": validator.validate_required_field(data.first_name, "نام"),
             "نام خانوادگی": validator.validate_required_field(data.last_name, "نام خانوادگی"),
             "کد پرسنلی": validator.validate_required_field(data.employee_code, "کد پرسنلی"),
             "کد ملی": validator.validate_national_id(national_id_to_validate),
+            "شماره بیمه": validator.validate_insurance_number(insurance_number_to_validate),
             "شماره تلفن": validator.validate_phone_number(data.phone_number),
             "ایمیل": validator.validate_email(data.email),
             "تاریخ استخدام": validator.validate_hire_date(data.hire_date),
@@ -48,7 +50,6 @@ class UserManagementLogic:
                 errors.append(error_message)
 
         if errors:
-            # The message is formatted for clear display in the dialog
             error_summary = "لطفاً خطاهای زیر را اصلاح کنید:\n\n" + "\n".join(f"• {e}" for e in errors)
             raise ValueError(error_summary)
 
@@ -65,11 +66,14 @@ class UserManagementLogic:
                         first_name=emp.first_name,
                         last_name=emp.last_name,
                         national_id=emp.national_id,
+                        insurance_number=emp.insurance_number,
+                        role_id=emp.role_id,
+                        role_name_fa=emp.role.role_name_fa if emp.role else "تعیین نشده",
                         date_of_birth=emp.date_of_birth,
                         hire_date=emp.hire_date,
                         email=emp.email,
                         phone_number=emp.phone_number,
-                        employment_type=emp.payroll_profile.employment_type.name,
+                        employment_type=emp.payroll_profile.employment_type,
                         base_salary_rials=emp.payroll_profile.base_salary_rials or Decimal(0),
                         hourly_rate_rials=emp.payroll_profile.hourly_rate_rials or Decimal(0),
                         commission_rate_pct=emp.payroll_profile.commission_rate_pct or Decimal(0),
@@ -78,12 +82,57 @@ class UserManagementLogic:
                     ))
             return dto_list
 
+    def get_employee_details_for_view(self, employee_id: str) -> EmployeeFullData:
+        """Fetches a single employee's full data and their edit history."""
+        with self._payroll_session() as p_sess:
+            emp = self._repo.get_employee_by_id(p_sess, employee_id)
+            if not emp:
+                raise ValueError("کارمند یافت نشد.")
+
+            logs_orm = self._repo.get_edit_logs_for_employee(p_sess, employee_id)
+            log_dtos = [
+                EmployeeEditLogData(
+                    edited_at=log.edited_at,
+                    edited_by=log.edited_by,
+                    field_name=log.field_name,
+                    old_value=log.old_value,
+                    new_value=log.new_value
+                ) for log in logs_orm
+            ]
+
+            return EmployeeFullData(
+                employee_id=emp.employee_id,
+                employee_code=emp.employee_code,
+                first_name=emp.first_name,
+                last_name=emp.last_name,
+                national_id=emp.national_id,
+                insurance_number=emp.insurance_number,
+                role_id=emp.role_id,
+                role_name_fa=emp.role.role_name_fa if emp.role else "تعیین نشده",
+                date_of_birth=emp.date_of_birth,
+                hire_date=emp.hire_date,
+                email=emp.email,
+                phone_number=emp.phone_number,
+                employment_type=emp.payroll_profile.employment_type,
+                base_salary_rials=emp.payroll_profile.base_salary_rials or Decimal(0),
+                hourly_rate_rials=emp.payroll_profile.hourly_rate_rials or Decimal(0),
+                commission_rate_pct=emp.payroll_profile.commission_rate_pct or Decimal(0),
+                marital_status=emp.payroll_profile.marital_status,
+                children_count=emp.payroll_profile.children_count,
+                edit_logs=log_dtos
+            )
+
+    def get_all_roles(self) -> list[EmployeeRoleModel]:
+        """Fetches all available roles for the dropdown."""
+        with self._payroll_session() as p_sess:
+            return self._repo.get_all_roles(p_sess)
+
     def save_employee(self, data: EmployeeFullData):
         """Dispatches to the correct create or update method for an employee profile."""
         data.national_id = self._sanitize_persian_numerals(data.national_id)
         data.phone_number = self._sanitize_persian_numerals(data.phone_number)
+        data.insurance_number = self._sanitize_persian_numerals(data.insurance_number)
 
-        # The logic is now based on whether employee_code exists, which signifies an existing record
         with self._payroll_session() as p_sess:
             existing_employee = self._repo.get_employee_by_id(p_sess, data.employee_id)
 
@@ -93,7 +142,7 @@ class UserManagementLogic:
             self._create_new_employee(data)
 
     def _create_new_employee(self, data: EmployeeFullData):
-        """Creates a new Employee record. Assumes the User already exists."""
+        """Creates a new Employee record."""
         self._validate_employee_data(data, is_edit=False)
 
         employee = EmployeeModel(
@@ -101,6 +150,8 @@ class UserManagementLogic:
             first_name=data.first_name,
             last_name=data.last_name,
             national_id=data.national_id,
+            insurance_number=data.insurance_number,
+            role_id=data.role_id,
             date_of_birth=data.date_of_birth,
             hire_date=data.hire_date or date.today(),
             email=data.email or None,
@@ -127,22 +178,21 @@ class UserManagementLogic:
         """Updates an existing Employee record."""
         self._validate_employee_data(data, is_edit=True)
         with self._payroll_session() as p_sess:
-            # Fetch current state to compare for logging
             current_employee_orm = self._repo.get_employee_by_id(p_sess, data.employee_id)
             if not current_employee_orm:
                 raise ValueError("Employee not found for update.")
 
-            # (Optional) Implement detailed field change logging here...
-            edit_logs = []
+            edit_logs = [] # In a real scenario, you'd compare old and new values to create logs.
 
             employee_changes = {
                 'first_name': data.first_name, 'last_name': data.last_name,
                 'national_id': data.national_id, 'date_of_birth': data.date_of_birth,
                 'hire_date': data.hire_date, 'email': data.email, 'phone_number': data.phone_number,
+                'insurance_number': data.insurance_number, 'role_id': data.role_id
             }
 
             payroll_changes = {
-                'employment_type': EmploymentType[data.employment_type],
+                'employment_type': EmploymentType[data.employment_type].value,
                 'base_salary_rials': data.base_salary_rials,
                 'hourly_rate_rials': data.hourly_rate_rials,
                 'commission_rate_pct': data.commission_rate_pct,
@@ -157,7 +207,7 @@ class UserManagementLogic:
                                        edit_logs=edit_logs)
 
     def delete_employee(self, employee_id: str):
-        """Archives an employee. The user account is deactivated separately."""
+        """Archives an employee."""
         if not employee_id:
             raise ValueError("شناسه کارمند برای حذف ضروری است.")
 

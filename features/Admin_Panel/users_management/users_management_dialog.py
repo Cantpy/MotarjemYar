@@ -4,7 +4,7 @@ import qtawesome as qta
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QFormLayout, QLineEdit, QComboBox, QPushButton, QHBoxLayout,
                                QCheckBox, QLabel)
 from PySide6.QtCore import Signal, Qt
-from features.Admin_Panel.employee_management.employee_management_dialog import ROLE_MAP
+from features.Admin_Panel.users_management.users_management_view import ROLE_MAP
 from features.Admin_Panel.users_management.users_management_models import UserData
 
 

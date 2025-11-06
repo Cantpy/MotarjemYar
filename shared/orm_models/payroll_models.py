@@ -42,47 +42,46 @@ def _now() -> datetime:
 
 
 class EmployeeModel(BasePayroll):
-    """Stores core personal and employment details for each employee."""
-
     __tablename__ = "employees"
 
     employee_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    employee_code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)  # کد پرسنلی
+    employee_code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
 
     first_name: Mapped[str] = mapped_column(String(200), nullable=False)
     last_name: Mapped[str] = mapped_column(String(200), nullable=False)
-
     national_id: Mapped[str] = mapped_column(String(10), unique=True, nullable=False, index=True)
-    insurance_number: Mapped[Optional[str]] = mapped_column(String(50), unique=True, nullable=True, index=True)
 
+    role_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("employee_roles.role_id"),
+        nullable=True,
+        index=True
+    )
+
+    insurance_number: Mapped[Optional[str]] = mapped_column(String(50), unique=True, nullable=True, index=True)
     date_of_birth: Mapped[Optional[Date]] = mapped_column(Date, nullable=True)
     hire_date: Mapped[Date] = mapped_column(Date, nullable=False)
     termination_date: Mapped[Optional[Date]] = mapped_column(Date, nullable=True)
-
     email: Mapped[Optional[str]] = mapped_column(String(320), unique=True, nullable=True)
     phone_number: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
-
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now, nullable=False)
 
-    # Relationships
+    role: Mapped[Optional["EmployeeRoleModel"]] = relationship(back_populates="employees")
+
     payroll_profile: Mapped[Optional["EmployeePayrollProfileModel"]] = relationship(
-        back_populates="employee",
-        uselist=False,
-        cascade="all, delete-orphan",
-    )
-    payroll_records: Mapped[List["PayrollRecordModel"]] = relationship(
-        back_populates="employee",
-        cascade="all, delete-orphan",
+        back_populates="employee", uselist=False, cascade="all, delete-orphan"
     )
 
-    def __repr__(self) -> str:  # pragma: no cover - simple repr
-        return f"<Employee {self.employee_code} {self.first_name} {self.last_name}>"
+    payroll_records: Mapped[List["PayrollRecordModel"]] = relationship(
+        back_populates="employee", cascade="all, delete-orphan"
+    )
 
     @property
     def full_name(self) -> str:
-        """Returns full name in a single string."""
         return f"{self.first_name} {self.last_name}"
+
+    def __repr__(self):
+        return f"<Employee {self.employee_code} {self.full_name}>"
 
 
 class EditedEmployeeLogModel(BasePayroll):
@@ -185,6 +184,29 @@ class EmployeePayrollProfileModel(BasePayroll):
         CheckConstraint("employment_type IN ('full_time','part_time','commission')"),
         CheckConstraint("marital_status IN ('Single', 'Married')"),
     )
+
+
+class EmployeeRoleModel(BasePayroll):
+    """
+    Stores all possible employee roles.
+    New roles can be added dynamically via the admin panel.
+    """
+    __tablename__ = "employee_roles"
+
+    role_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    role_name_en: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    role_name_fa: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    # Reverse relationship
+    employees: Mapped[List["EmployeeModel"]] = relationship(
+        back_populates="role",
+        cascade="all, delete",
+    )
+
+    def __repr__(self):
+        return f"<Role {self.role_name_en} ({self.role_name_fa})>"
 
 
 class EmployeeCustomPayrollComponentModel(BasePayroll):

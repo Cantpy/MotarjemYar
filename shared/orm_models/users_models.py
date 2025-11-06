@@ -51,10 +51,7 @@ class UsersModel(BaseUsers):
         String(100), nullable=False,
         comment="User's preferred display name for UI (e.g., nickname, 'Mr. Smith')"
     )
-    avatar_path: Mapped[str | None] = mapped_column(
-        Text, nullable=True,
-        comment="Optional path to user's profile picture"
-    )
+    avatar_path: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Access control
     start_date: Mapped[str | None] = mapped_column(Text)
@@ -102,7 +99,7 @@ class UsersModel(BaseUsers):
 
     __table_args__ = (
         CheckConstraint(
-            "role IN ('admin', 'translator', 'clerk', 'accountant')",
+            "role IN ('admin', 'user')",
             name='check_role'
         ),
         CheckConstraint(
@@ -113,7 +110,6 @@ class UsersModel(BaseUsers):
         Index('idx_users_role', 'role'),
         Index('idx_users_token', 'token_hash'),
         Index('idx_users_username', 'username'),
-        # --- REMOVED: Index for employee_id ---
     )
 
     def __repr__(self) -> str:

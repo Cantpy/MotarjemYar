@@ -42,6 +42,36 @@ def validate_phone_number(phone: str) -> tuple[bool, str]:
     return False, "فرمت شماره تلفن نامعتبر است (مثال: 09123456789)"
 
 
+def validate_insurance_number(insurance_number: str) -> tuple[bool, str]:
+    """
+    Validate Iranian insurance number (شماره بیمه).
+
+    - Must be numeric.
+    - Must be 8 to 10 digits long (most commonly 9 digits).
+    - Cannot contain repeating identical digits.
+    """
+    if not insurance_number or not isinstance(insurance_number, str):
+        return False, "شماره بیمه الزامی است"
+
+    insurance_number = insurance_number.strip()
+
+    # Must be only digits
+    if not insurance_number.isdigit():
+        return False, "شماره بیمه باید فقط شامل اعداد باشد"
+
+    # Length check: usually 9 digits, but we accept 8–10 for safety
+    if len(insurance_number) < 8 or len(insurance_number) > 10:
+        return False, "شماره بیمه باید بین ۸ تا ۱۰ رقم باشد"
+
+    # Reject if all digits are the same (e.g., 111111111)
+    if len(set(insurance_number)) == 1:
+        return False, "شماره بیمه نامعتبر است"
+
+    # Optional checksum (for stricter validation, if you want)
+    # Here we just accept if all the above pass.
+    return True, ""
+
+
 def validate_national_id(national_id: str) -> tuple[bool, str]:
     """Validate Iranian national ID (Melli Code)."""
     if not national_id or not isinstance(national_id, str):

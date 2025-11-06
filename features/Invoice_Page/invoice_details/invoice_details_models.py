@@ -13,6 +13,7 @@ class UserInfo:
     role: str = "نامشخص"
     role_fa: str = "نامشخص"
     username: str = "نامشخص"
+    display_name: str = "نامشخص"
 
 
 @dataclass

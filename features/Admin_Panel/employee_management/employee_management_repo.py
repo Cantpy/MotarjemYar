@@ -1,7 +1,7 @@
 # features/Admin_Panel/employee_management/employee_management_repo.py
 
 from sqlalchemy.orm import Session, joinedload
-from shared.orm_models.payroll_models import (EmployeeModel, EmployeePayrollProfileModel,
+from shared.orm_models.payroll_models import (EmployeeModel, EmployeePayrollProfileModel, EmployeeRoleModel,
                                               DeletedEmployeeModel, EditedEmployeeLogModel)
 
 
@@ -12,10 +12,22 @@ class EmployeeManagementRepository:
     """
 
     def get_all_employees_with_details(self, payroll_session: Session) -> list[EmployeeModel]:
-        """Fetches all employees with their payroll profile pre-loaded."""
+        """Fetches all employees with their payroll profile and role pre-loaded."""
         return payroll_session.query(EmployeeModel).options(
-            joinedload(EmployeeModel.payroll_profile)
+            joinedload(EmployeeModel.payroll_profile),
+            joinedload(EmployeeModel.role)
         ).order_by(EmployeeModel.last_name).all()
+
+    def get_all_roles(self, payroll_session: Session) -> list[EmployeeRoleModel]:
+        """Fetches all active employee roles."""
+        return payroll_session.query(EmployeeRoleModel).filter_by(active=True).order_by(EmployeeRoleModel.role_name_fa).all()
+
+    def get_edit_logs_for_employee(self, payroll_session: Session, employee_id: str) -> list[EditedEmployeeLogModel]:
+        """Fetches all change logs for a given employee, ordered by most recent."""
+        return payroll_session.query(EditedEmployeeLogModel)\
+            .filter_by(employee_id=employee_id)\
+            .order_by(EditedEmployeeLogModel.edited_at.desc())\
+            .all()
 
     def save_new_employee(self, payroll_session: Session, employee: EmployeeModel):
         """Saves a new employee and their payroll profile to the database."""
@@ -48,7 +60,18 @@ class EmployeeManagementRepository:
                          deleted_by: str):
         """Moves an employee to the deleted table."""
         try:
-            deleted_record = DeletedEmployeeModel(...)
+            # Note: The '...' is a placeholder for the actual data mapping
+            deleted_record = DeletedEmployeeModel(
+                original_employee_id=employee_to_delete.employee_id,
+                employee_code=employee_to_delete.employee_code,
+                first_name=employee_to_delete.first_name,
+                last_name=employee_to_delete.last_name,
+                national_id=employee_to_delete.national_id,
+                insurance_number=employee_to_delete.insurance_number,
+                hire_date=employee_to_delete.hire_date,
+                termination_date=employee_to_delete.termination_date,
+                deleted_by=deleted_by
+            )
             payroll_session.add(deleted_record)
             payroll_session.delete(employee_to_delete)
             payroll_session.commit()
@@ -58,7 +81,8 @@ class EmployeeManagementRepository:
 
     def get_employee_by_id(self, payroll_session: Session, employee_id: str) -> EmployeeModel | None:
         return payroll_session.query(EmployeeModel).options(
-            joinedload(EmployeeModel.payroll_profile)
+            joinedload(EmployeeModel.payroll_profile),
+            joinedload(EmployeeModel.role)
         ).filter(EmployeeModel.employee_id == employee_id).first()
 
     def get_employee_by_national_id(self, payroll_session: Session, national_id: str) -> EmployeeModel | None:

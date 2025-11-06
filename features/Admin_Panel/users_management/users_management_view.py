@@ -2,11 +2,11 @@
 
 import qtawesome as qta
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem,
-                               QHBoxLayout, QPushButton, QLineEdit, QLabel, QHeaderView)
+                               QHBoxLayout, QPushButton, QLineEdit, QHeaderView)
 from PySide6.QtCore import Signal, Qt
-from PySide6.QtGui import QFont
 from features.Admin_Panel.users_management.users_management_models import UserData
-from features.Admin_Panel.employee_management.employee_management_dialog import ROLE_MAP
+
+ROLE_MAP = {"admin": "مدیر", "user": "کاربر"}
 
 
 class UsersManagementView(QWidget):
