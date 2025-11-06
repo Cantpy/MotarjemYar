@@ -15,7 +15,10 @@ from shared.orm_models.invoices_models import (
     DeletedInvoiceData
 )
 from shared.orm_models.users_models import UsersModel
-from shared.orm_models.payroll_models import EmployeeModel
+# --- MODIFICATION START ---
+# Import Employee and Role models from the payroll domain
+from shared.orm_models.payroll_models import EmployeeModel, EmployeeRoleModel
+# --- MODIFICATION END ---
 from shared.orm_models.services_models import ServicesModel, ServiceDynamicPrice
 
 
@@ -331,45 +334,49 @@ class InvoiceRepository:
             return []
 
 
-class UserRepository:
+class PayrollRepository:
     """
-    Repository for user-related database operations.
-    Now fetches employee data from payroll DB for translator names.
+    Repository for payroll-related database operations.
+    Now includes method to fetch translator names.
     """
-
-    def get_translator_names(
-            self,
-            users_session: Session,
-            payroll_session: Session
-    ) -> list[str]:
+    def get_translator_names(self, payroll_session: Session) -> list[str]:
         """
-        Get list of translator display names.
-        Fetches from users DB, but could also enrich from payroll DB if needed.
+        Get a list of translator names from the payroll database.
+        Fetches full names of active employees with the 'translator' role.
         """
         translator_names = ["نامشخص"]
-
         try:
-            # Get active translators
+            # Query active employees who have the 'translator' role
             translators = (
-                users_session.query(UsersModel)
+                payroll_session.query(EmployeeModel)
+                .join(EmployeeRoleModel, EmployeeModel.role_id == EmployeeRoleModel.role_id)
                 .filter(
-                    UsersModel.role == 'translator',
-                    UsersModel.active == 1
+                    EmployeeRoleModel.role_name_en == 'translator',
+                    # Assuming we only want current employees
+                    EmployeeModel.termination_date.is_(None)
                 )
                 .all()
             )
 
             for translator in translators:
-                # Use display_name from users table
-                if translator.display_name:
-                    translator_names.append(translator.display_name)
+                if translator.full_name:
+                    translator_names.append(translator.full_name)
 
         except SQLAlchemyError as e:
-            print(f"Error loading translator names: {e}")
+            print(f"Error loading translator names from payroll DB: {e}")
+            # Fallback data in case of error
             translator_names.extend(["مریم", "علی", "رضا"])
 
-        return translator_names
+        # Remove duplicates and sort, keeping "نامشخص" at the top
+        unique_names = sorted(list(set(translator_names) - {"نامشخص"}))
+        return ["نامشخص"] + unique_names
 
+
+class UserRepository:
+    """
+    Repository for user-related database operations.
+    Now fetches employee data from payroll DB for translator names.
+    """
     def get_user_with_employee_details(
             self,
             users_session: Session,
@@ -402,7 +409,7 @@ class UserRepository:
                 'avatar_path': user.avatar_path,
                 'employee_id': user.employee_id,
                 # Employee details from payroll DB
-                'display_name': employee.full_name if employee else None,
+                'employee_name': employee.full_name if employee else None,
                 'email': employee.email if employee else None,
                 'phone': employee.phone_number if employee else None,
                 'national_id': employee.national_id if employee else None,
@@ -440,6 +447,7 @@ class RepositoryManager:
     def __init__(self):
         self.invoice_repo = InvoiceRepository()
         self.user_repo = UserRepository()
+        self.payroll_repo = PayrollRepository()
 
     def get_invoice_repository(self) -> InvoiceRepository:
         """Get invoice repository instance"""
@@ -448,3 +456,7 @@ class RepositoryManager:
     def get_user_repository(self) -> UserRepository:
         """Get user repository instance"""
         return self.user_repo
+
+    def get_payroll_repository(self) -> PayrollRepository:
+        """Get payroll repository instance"""
+        return self.payroll_repo

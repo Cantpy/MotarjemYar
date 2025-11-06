@@ -85,16 +85,20 @@ class InvoiceService:
     This class is the single gateway to the database for invoices.
     """
 
+    # --- MODIFICATION START ---
     def __init__(self,
                  repo_manager: RepositoryManager,
                  invoices_engine: ManagedSessionProvider,
                  users_engine: ManagedSessionProvider,
-                 services_engine: ManagedSessionProvider):
+                 services_engine: ManagedSessionProvider,
+                 payroll_engine: ManagedSessionProvider):  # Add payroll_engine
         self._repo_manager = repo_manager
         self._invoice_session = invoices_engine
         self._users_session = users_engine
         self._services_session = services_engine
+        self._payroll_session = payroll_engine  # Store payroll_engine
         self._document_counts_cache: Dict[str, int] = {}
+    # --- MODIFICATION END ---
 
     # ==============================================================
     # BASIC FETCH OPERATIONS
@@ -207,9 +211,9 @@ class InvoiceService:
     # ==============================================================
 
     def get_translator_names(self) -> List[str]:
-        """Gets a list of all available translator names."""
-        with self._users_session() as session:
-            return self._repo_manager.get_user_repository().get_translator_names(session)
+        """Gets a list of all available translator names from the payroll DB."""
+        with self._payroll_session() as session:
+            return self._repo_manager.get_payroll_repository().get_translator_names(session)
 
     def get_document_counts(self) -> Dict[str, int]:
         """Returns the cached document counts for all invoices."""

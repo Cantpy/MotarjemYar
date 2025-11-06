@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 BaseInvoices = declarative_base()
 
-# ... (rest of the dataclasses remain the same)
+
 @dataclass
 class InvoiceData:
     id: int

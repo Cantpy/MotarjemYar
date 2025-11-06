@@ -136,6 +136,7 @@ class MainWindowController(QObject):
             invoices_engine=self._engines.get('invoices'),
             users_engine=self._engines.get('users'),
             services_engine=self._engines.get('services'),
+            payroll_engine=self._engines.get('payroll'),
             parent=self._view
         )
         controller.request_deep_edit_navigation.connect(self._on_request_deep_edit)
