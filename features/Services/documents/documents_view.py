@@ -242,13 +242,29 @@ class ServicesDocumentsView(QWidget):
         return False
 
     def _toggle_select_all(self, state):
+        """
+        Handles the state change of the 'select all' checkbox.
+        This method is now optimized to prevent a "signal storm".
+        """
+        # Determine the target state. If the master checkbox was clicked and became
+        # 'Checked', all children should be checked. Otherwise, they are unchecked.
         is_checked = (state == Qt.CheckState.Checked.value)
+
+        # Iterate through all rows and set the state of each checkbox.
         for row in range(self.table.rowCount()):
             widget = self.table.cellWidget(row, 0)
             if widget:
                 checkbox = widget.findChild(QCheckBox)
                 if checkbox:
+                    # *** FIX: Temporarily block signals for the row checkbox ***
+                    # This prevents the _update_selection_ui method from being
+                    # called for every single row, which was causing the issue.
+                    checkbox.blockSignals(True)
                     checkbox.setChecked(is_checked)
+                    checkbox.blockSignals(False)
+
+        # After all programmatic changes are done, call the UI update method once.
+        # This will correctly update the "X items selected" label.
         self._update_selection_ui()
 
     # --- Private Signal Emitters ---

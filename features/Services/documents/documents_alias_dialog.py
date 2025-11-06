@@ -14,6 +14,7 @@ class ServicePropertiesDialog(QDialog):
                  default_page_count: int, dynamic_prices_data: list[dict], parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"ویرایش جزئیات: {service_name}")
+        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         self.setMinimumWidth(500)
 
         # Store initial data
