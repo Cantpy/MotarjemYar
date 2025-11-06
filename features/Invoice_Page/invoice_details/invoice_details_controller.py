@@ -43,7 +43,6 @@ class InvoiceDetailsController:
         self._current_details = self._logic.create_initial_details(items)
         self._process_update(self._current_details)
 
-    # --- NEW METHOD for EDIT WORKFLOW ---
     def prepare_and_display_data_for_edit(self, customer: Customer, items: list[InvoiceItem],
                                           original_invoice: InvoiceData):
         """Public method for an EDITED INVOICE to kick off this step."""
@@ -51,7 +50,6 @@ class InvoiceDetailsController:
         user_info = self._logic.get_static_user_info()
         self._view.display_static_info(customer, office_info, user_info)
 
-        # Call the new logic method to pre-populate from original data
         self._current_details = self._logic.create_details_for_edit(items, original_invoice)
         self._process_update(self._current_details)
 
@@ -70,11 +68,22 @@ class InvoiceDetailsController:
         return True, ""
 
     def reset_view(self):
-        """Clears all fields in the invoice details view."""
+        """Clears all fields in the invoice details view and resets to defaults."""
+        # 1. Create an empty data model to clear calculated labels
         empty_details = self._logic.create_empty_details()
         self._view.update_display(empty_details)
+
+        # 2. Explicitly clear all user input widgets in the view
         self._view.delivery_date_edit.clear()
-        print("VIEW RESET: Invoice Details view cleared.")
+        self._view.emergency_input.setValue(0)
+        self._view.discount_input.setValue(0)
+        self._view.advance_input.setValue(0)
+        self._view.clear_errors()  # Also reset any validation highlights
+
+        # 3. Re-apply all default settings (remarks, visibility, and languages)
+        self._view.apply_settings()
+
+        print("VIEW RESET: Invoice Details view cleared and defaults restored.")
 
     def _process_update(self, details: InvoiceDetails):
         """A central place to handle all updates."""
@@ -105,7 +114,7 @@ class InvoiceDetailsController:
 
     def _on_settings_requested(self):
         dialog = SettingsDialog(self._settings_manager, self._view)
-        if dialog.exec() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             self._view.apply_settings()
             if self._current_details:
                 new_details = self._logic.recalculate_all_variables(self._current_details)

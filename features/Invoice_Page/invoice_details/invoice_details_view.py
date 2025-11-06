@@ -10,6 +10,7 @@ from shared.utils.persian_tools import to_persian_numbers
 from shared.widgets.persian_tools import PlainDoubleSpinBox
 from shared.utils.text_utils import amount_to_persian_words
 from shared.utils.date_utils import get_persian_date
+from features.Invoice_Page.invoice_details.invoice_details_settings_dialog import SettingsManager
 
 
 class InvoiceDetailsWidget(QWidget):
@@ -137,25 +138,20 @@ class InvoiceDetailsWidget(QWidget):
         form = QFormLayout(group)
         form.setSpacing(12)
 
-        # Set current date/time for receive date
         from shared.utils.date_utils import get_persian_date
         current_jalali_datetime = get_persian_date()
         self.issue_date_label.setText(current_jalali_datetime)
 
-        # Setup language combos
+        # Setup language combos but don't set defaults here
         languages = [lang.value for lang in Language]
         self.source_language.addItems(languages)
         self.target_language.addItems(languages)
-        self.source_language.setCurrentText(Language.FARSI.value)
-        self.target_language.setCurrentText(Language.ENGLISH.value)
 
-        # Style the labels
         self._style_info_label(self.invoice_number_label)
         self._style_info_label(self.total_documents)
         self._style_info_label(self.issue_date_label)
         self._style_info_label(self.user_label)
 
-        # Update translation direction label
         self._update_translation_direction()
 
         form.addRow("شماره رسید:", self.invoice_number_label)
@@ -170,16 +166,23 @@ class InvoiceDetailsWidget(QWidget):
         return group
 
     def apply_settings(self):
-        """Applies settings from the manager to the UI (visibility, default text)."""
-        # Apply visibility
+        """Applies settings from the manager to the UI (visibility, default text, default languages)."""
         visibility = self.settings_manager.get("group_box_visibility")
         self.invoice_group.setVisible(visibility.get("invoice", True))
         self.customer_group.setVisible(visibility.get("customer", True))
         self.financial_group.setVisible(visibility.get("financial", True))
         self.office_group.setVisible(visibility.get("office", True))
+
         default_remarks = self.settings_manager.get("default_remarks")
         self.remarks_text.setPlainText(default_remarks)
 
+        # Apply default languages from settings
+        default_src = self.settings_manager.get("default_source_language", Language.FARSI.value)
+        default_trgt = self.settings_manager.get("default_target_language", Language.ENGLISH.value)
+        self.source_language.setCurrentText(default_src)
+        self.target_language.setCurrentText(default_trgt)
+
+    # ... (no other changes to the rest of invoice_details_view.py) ...
     def _create_customer_group(self) -> QGroupBox:
         """Create customer information group."""
         group = QGroupBox("اطلاعات مشتری")

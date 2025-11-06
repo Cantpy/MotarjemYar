@@ -36,6 +36,7 @@ class CustomerInfoWidget(QWidget):
         self._setup_companions_section()
         self.main_layout.addStretch(1)
         self._setup_action_buttons()
+        self._setup_styles()
 
     # --- UI Setup Methods ---
 
@@ -102,6 +103,9 @@ class CustomerInfoWidget(QWidget):
         # Connect internal signals to internal slots
         self.save_button.clicked.connect(self._on_save_clicked)
         self.clear_button.clicked.connect(self.clear_form)
+
+    def _setup_styles(self):
+        self.setStyleSheet(CUSTOMER_INFO_STYLES)
 
     # --- Public Methods (Slots for Controller) ---
 

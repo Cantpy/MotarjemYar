@@ -51,7 +51,6 @@ class CustomerInfoController:
             saved_customer = self._logic.save_customer(raw_data)
             self._state_manager.set_customer(saved_customer)
             self._view.show_save_success("اطلاعات مشتری با موفقیت ذخیره شد!")
-            self._view.clear_form()
             self._populate_all_completers()
 
         except ValidationError as e:
