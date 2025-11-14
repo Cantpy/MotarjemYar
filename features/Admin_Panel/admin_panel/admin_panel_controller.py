@@ -1,5 +1,11 @@
 # features/Admin_Panel/admin_panel/admin_panel_controller.py
 
+"""
+Admin Panel Controller Module
+This module defines the AdminPanelController, which orchestrates the creation
+and display of all admin sub-features within a tabbed view.
+"""
+
 from PySide6.QtCore import QObject
 
 from sqlalchemy.engine import Engine
@@ -11,12 +17,16 @@ from features.Admin_Panel.admin_reports.admin_reports_factory import AdminReport
 from features.Admin_Panel.users_management.users_management_factory import UsersManagementFactory
 from features.Admin_Panel.employee_management.employee_management_factory import EmployeeManagementFactory
 from features.Admin_Panel.wage_calculator.wage_calculator_factory import WageCalculatorFactory
+# --- Import the new factories ---
+from features.Admin_Panel.translation_office_info.translation_office_info_factory import TranslationOfficeInfoFactory
+from features.Admin_Panel.user_info.user_info_factory import UserInfoFactory
 
 
 class AdminPanelController(QObject):
     """
     Orchestrates the creation and display of all admin sub-features within a tabbed view.
     """
+
     def __init__(self, view: AdminPanelView, engines: dict[str, Engine]):
         super().__init__()
         self._view = view
@@ -56,7 +66,7 @@ class AdminPanelController(QObject):
         except Exception as e:
             print(f"Failed to create Admin Reports tab: {e}")
 
-        # --- NEW: 3. User Management Tab (Added before Employee Management) ---
+        # --- 3. User Management Tab ---
         try:
             users_controller = UsersManagementFactory.create(
                 users_engine=self._engines['users'],
@@ -67,7 +77,7 @@ class AdminPanelController(QObject):
         except Exception as e:
             print(f"Failed to create User Management tab: {e}")
 
-        # --- 4. Employee Management Tab (Was 3) ---
+        # --- 4. Employee Management Tab ---
         try:
             employee_controller = EmployeeManagementFactory.create(
                 payroll_engine=self._engines['payroll'],
@@ -78,7 +88,7 @@ class AdminPanelController(QObject):
         except Exception as e:
             print(f"Failed to create Employee Management tab: {e}")
 
-        # --- 5. Wage Calculator Tab (Was 4) ---
+        # --- 5. Wage Calculator Tab ---
         try:
             wage_controller = WageCalculatorFactory.create(
                 payroll_engine=self._engines['payroll'],
@@ -87,9 +97,26 @@ class AdminPanelController(QObject):
                 parent=self._view
             )
             self._sub_controllers['wage_calculator'] = wage_controller
-            self._view.add_feature_tab(wage_controller.get_view(), 'fa5s.calculator', "محاسبه حقوق و دستمزد ")
+            self._view.add_feature_tab(wage_controller.get_view(), 'fa5s.calculator', "محاسبه حقوق و دستمزد")
         except Exception as e:
             print(f"Failed to create Wage Calculator tab: {e}")
+
+        # --- 6. User Info Tab ---
+        try:
+            user_info_controller = UserInfoFactory.create(parent=self._view)
+            self._sub_controllers['user_info'] = user_info_controller
+            self._view.add_feature_tab(user_info_controller.get_view(), 'fa5s.user-circle', "اطلاعات کاربری")
+        except Exception as e:
+            print(f"Failed to create User Info tab: {e}")
+
+        # --- 7. Translation Office Info Tab ---
+        try:
+            office_info_controller = TranslationOfficeInfoFactory.create(parent=self._view,
+                                                                         users_engine=self._engines['users'])
+            self._sub_controllers['office_info'] = office_info_controller
+            self._view.add_feature_tab(office_info_controller.get_view(), 'fa5s.building', "اطلاعات دارالترجمه")
+        except Exception as e:
+            print(f"Failed to create Translation Office Info tab: {e}")
 
     def get_view(self) -> AdminPanelView:
         """

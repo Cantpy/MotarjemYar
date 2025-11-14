@@ -7,7 +7,7 @@ from PySide6.QtGui import QPainter, QPixmap
 from PySide6.QtCore import Qt
 import jdatetime
 
-from features.Admin_Panel.wage_calculator_preview.wage_calculator_preview_view import WageCalculatorPreviewDialog
+from features.Admin_Panel.wage_calculator.wage_calculator_preview.wage_calculator_preview_view import WageCalculatorPreviewDialog
 from features.Admin_Panel.wage_calculator.wage_calculator_logic import WageCalculatorLogic
 from features.Admin_Panel.wage_calculator.wage_calculator_models import PayslipData
 

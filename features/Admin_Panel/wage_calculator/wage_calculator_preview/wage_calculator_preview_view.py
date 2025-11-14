@@ -6,7 +6,7 @@ from PySide6.QtCore import Signal
 import qtawesome as qta
 from shared.widgets.persian_calendar import DataDatePicker
 # --- FIX: Import widget from its new local path ---
-from features.Admin_Panel.wage_calculator_preview.salary_slip_viewer import SalarySlipViewer
+from features.Admin_Panel.wage_calculator.wage_calculator_preview.salary_slip_viewer import SalarySlipViewer
 # --- FIX: Explicitly import from the core wage_calculator package ---
 from features.Admin_Panel.wage_calculator.wage_calculator_models import EmployeeInfo, PayslipData
 from shared import show_warning_message_box

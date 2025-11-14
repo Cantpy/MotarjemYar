@@ -1,3 +1,5 @@
+# core/database_seeder.py
+
 """
 Centralized and production-ready database seeder for all engines.
 Handles users, services, payroll, and configuration constants.
@@ -13,7 +15,12 @@ from sqlalchemy.orm import sessionmaker, Session
 
 from shared.orm_models.users_models import UsersModel
 from shared.orm_models.services_models import FixedPricesModel, ServicesModel
-from shared.orm_models.payroll_models import SystemConstantModel, SalaryComponentModel, TaxBracketModel
+from shared.orm_models.payroll_models import (
+    SystemConstantModel,
+    SalaryComponentModel,
+    TaxBracketModel,
+    EmployeeRoleModel
+)
 from shared import get_resource_path
 from shared.session_provider import ManagedSessionProvider
 
@@ -44,6 +51,7 @@ class DatabaseSeeder:
 
         self._seed_fixed_prices()
         self._seed_services_from_excel()
+        self._seed_employee_roles()
         self._seed_payroll_system_constants()
         self._seed_salary_components()
         self._seed_tax_brackets()
@@ -180,6 +188,70 @@ class DatabaseSeeder:
     # PAYROLL SEEDING
     # ------------------------------------------------------------------
 
+    def _seed_employee_roles(self) -> None:
+        """Seed standard employee roles."""
+        print("👥 Seeding employee roles...")
+
+        session = self._get_session("payroll")
+        if not session:
+            return
+
+        try:
+            if session.query(EmployeeRoleModel).count() > 0:
+                print("⚙️ Employee roles already exist. Skipping.")
+                return
+
+            roles = [
+                EmployeeRoleModel(
+                    role_name_en="manager",
+                    role_name_fa="مدیر",
+                    description="مدیریت کل سازمان و تصمیم‌گیری‌های استراتژیک",
+                    active=True
+                ),
+                EmployeeRoleModel(
+                    role_name_en="translator",
+                    role_name_fa="مترجم",
+                    description="ترجمه اسناد و مدارک",
+                    active=True
+                ),
+                EmployeeRoleModel(
+                    role_name_en="clerk",
+                    role_name_fa="منشی",
+                    description="امور اداری و دفتری",
+                    active=True
+                ),
+                EmployeeRoleModel(
+                    role_name_en="accountant",
+                    role_name_fa="حسابدار",
+                    description="امور مالی و حسابداری",
+                    active=True
+                ),
+                EmployeeRoleModel(
+                    role_name_en="digital_marketer",
+                    role_name_fa="بازاریاب دیجیتال",
+                    description="بازاریابی آنلاین و مدیریت شبکه‌های اجتماعی",
+                    active=True
+                ),
+                EmployeeRoleModel(
+                    role_name_en="it_specialist",
+                    role_name_fa="متخصص فناوری اطلاعات",
+                    description="پشتیبانی فنی و مدیریت سیستم‌های IT",
+                    active=True
+                ),
+                EmployeeRoleModel(
+                    role_name_en="delivery",
+                    role_name_fa="پیک",
+                    description="تحویل و ارسال اسناد",
+                    active=True
+                ),
+            ]
+
+            session.add_all(roles)
+            self._safe_commit(session)
+            print("✅ Employee roles seeded.")
+        finally:
+            session.close()
+
     def _seed_payroll_system_constants(self) -> None:
         """Seed government-mandated constants and system configuration values."""
         print("🏛️ Seeding payroll system constants...")
@@ -227,6 +299,30 @@ class DatabaseSeeder:
                     unit="ریال",
                     description="حداکثر پایه حقوق مشمول بیمه تامین اجتماعی در سال 1404"
                 ),
+                SystemConstantModel(
+                    year=1404,
+                    code="FAMILY_ALLOWANCE_RIAL_1404",
+                    name="حق عائله‌مندی (ماهانه)",
+                    value=Decimal("10000000"),
+                    unit="ریال",
+                    description="حق عائله‌مندی ماهانه برای کارکنان متاهل"
+                ),
+                SystemConstantModel(
+                    year=1404,
+                    code="CHILD_ALLOWANCE_RIAL_1404",
+                    name="حق اولاد (هر فرزند)",
+                    value=Decimal("5000000"),
+                    unit="ریال",
+                    description="حق اولاد ماهانه برای هر فرزند (حداکثر 5 فرزند)"
+                ),
+                SystemConstantModel(
+                    year=1404,
+                    code="HOUSING_ALLOWANCE_RIAL_1404",
+                    name="حق مسکن",
+                    value=Decimal("15000000"),
+                    unit="ریال",
+                    description="کمک هزینه مسکن ماهانه"
+                ),
             ]
 
             session.add_all(constants)
@@ -236,7 +332,7 @@ class DatabaseSeeder:
             session.close()
 
     def _seed_salary_components(self) -> None:
-        """Seed standard earning and deduction components for payroll slips."""
+        """Seed standard earning and deduction components based on Iranian Labour law."""
         print("🧾 Seeding salary components...")
 
         session = self._get_session("payroll")
@@ -249,6 +345,7 @@ class DatabaseSeeder:
                 return
 
             components = [
+                # مزایای حقوقی (Earnings)
                 SalaryComponentModel(
                     name="base_salary",
                     display_name="حقوق پایه",
@@ -258,8 +355,56 @@ class DatabaseSeeder:
                     is_base_for_insurance_calculation=True
                 ),
                 SalaryComponentModel(
+                    name="family_allowance",
+                    display_name="حق عائله‌مندی",
+                    type="Earning",
+                    is_taxable_for_income_tax=True,
+                    is_deductible_for_taxable_income=False,
+                    is_base_for_insurance_calculation=True
+                ),
+                SalaryComponentModel(
+                    name="child_allowance",
+                    display_name="حق اولاد",
+                    type="Earning",
+                    is_taxable_for_income_tax=True,
+                    is_deductible_for_taxable_income=False,
+                    is_base_for_insurance_calculation=True
+                ),
+                SalaryComponentModel(
+                    name="housing_allowance",
+                    display_name="حق مسکن",
+                    type="Earning",
+                    is_taxable_for_income_tax=True,
+                    is_deductible_for_taxable_income=False,
+                    is_base_for_insurance_calculation=False
+                ),
+                SalaryComponentModel(
                     name="overtime_pay",
                     display_name="اضافه‌کار",
+                    type="Earning",
+                    is_taxable_for_income_tax=True,
+                    is_deductible_for_taxable_income=False,
+                    is_base_for_insurance_calculation=True
+                ),
+                SalaryComponentModel(
+                    name="night_shift_allowance",
+                    display_name="حق شیفت شب",
+                    type="Earning",
+                    is_taxable_for_income_tax=True,
+                    is_deductible_for_taxable_income=False,
+                    is_base_for_insurance_calculation=True
+                ),
+                SalaryComponentModel(
+                    name="hardship_allowance",
+                    display_name="حق سختی کار",
+                    type="Earning",
+                    is_taxable_for_income_tax=True,
+                    is_deductible_for_taxable_income=False,
+                    is_base_for_insurance_calculation=True
+                ),
+                SalaryComponentModel(
+                    name="responsibility_allowance",
+                    display_name="حق مسئولیت",
                     type="Earning",
                     is_taxable_for_income_tax=True,
                     is_deductible_for_taxable_income=False,
@@ -282,6 +427,31 @@ class DatabaseSeeder:
                     is_base_for_insurance_calculation=False
                 ),
                 SalaryComponentModel(
+                    name="years_of_service_bonus",
+                    display_name="پاداش سنوات خدمت",
+                    type="Earning",
+                    is_taxable_for_income_tax=True,
+                    is_deductible_for_taxable_income=False,
+                    is_base_for_insurance_calculation=False
+                ),
+                SalaryComponentModel(
+                    name="performance_bonus",
+                    display_name="پاداش عملکرد",
+                    type="Earning",
+                    is_taxable_for_income_tax=True,
+                    is_deductible_for_taxable_income=False,
+                    is_base_for_insurance_calculation=False
+                ),
+                SalaryComponentModel(
+                    name="commission",
+                    display_name="حق کمیسیون",
+                    type="Earning",
+                    is_taxable_for_income_tax=True,
+                    is_deductible_for_taxable_income=False,
+                    is_base_for_insurance_calculation=True
+                ),
+                # کسورات (Deductions)
+                SalaryComponentModel(
                     name="income_tax",
                     display_name="مالیات بر درآمد",
                     type="Deduction",
@@ -291,10 +461,50 @@ class DatabaseSeeder:
                 ),
                 SalaryComponentModel(
                     name="insurance_contribution",
-                    display_name="حق بیمه",
+                    display_name="حق بیمه تامین اجتماعی (سهم کارگر)",
                     type="Deduction",
                     is_taxable_for_income_tax=False,
                     is_deductible_for_taxable_income=True,
+                    is_base_for_insurance_calculation=False
+                ),
+                SalaryComponentModel(
+                    name="supplementary_insurance",
+                    display_name="بیمه تکمیلی",
+                    type="Deduction",
+                    is_taxable_for_income_tax=False,
+                    is_deductible_for_taxable_income=True,
+                    is_base_for_insurance_calculation=False
+                ),
+                SalaryComponentModel(
+                    name="loan_repayment",
+                    display_name="بازپرداخت وام",
+                    type="Deduction",
+                    is_taxable_for_income_tax=False,
+                    is_deductible_for_taxable_income=False,
+                    is_base_for_insurance_calculation=False
+                ),
+                SalaryComponentModel(
+                    name="advance_payment",
+                    display_name="مساعده / علی‌الحساب",
+                    type="Deduction",
+                    is_taxable_for_income_tax=False,
+                    is_deductible_for_taxable_income=False,
+                    is_base_for_insurance_calculation=False
+                ),
+                SalaryComponentModel(
+                    name="absence_deduction",
+                    display_name="کسر غیبت",
+                    type="Deduction",
+                    is_taxable_for_income_tax=False,
+                    is_deductible_for_taxable_income=False,
+                    is_base_for_insurance_calculation=False
+                ),
+                SalaryComponentModel(
+                    name="other_deductions",
+                    display_name="سایر کسورات",
+                    type="Deduction",
+                    is_taxable_for_income_tax=False,
+                    is_deductible_for_taxable_income=False,
                     is_base_for_insurance_calculation=False
                 ),
             ]

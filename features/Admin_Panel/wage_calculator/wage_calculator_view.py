@@ -6,10 +6,8 @@ from PySide6.QtCore import Signal
 from PySide6.QtGui import QColor
 import qtawesome as qta
 import jdatetime
-from shared.fonts.font_manager import FontManager
 from shared.utils.persian_tools import to_persian_numbers, to_english_numbers
-from features.Admin_Panel.wage_calculator.wage_calculator_models import PayrollRunEmployee, PayslipData
-from features.Admin_Panel.wage_calculator_preview.salary_slip_viewer import SalarySlipViewer
+from features.Admin_Panel.wage_calculator.wage_calculator_models import PayrollRunEmployee
 from features.Admin_Panel.wage_calculator.wage_calculator_styles import WAGE_CALCULATOR_STYLES
 
 

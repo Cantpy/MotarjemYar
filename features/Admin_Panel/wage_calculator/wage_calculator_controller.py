@@ -5,10 +5,10 @@ from PySide6.QtWidgets import QMessageBox, QDialog, QVBoxLayout
 
 from features.Admin_Panel.wage_calculator.wage_calculator_view import WageCalculatorView
 from features.Admin_Panel.wage_calculator.wage_calculator_logic import WageCalculatorLogic
-from features.Admin_Panel.wage_calculator_preview.wage_calculator_preview_controller import \
+from features.Admin_Panel.wage_calculator.wage_calculator_preview.wage_calculator_preview_controller import \
     WageCalculatorPreviewController
-from features.Admin_Panel.wage_calculator_preview.wage_calculator_preview_view import WageCalculatorPreviewDialog
-from features.Admin_Panel.wage_calculator_preview.salary_slip_viewer import SalarySlipViewer
+from features.Admin_Panel.wage_calculator.wage_calculator_preview.wage_calculator_preview_view import WageCalculatorPreviewDialog
+from features.Admin_Panel.wage_calculator.wage_calculator_preview.salary_slip_viewer import SalarySlipViewer
 from shared import show_error_message_box
 
 
