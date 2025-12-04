@@ -1,12 +1,16 @@
 # features/Main_Window/main_window_controller.py
+
+"""
+Controller for the Main Window feature.
+Handles navigation and page management within the main application window.
+"""
+
 from PySide6.QtCore import QObject, Signal
 from sqlalchemy.engine import Engine
 
 from core.navigation import PageManager, PageLifetime
 from config.config_manager import ConfigManager
 
-from features.Main_Window.main_window_view import MainWindowView
-from features.Main_Window.main_window_logic import MainWindowLogic
 from features.Home_Page.home_page_factory import HomePageFactory
 from features.Invoice_Page.wizard_host.invoice_wizard_factory import InvoiceWizardFactory
 from features.Admin_Panel.admin_panel.admin_panel_factory import AdminPanelFactory
@@ -60,10 +64,7 @@ class MainWindowController(QObject):
         self.page_manager.register(
             "home",
             lambda: HomePageFactory.create(
-                customers_engine=self._engines.get('customers'),
-                invoices_engine=self._engines.get('invoices'),
-                services_engine=self._engines.get('services'),
-                users_engine=self._engines.get('users'),
+                business_engine=self._engines.get('business'),
                 parent=self._view),
             lifetime=PageLifetime.REFRESH_ON_SHOW
         )
@@ -77,7 +78,7 @@ class MainWindowController(QObject):
         self.page_manager.register(
             "services",
             lambda: ServicesManagementFactory.create(
-                services_engine=self._engines.get('services'),
+                business_engine=self._engines.get('business'),
                 parent=self._view),
             lifetime=PageLifetime.REFRESH_ON_SHOW
         )
@@ -86,10 +87,7 @@ class MainWindowController(QObject):
         self.page_manager.register(
             "invoice",
             lambda: InvoiceWizardFactory.create(
-                customer_engine=self._engines.get('customers'),
-                invoices_engine=self._engines.get('invoices'),
-                services_engine=self._engines.get('services'),
-                users_engine=self._engines.get('users'),
+                business_engine=self._engines.get('business'),
                 parent=self._view),
             lifetime=PageLifetime.KEEP_ALIVE
         )
@@ -97,12 +95,8 @@ class MainWindowController(QObject):
         self.page_manager.register(
             "admin_panel",
             lambda: AdminPanelFactory.create(
-                invoices_engine=self._engines.get('invoices'),
-                customers_engine=self._engines.get('customers'),
-                services_engine=self._engines.get('services'),
-                expenses_engine=self._engines.get('expenses'),
+                business_engine=self._engines.get('business'),
                 payroll_engine=self._engines.get('payroll'),
-                users_engine=self._engines.get('users'),
                 parent=self._view),
             lifetime=PageLifetime.TIMEOUT
         )

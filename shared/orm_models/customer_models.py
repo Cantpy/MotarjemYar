@@ -1,4 +1,4 @@
-# shared/orm_models/customer_models.py
+# shared/orm_models/business_models.py
 
 from __future__ import annotations
 from sqlalchemy import Integer, Text, Index, ForeignKey

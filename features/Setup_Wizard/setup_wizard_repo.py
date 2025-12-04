@@ -1,7 +1,7 @@
 # features/Setup_Wizard/setup_wizard_repo.py
 
 from sqlalchemy.orm import Session
-from shared.orm_models.users_models import UsersModel, TranslationOfficeDataModel, SecurityQuestionModel
+from shared.orm_models.business_models import UsersModel, TranslationOfficeDataModel, SecurityQuestionModel
 from shared.orm_models.license_models import LicenseModel
 from features.Setup_Wizard.setup_wizard_models import TranslationOfficeDTO, AdminUserDTO
 import bcrypt

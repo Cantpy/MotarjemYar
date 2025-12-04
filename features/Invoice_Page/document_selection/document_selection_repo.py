@@ -1,11 +1,13 @@
 # features/Invoice_Page/document_selection/document_selection_repo.py
 
+"""
+
+"""
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc
-from shared.orm_models.services_models import (ServicesModel, SmartSearchHistoryModel, ServiceDynamicPrice,
+from shared.orm_models.business_models import (ServicesModel, SmartSearchHistoryModel, ServiceDynamicPrice,
                                                FixedPricesModel, OtherServicesModel)
-from shared.orm_models.invoices_models import InvoiceItemModel
-from features.Invoice_Page.document_selection.document_selection_models import InvoiceItem, Service, FixedPrice
+from features.Invoice_Page.document_selection.document_selection_models import Service, FixedPrice
 
 
 class DocumentSelectionRepository:

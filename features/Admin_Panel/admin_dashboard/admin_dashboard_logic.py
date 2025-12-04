@@ -10,14 +10,12 @@ from shared. session_provider import ManagedSessionProvider
 
 class AdminDashboardLogic:
     def __init__(self, repository: AdminDashboardRepository,
-                 invoices_engine: ManagedSessionProvider,
-                 customers_engine: ManagedSessionProvider):
+                 business_engine: ManagedSessionProvider):
         self._repo = repository
-        self._invoices_session = invoices_engine
-        self._customers_session = customers_engine
+        self._business_session = business_engine
 
     def get_kpi_data(self) -> KpiData:
-        with self._invoices_session() as session:
+        with self._business_session() as session:
             revenue_today = self._repo.get_revenue_today(session)
             revenue_month = self._repo.get_revenue_this_month(session)
             outstanding = self._repo.get_total_outstanding(session)
@@ -32,7 +30,7 @@ class AdminDashboardLogic:
 
     def get_top_performers_data(self) -> dict:
         """Fetches and prepares data for the top performers widget."""
-        with self._invoices_session() as session:
+        with self._business_session() as session:
             raw_translators = self._repo.get_top_translators_this_month(session)
             raw_clerks = self._repo.get_top_clerks_this_month(session)
 
@@ -48,14 +46,14 @@ class AdminDashboardLogic:
         """
         Fetches orders needing attention and enriches them with companion counts.
         """
-        with self._invoices_session() as inv_session, self._customers_session() as cust_session:
-            raw_orders = self._repo.get_orders_needing_attention(inv_session)
+        with self._business_session() as session:
+            raw_orders = self._repo.get_orders_needing_attention(session)
             unpaid_collected = self.get_unpaid_collected_data()
             if not raw_orders and not unpaid_collected:
                 return {}
 
             national_ids = [order.national_id for order in raw_orders]
-            companion_counts = self._repo.get_companion_counts_for_customers(cust_session, national_ids)
+            companion_counts = self._repo.get_companion_counts_for_customers(session, national_ids)
 
             attention_items = []
             for order in raw_orders:
@@ -79,7 +77,7 @@ class AdminDashboardLogic:
 
     def get_unpaid_collected_data(self) -> list[UnpaidCollectedItem]:
         """Fetches and prepares data for unpaid but collected invoices."""
-        with self._invoices_session() as session:
+        with self._business_session() as session:
             raw_invoices = self._repo.get_unpaid_collected_invoices(session)
             unpaid_items = []
             for invoice in raw_invoices:

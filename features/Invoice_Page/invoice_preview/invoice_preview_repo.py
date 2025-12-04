@@ -1,11 +1,15 @@
 # features/Invoice_Page/invoice_preview/invoice_preview_repo.py
 
+"""
+Repository for handling database operations related to invoice preview and issuance.
+"""
+
 from sqlalchemy import update, desc
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import SQLAlchemyError
 from typing import List, Optional
 
-from shared.orm_models.invoices_models import IssuedInvoiceModel, InvoiceItemModel, EditedInvoiceModel
+from shared.orm_models.business_models import IssuedInvoiceModel, InvoiceItemModel, EditedInvoiceModel
 
 
 # --- Repository for Data Export ---

@@ -10,11 +10,11 @@ class SetupWizardLogic:
     """Business logic for the first-time setup wizard."""
 
     def __init__(self, repo: SetupWizardRepository,
-                 user_db_session: ManagedSessionProvider,
-                 license_db_session: ManagedSessionProvider):
+                 business_engine: ManagedSessionProvider,
+                 license_engine: ManagedSessionProvider):
         self._repo = repo
-        self._user_db_session = user_db_session
-        self._license_db_session = license_db_session
+        self._business_session = business_engine
+        self._license_session = license_engine
         self._validated_license_key: str | None = None
 
     def _get_license_details_from_rules(self, license_key: str) -> dict | None:
@@ -46,11 +46,11 @@ class SetupWizardLogic:
 
     def get_next_step(self) -> WizardStep:
         """Determines which wizard step should be shown next."""
-        with self._license_db_session() as session:
+        with self._license_session() as session:
             if not self._repo.is_license_present(session):
                 return WizardStep.LICENSE
 
-        with self._user_db_session() as session:
+        with self._business_session() as session:
             if not self._repo.is_office_present(session):
                 return WizardStep.TRANSLATION_OFFICE
             if not self._repo.is_admin_present(session):
@@ -68,7 +68,7 @@ class SetupWizardLogic:
             raise ValueError("کلید لایسنس وارد شده معتبر نمی باشد.")
 
         # 3. If valid, pass the complete dictionary to the repository.
-        with self._license_db_session() as session:
+        with self._license_session() as session:
             self._repo.save_license(session, license_details)
 
         # 4. Cache the key for the next step (e.g., to link the office to it).
@@ -84,7 +84,7 @@ class SetupWizardLogic:
             print(f'process office step error: license key is not valid')
             raise RuntimeError("License key has not been validated.")
 
-        with self._user_db_session() as session:
+        with self._business_session() as session:
             print(f'saving data to the database under key: {self._validated_license_key}')
             self._repo.save_translation_office(session, office_dto, self._validated_license_key)
 
@@ -96,6 +96,6 @@ class SetupWizardLogic:
             raise ValueError("نام کاربری و نام نمایشی نمی‌تواند خالی باشد و رمز عبور باید حداقل ۸ کاراکتر باشد.")
 
         # CHANGE: Removed payroll_session from the context manager.
-        with self._user_db_session() as user_session:
+        with self._business_session() as user_session:
             # CHANGE: Call the new, simplified repository method.
             self._repo.save_admin_user(user_session, user_dto)

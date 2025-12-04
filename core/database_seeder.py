@@ -85,7 +85,7 @@ class DatabaseSeeder:
         """Create a default demo user if none exists."""
         print("🧪 Seeding default demo user (testuser)...")
 
-        session = self._get_session("users")
+        session = self._get_session("business")
         if not session:
             return
 
@@ -119,9 +119,9 @@ class DatabaseSeeder:
 
     def _seed_services_from_excel(self) -> None:
         """Seed the services DB from an Excel file if empty."""
-        print("📦 Checking Services.db for seeding requirements...")
+        print("📦 Checking business.db for seeding requirements...")
 
-        session = self._get_session("services")
+        session = self._get_session("business")
         if not session:
             return
 
@@ -135,7 +135,7 @@ class DatabaseSeeder:
                 print(f"⚠️ Excel file not found at {excel_path}")
                 return
 
-            managed_engine = ManagedSessionProvider(self.engines["services"])
+            managed_engine = ManagedSessionProvider(self.engines["business"])
             services_logic = ServicesLogic(ServiceRepository(), managed_engine)
             other_services_logic = OtherServicesLogic(OtherServicesRepository(), managed_engine)
             importer = ExcelImportLogic(services_logic, other_services_logic)
@@ -156,7 +156,7 @@ class DatabaseSeeder:
         """Seed fixed service prices."""
         print("💰 Seeding fixed prices...")
 
-        session = self._get_session("services")
+        session = self._get_session("business")
         if not session:
             return
 

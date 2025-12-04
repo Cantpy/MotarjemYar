@@ -16,7 +16,7 @@ sys.path.append(str(PROJECT_ROOT))
 def launch_feature_for_ui_test(factory_class: Type,
                                required_engines: Dict[str, str],
                                use_memory_db: bool = True,
-                               parent: QWidget = None): # <-- Added parent
+                               parent: QWidget = None):
     """
     A generic helper to initialize dependencies and launch a single feature
     for visual inspection or manual UI testing.

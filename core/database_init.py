@@ -51,7 +51,7 @@ class DatabaseInitializer:
             engine = create_engine(url, connect_args=connect_args)
             engines[name] = engine
 
-            # Look up the correct SQLAlchemy Base and create tables
+            # Look up the correct SQLAlchemy BaseBusiness and create tables
             base = DATABASE_BASES.get(name)
             if base:
                 base.metadata.create_all(engine)

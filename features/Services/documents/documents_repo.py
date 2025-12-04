@@ -4,7 +4,7 @@ from typing import Any
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import SQLAlchemyError
 
-from shared.orm_models.services_models import ServicesModel, ServiceDynamicPrice, ServiceAlias, ServiceDynamicPriceAlias
+from shared.orm_models.business_models import ServicesModel, ServiceDynamicPrice, ServiceAlias, ServiceDynamicPriceAlias
 
 
 class ServiceRepository:

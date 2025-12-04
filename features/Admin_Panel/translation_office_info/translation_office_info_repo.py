@@ -2,7 +2,7 @@
 
 from sqlalchemy.orm import Session
 
-from shared.orm_models.users_models import TranslationOfficeDataModel
+from shared.orm_models.business_models import TranslationOfficeDataModel
 
 
 class TranslationOfficeInfoRepository:

@@ -1,5 +1,9 @@
 # features/Invoice_Page/document_selection/document_selection_logic.py
 
+"""
+The core business _logic for the document selection page.
+"""
+
 from features.Invoice_Page.document_selection.document_selection_repo import DocumentSelectionRepository
 from features.Invoice_Page.document_selection.document_selection_models import Service, FixedPrice, InvoiceItem
 from shared.session_provider import ManagedSessionProvider
@@ -8,13 +12,15 @@ from shared.session_provider import ManagedSessionProvider
 class DocumentSelectionLogic:
     """
     The core business _logic for the document selection page.
+    This class is completely decoupled from any UI framework.
+    It manages the state of the current invoice items and provides
+    methods to manipulate and calculate them.
     """
-
     def __init__(self, repo: DocumentSelectionRepository,
-                 services_engine: ManagedSessionProvider):
+                 business_engine: ManagedSessionProvider):
         super().__init__()
         self._repo = repo
-        self._services_engine = services_engine
+        self._business_session = business_engine
         self._parsing_keywords = {
             "با تاییدات": {"judiciary": True, "foreign_affairs": True},
             "با مهرها": {"judiciary": True, "foreign_affairs": True},
@@ -34,7 +40,7 @@ class DocumentSelectionLogic:
             'extra_copies': ['نسخه اضافی', 'اضافی'],
         }
 
-        with self._services_engine() as session:
+        with self._business_session() as session:
             self._services_map = {s.name: s for s in self._repo.get_all_services(session)}
             self._calculation_fees = self._repo.get_calculation_fees(session)
             self._fees_map = {fee.name: fee.price for fee in self._calculation_fees}
@@ -51,15 +57,13 @@ class DocumentSelectionLogic:
         Private method to fetch all services, fees, and aliases from the
         database and populate the in-memory cache.
         """
-        print("Reloading all services, fees, and aliases from the database...")
-        with self._services_engine() as session:
+        with self._business_session() as session:
             all_services_and_fees = self._repo.get_all_services(session)
             # Create a map of both Service and FixedPrice objects by name
             self._services_map = {s.name: s for s in all_services_and_fees}
 
             self._calculation_fees = self._repo.get_calculation_fees(session)
             self._fees_map = {fee.name: fee.price for fee in self._calculation_fees}
-        print("Data reloaded successfully.")
 
     def refresh_all_data(self):
         """
@@ -70,7 +74,7 @@ class DocumentSelectionLogic:
 
     def get_smart_search_history(self) -> list[str]:
         """Provides a list of recent smart search entries for the completer."""
-        with self._services_engine() as session:
+        with self._business_session() as session:
             return self._repo.get_smart_search_history(session)
 
     def _build_item_shell(self, service, original_text: str, quantity: int, page_count: int, extra_copies: int,
@@ -230,12 +234,12 @@ class DocumentSelectionLogic:
 
     def get_all_fixed_prices(self) -> list[FixedPrice]:
         """Provides all fixed price items for the settings dialog."""
-        with self._services_engine() as session:
+        with self._business_session() as session:
             return self._repo.get_all_fixed_prices(session)
 
     def update_fixed_prices(self, updated_prices: list[FixedPrice]):
         """Saves the updated prices to the database."""
-        with self._services_engine() as session:
+        with self._business_session() as session:
             self._repo.update_fixed_prices(session, updated_prices)
             session.commit()
 
@@ -261,7 +265,6 @@ class DocumentSelectionLogic:
         This is crucial for initializing the logic in an edit session.
         """
         self._current_invoice_items = items
-        print(f"LOGIC UPDATE: Internal items set for editing: {self._current_invoice_items}")
 
     def add_item(self, item: InvoiceItem) -> list[InvoiceItem]:
         """Adds a new, fully calculated item to the invoice list."""
@@ -353,7 +356,7 @@ class DocumentSelectionLogic:
                 item_shell.registration_price +
                 item_shell.judiciary_seal_price +
                 item_shell.foreign_affairs_seal_price +
-                item_shell.extra_copy_price # Add extra copy price to the grand total
+                item_shell.extra_copy_price
         )
 
         return item_shell
@@ -362,5 +365,5 @@ class DocumentSelectionLogic:
 
     def _add_to_smart_search_history(self, text: str):
         """Saves a successful smart search entry to the database."""
-        with self._services_engine() as session:
+        with self._business_session() as session:
             self._repo.add_smart_search_entry(session, text)

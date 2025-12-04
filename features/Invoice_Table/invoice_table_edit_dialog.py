@@ -1,8 +1,12 @@
 # features/Invoice_Table/invoice_table_edit_dialog.py
 
+"""
+
+"""
+
 import getpass
 import jdatetime
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
 from PySide6.QtCore import Qt
@@ -116,7 +120,7 @@ class EditInvoiceDialog(QDialog):
                                   old_value=original_date_str,
                                   new_value=new_date_for_history,
                                   edited_by=edited_by,
-                                  edited_at=datetime.utcnow(),
+                                  edited_at=datetime.now(timezone.utc),
                                   remarks="Updated"))
 
         # --- 2. Check Translator ---
@@ -131,7 +135,7 @@ class EditInvoiceDialog(QDialog):
                                   old_value=original_translator,
                                   new_value=new_translator,
                                   edited_by=edited_by,
-                                  edited_at=datetime.utcnow(),
+                                  edited_at=datetime.now(timezone.utc),
                                   remarks="Updated"))
 
         # --- 3. Check Remarks ---
@@ -146,7 +150,7 @@ class EditInvoiceDialog(QDialog):
                                   old_value=original_remarks,
                                   new_value=new_remarks,
                                   edited_by=edited_by,
-                                  edited_at=datetime.utcnow(),
+                                  edited_at=datetime.now(timezone.utc),
                                   remarks="Updated"))
 
         return updates, history_records

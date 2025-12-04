@@ -43,8 +43,7 @@ class AdminPanelController(QObject):
         # --- 1. Dashboard Tab ---
         try:
             dashboard_controller = AdminDashboardFactory.create(
-                invoices_engine=self._engines['invoices'],
-                customers_engine=self._engines['customers'],
+                business_engine=self._engines['business'],
                 parent=self._view
             )
             self._sub_controllers['dashboard'] = dashboard_controller
@@ -55,10 +54,7 @@ class AdminPanelController(QObject):
         # --- 2. Reports Tab ---
         try:
             reports_controller = AdminReportsFactory.create(
-                invoices_engine=self._engines['invoices'],
-                services_engine=self._engines['services'],
-                expenses_engine=self._engines['expenses'],
-                customers_engine=self._engines['customers'],
+                business_engine=self._engines['business'],
                 parent=self._view
             )
             self._sub_controllers['reports'] = reports_controller
@@ -69,7 +65,7 @@ class AdminPanelController(QObject):
         # --- 3. User Management Tab ---
         try:
             users_controller = UsersManagementFactory.create(
-                users_engine=self._engines['users'],
+                business_engine=self._engines['business'],
                 parent=self._view
             )
             self._sub_controllers['users_management'] = users_controller
@@ -92,8 +88,7 @@ class AdminPanelController(QObject):
         try:
             wage_controller = WageCalculatorFactory.create(
                 payroll_engine=self._engines['payroll'],
-                invoices_engine=self._engines['invoices'],
-                users_engine=self._engines['users'],
+                business_engine=self._engines['business'],
                 parent=self._view
             )
             self._sub_controllers['wage_calculator'] = wage_controller
@@ -112,7 +107,7 @@ class AdminPanelController(QObject):
         # --- 7. Translation Office Info Tab ---
         try:
             office_info_controller = TranslationOfficeInfoFactory.create(parent=self._view,
-                                                                         users_engine=self._engines['users'])
+                                                                         business_engine=self._engines['business'])
             self._sub_controllers['office_info'] = office_info_controller
             self._view.add_feature_tab(office_info_controller.get_view(), 'fa5s.building', "اطلاعات دارالترجمه")
         except Exception as e:

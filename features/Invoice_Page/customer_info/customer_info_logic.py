@@ -34,9 +34,9 @@ class CustomerLogic:
     Business logic for managing customers and companions.
     """
 
-    def __init__(self, repo: CustomerRepository, customer_engine: ManagedSessionProvider):
+    def __init__(self, repo: CustomerRepository, business_engine: ManagedSessionProvider):
         self._repo = repo
-        self._customer_session = customer_engine
+        self._business_session = business_engine
         self._completer_cache: list[dict] | None = None
         self._loaded_customer_state: Customer | None = None
         self.customer: Customer | None = None
@@ -84,7 +84,7 @@ class CustomerLogic:
         NEW: Fetches and formats data for name, NID, and phone completers.
         Returns a dictionary with lists for each completer type.
         """
-        with self._customer_session() as session:
+        with self._business_session() as session:
             all_customers = self._repo.get_all_customers(session)
 
         # Prepare the data structures
@@ -127,7 +127,7 @@ class CustomerLogic:
         if self._completer_cache is not None:
             return self._completer_cache
 
-        with self._customer_session() as session:
+        with self._business_session() as session:
             customers = self._repo.get_all_customers_for_completer(session)
             companions = self._repo.get_all_companions_for_completer(session)
 
@@ -160,11 +160,11 @@ class CustomerLogic:
         if validation_errors:
             raise ValidationError("اطلاعات وارد شده نامعتبر است.", errors=validation_errors)
 
-        with self._customer_session() as session:
+        with self._business_session() as session:
             if self._repo.get_customer(session, customer.national_id):
                 raise CustomerExistsError("مشتری با این کد ملی قبلا ثبت شده است.", customer)
 
-        with self._customer_session() as session:
+        with self._business_session() as session:
             self._repo.save_customer(session, customer)
 
         self.invalidate_completer_cache()
@@ -172,7 +172,7 @@ class CustomerLogic:
 
     def update_customer(self, customer: Customer) -> Customer:
         """Updates an existing customer's data."""
-        with self._customer_session() as session:
+        with self._business_session() as session:
             self._repo.save_customer(session, customer)
         self.invalidate_completer_cache()
         self._loaded_customer_state = customer
@@ -181,9 +181,8 @@ class CustomerLogic:
     def get_customer_details(self, national_id: str) -> Customer | None:
         """Gets full details for one customer."""
         nid_normalized = to_english_number(national_id)
-        with self._customer_session() as session:
+        with self._business_session() as session:
             self.customer = self._repo.get_customer(session, nid_normalized)
-            print(f"customer extracted by the logic layer: {self.customer} with national id: {national_id}")
         self._loaded_customer_state = self.customer
         return self.customer
 
@@ -191,7 +190,7 @@ class CustomerLogic:
         """Fetches and caches customer info for the completer."""
         # In a real app, you might refresh this periodically
         if not self._completer_cache:
-            with self._customer_session() as session:
+            with self._business_session() as session:
                 customers = self._repo.get_all_customers(session)
                 self._customers_for_completer = [
                     {"name": c.name, "national_id": c.national_id} for c in customers
@@ -252,7 +251,7 @@ class CustomerLogic:
                 return CustomerStatus.EXISTING_UNMODIFIED, self._loaded_customer_state
 
         db_customer = None
-        with self._customer_session() as session:
+        with self._business_session() as session:
             db_customer = self._repo.get_customer(session, nid)
 
         if db_customer:

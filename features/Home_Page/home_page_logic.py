@@ -20,58 +20,49 @@ class HomePageLogic:
     """Business _logic for home page operations. Manages units of work."""
 
     def __init__(self, repository: HomePageRepository,
-                 customer_engine: ManagedSessionProvider,
-                 invoices_engine: ManagedSessionProvider,
-                 services_engine: ManagedSessionProvider,
-                 users_engine: ManagedSessionProvider):
+                 business_engine: ManagedSessionProvider):
         """Initialize with _repository class and session makers."""
         self._repository = repository
-        self._customer_session = customer_engine
-        self._invoices_session = invoices_engine
-        self._services_session = services_engine
-        self._users_session = users_engine
+        self._business_session = business_engine
 
     # --- PUBLIC METHODS ---
 
     def get_all_translators(self) -> List[str]:
         """Retrieves a list of all users with the 'translator' role."""
-        with self._users_session() as session:
-            return self._repository.users_repo.get_all_translators(session)
+        with self._business_session() as session:
+            return self._repository.get_all_translators(session)
 
     def get_dashboard_statistics(self) -> DashboardStats:
         """Get all dashboard statistics. This is an orchestrating unit of work."""
         total_customers = 0
-        with self._customer_session() as customer_session:
-            total_customers = self._repository.customers_repo.get_total_count(customer_session)
+        with self._business_session() as session:
+            total_customers = self._repository.get_customer_total_count(session)
 
         # --- THIS IS THE CORE CHANGE ---
         most_repeated_name = None
         most_repeated_month_name = None
 
-        with self._invoices_session() as invoice_session:
+        with self._business_session() as session:
             # 1. Get raw data (with IDs) from the invoices DB
-            total_invoices = self._repository.invoices_repo.get_total_count(invoice_session)
-            print(f'Total invoices: {total_invoices}')
-            today_invoices = self._repository.invoices_repo.get_today_count(invoice_session, datetime.today())
-            print(f'Today invoices: {today_invoices}')
-            print(f'Today: {date.today()}')
-            doc_stats = self._repository.invoices_repo.get_document_statistics(invoice_session)
-            most_repeated_raw = self._repository.invoices_repo.get_most_repeated_doc(invoice_session)
-            most_repeated_month_raw = self._repository.invoices_repo.get_most_repeated_doc_month(invoice_session)
+            total_invoices = self._repository.get_invoice_total_count(session)
+            today_invoices = self._repository.get_invoice_today_count(session, datetime.today())
+            doc_stats = self._repository.get_document_statistics(session)
+            most_repeated_raw = self._repository.get_most_repeated_doc(session)
+            most_repeated_month_raw = self._repository.get_most_repeated_doc_month(session)
 
         # 2. If we found IDs, use the services DB to get the names
         if most_repeated_raw:
             service_id, total_qty = most_repeated_raw
-            with self._services_session() as services_session:
-                service_name = self._repository.services_repo.get_name_by_id(services_session, service_id)
+            with self._business_session() as session:
+                service_name = self._repository.get_service_name_by_id(session, service_id)
                 if service_name:
                     # Pass a tuple with the resolved NAME to the formatting function
                     most_repeated_name = self._format_most_repeated_doc((service_name, total_qty))
 
         if most_repeated_month_raw:
             service_id, year, month, total_qty = most_repeated_month_raw
-            with self._services_session() as services_session:
-                service_name = self._repository.services_repo.get_name_by_id(services_session, service_id)
+            with self._business_session() as session:
+                service_name = self._repository.get_service_name_by_id(session, service_id)
                 if service_name:
                     # Pass a tuple with the resolved NAME to the formatting function
                     most_repeated_month_name = self._format_most_repeated_doc_month(
@@ -99,19 +90,17 @@ class HomePageLogic:
 
         print(f'finding invoices between {today} to {threshold_date}')
         invoice_priority_list = []
-        with self._invoices_session() as session:
-            invoice_models = self._repository.invoices_repo.get_by_delivery_date_range(
+        with self._business_session() as session:
+            invoice_models = self._repository.get_invoices_by_delivery_range(
                 session,
                 start_date=today,
                 end_date=threshold_date,
                 exclude_completed=True
             )
-            print(f'found {len(invoice_models)} invoice(s)')
 
             for model in invoice_models:
                 delivery_date = self.normalize_date(model.delivery_date)
                 priority = self._calculate_priority(delivery_date, date.today())
-                print(f'Invoice {model.invoice_number} with delivery {delivery_date} is {priority}')
                 invoice_dto = self.map_orm_to_invoice_dto(model)
                 invoice_priority_list.append((invoice_dto, priority))
 
@@ -120,8 +109,8 @@ class HomePageLogic:
         return invoice_priority_list
 
     def get_data_for_notification(self, invoice_number: str) -> Optional[NotificationDataDTO]:
-        with self._invoices_session() as invoice_session:
-            invoice_model = self._repository.invoices_repo.get_by_number(invoice_session, invoice_number)
+        with self._business_session() as invoice_session:
+            invoice_model = self._repository.get_invoice_by_number(invoice_session, invoice_number)
 
             if not invoice_model:
                 raise Exception("اطلاعات فاکتور برای ارسال یافت نشد")
@@ -131,14 +120,11 @@ class HomePageLogic:
             invoice_phone = invoice_model.phone
             invoice_number_value = invoice_model.invoice_number
 
-        print(f'found invoice for {invoice_name}, national id: {invoice_national_id}')
-
         # Now safely open second session
         customer_data = None
         if invoice_national_id:
-            with self._customer_session() as customer_session:
-                customer_model = self._repository.customers_repo.get_by_national_id(customer_session,
-                                                                                    invoice_national_id)
+            with self._business_session() as session:
+                customer_model = self._repository.get_customer_by_national_id(session, invoice_national_id)
                 if customer_model:
                     customer_data = {
                         "name": customer_model.name,
@@ -171,9 +157,9 @@ class HomePageLogic:
         Handles all business _logic for changing an invoice's status.
         This is a single, consolidated transactional unit of work.
         """
-        with self._invoices_session() as session:
+        with self._business_session() as session:
             try:
-                invoice = self._repository.invoices_repo.get_by_number(session, request.invoice_number)
+                invoice = self._repository.get_invoice_by_number(session, request.invoice_number)
                 if not invoice:
                     return False, "فاکتور یافت نشد"
 
@@ -194,7 +180,7 @@ class HomePageLogic:
                     payment_status_to_set = 1 if request.set_payment_as_paid else 0
 
                 # === Update the record ===
-                success = self._repository.invoices_repo.update_status(
+                success = self._repository.update_invoice_status(
                     session,
                     request.invoice_number,
                     request.target_status,
@@ -215,8 +201,8 @@ class HomePageLogic:
 
     def get_invoice_for_menu(self, invoice_number: str) -> Optional[InvoiceDTO]:
         """Gets the necessary invoice data (as a DTO) for creating a services menu."""
-        with self._invoices_session() as session:
-            invoice_model = self._repository.invoices_repo.get_by_number(session, invoice_number)
+        with self._business_session() as session:
+            invoice_model = self._repository.get_invoice_by_number(session, invoice_number)
             if invoice_model:
                 return self.map_orm_to_invoice_dto(invoice_model)
             return None
@@ -466,8 +452,8 @@ class HomePageLogic:
             A tuple of (next_status_enum, next_step_button_text) if an advance is possible.
             None if the invoice is not found or is already in the final state.
         """
-        with self._invoices_session() as session:
-            invoice = self._repository.invoices_repo.get_by_number(session, invoice_number)
+        with self._business_session() as session:
+            invoice = self._repository.get_invoice_by_number(session, invoice_number)
             if not invoice:
                 return None
 
@@ -512,11 +498,11 @@ class HomePageLogic:
         Handles the business _logic of sending an email and updating customer info.
         """
         # Business Rule: Update the customer's email if it has changed.
-        with self._customer_session() as session:
+        with self._business_session() as session:
             try:
-                customer = self._repository.customers_repo.get_by_national_id(session, national_id)
+                customer = self._repository.get_customer_by_national_id(session, national_id)
                 if customer and customer.email != email_request.recipient_email:
-                    self._repository.customers_repo.update_email(session, national_id, email_request.recipient_email)
+                    self._repository.update_customer_email(session, national_id, email_request.recipient_email)
                     session.commit()
             except Exception as e:
                 session.rollback()

@@ -3,7 +3,7 @@
 from sqlalchemy.orm import Session
 
 from features.Invoice_Page.customer_info.customer_info_models import Customer, Companion
-from shared.orm_models.customer_models import CustomerModel, CompanionModel
+from shared.orm_models.business_models import CustomerModel, CompanionModel
 
 
 class CustomerRepository:

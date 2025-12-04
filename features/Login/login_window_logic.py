@@ -1,8 +1,12 @@
 # features/Login/login_window_logic.py
 
+"""
+
+"""
+
 import bcrypt
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy.exc import SQLAlchemyError
@@ -19,10 +23,10 @@ class LoginService:
     """
     def __init__(self, repo: LoginRepository,
                  auth_file_repo: AuthFileRepository,
-                 user_engine: ManagedSessionProvider):
+                 business_engine: ManagedSessionProvider):
         self.repo = repo
         self.auth_file_repo = auth_file_repo
-        self._users_session = user_engine
+        self._business_session = business_engine
 
     def login(self, login_dto: UserLoginDTO) -> tuple[bool, str, Optional[LoggedInUserDTO]]:
         """
@@ -71,7 +75,7 @@ class LoginService:
         from datetime import datetime
         import bcrypt
 
-        with self._users_session() as session:
+        with self._business_session() as session:
             try:
                 user = self.repo.get_user_by_username(session, login_dto.username)
 
@@ -80,8 +84,8 @@ class LoginService:
                     return False, "نام کاربری یا رمز عبور اشتباه است.", None
 
                 # --- STEP 2: Check if account is currently locked ---
-                if user.lockout_until_utc and user.lockout_until_utc > datetime.utcnow():
-                    time_remaining = user.lockout_until_utc - datetime.utcnow()
+                if user.lockout_until_utc and user.lockout_until_utc > datetime.now(timezone.utc):
+                    time_remaining = user.lockout_until_utc - datetime.now(timezone.utc)
                     minutes_left = round(time_remaining.total_seconds() / 60)
                     message = (
                         f"حساب کاربری به دلیل تلاش‌های ناموفق متعدد قفل شده است. "
@@ -129,7 +133,7 @@ class LoginService:
             return False, None
 
         if self._verify_remember_token(settings.username, settings.token):
-            with self._users_session() as session:
+            with self._business_session() as session:
                 user = self.repo.get_user_by_username(session, settings.username)
                 if user and user.active == 1:
                     return True, LoggedInUserDTO(
@@ -146,7 +150,7 @@ class LoginService:
 
     def _verify_remember_token(self, username: str, token: str) -> bool:
         """Verifies the remember me token against the database."""
-        with self._users_session() as session:
+        with self._business_session() as session:
             user = self.repo.get_user_by_username(session, username)
             if not (user and user.token_hash and user.expires_at):
                 return False
@@ -169,7 +173,7 @@ class LoginService:
         token_hash = bcrypt.hashpw(token.encode("utf-8"), bcrypt.gensalt())
         expires_at = (datetime.now() + timedelta(days=30)).isoformat()
 
-        with self._users_session() as session:
+        with self._business_session() as session:
             # Save the hashed token in the database
             self.repo.update_user_token(session, username, token_hash, expires_at)
             session.commit()
@@ -187,7 +191,7 @@ class LoginService:
 
     def _clear_remember_me(self, username: str):
         """Clears remember-me tokens from the DB and the settings file."""
-        with self._users_session() as session:
+        with self._business_session() as session:
             self.repo.update_user_token(session, username, None, None)
             session.commit()
         self.auth_file_repo.clear_remember_me()
@@ -201,7 +205,7 @@ class LoginService:
         print(f"--- Starting session for user: {user_dto.username} ---")
         login_time = datetime.now()
 
-        with self._users_session() as session:
+        with self._business_session() as session:
             try:
                 # Get the full user object to access its ID
                 user = self.repo.get_user_by_username(session, user_dto.username)
@@ -249,7 +253,7 @@ class LoginService:
         logout_time = datetime.now()
 
         # 2. Update the DB log entry
-        with self._users_session() as session:
+        with self._business_session() as session:
             try:
                 self.repo.update_logout_time(session, session_data.log_id, logout_time)
                 session.commit()

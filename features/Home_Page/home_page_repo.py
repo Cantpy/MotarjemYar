@@ -5,25 +5,27 @@ from datetime import date, datetime
 from sqlalchemy import func, extract, asc
 from sqlalchemy.orm import Session, aliased
 
-from shared.orm_models.invoices_models import IssuedInvoiceModel, InvoiceItemModel
-from shared.orm_models.customer_models import CustomerModel
-from shared.orm_models.services_models import ServicesModel
-from shared.orm_models.users_models import UsersModel
+from shared.orm_models.business_models import (
+    IssuedInvoiceModel,
+    InvoiceItemModel,
+    CustomerModel,
+    ServicesModel,
+    UsersModel
+)
 
 from features.Home_Page.home_page_models import DocumentStatistics
 
 
-class HomePageInvoicesRepository:
-    """Stateless repository for accessing invoice-related data."""
+class HomePageRepository:
+    """Unified stateless repository for invoices, customers, services, and users."""
 
-    def get_total_count(self, session: Session) -> int:
+    # ================================
+    #     INVOICES SECTION
+    # ================================
+    def get_invoice_total_count(self, session: Session) -> int:
         return session.query(IssuedInvoiceModel).count()
 
-    def get_today_count(self, session: Session, today: date) -> int:
-        """
-        Count invoices where issue_date falls within today's date range,
-        ignoring the time part.
-        """
+    def get_invoice_today_count(self, session: Session, today: date) -> int:
         start_of_day = datetime.combine(today, datetime.min.time())
         end_of_day = datetime.combine(today, datetime.max.time())
 
@@ -36,27 +38,41 @@ class HomePageInvoicesRepository:
             .count()
         )
 
-    def get_by_delivery_date_range(
-            self, session: Session, start_date: date, end_date: date, exclude_completed: bool = False
+    def get_invoices_by_delivery_range(
+        self,
+        session: Session,
+        start_date: date,
+        end_date: date,
+        exclude_completed: bool = False
     ) -> List[IssuedInvoiceModel]:
+
         query = session.query(IssuedInvoiceModel).filter(
             IssuedInvoiceModel.delivery_date.between(start_date, end_date)
         )
+
         if exclude_completed:
             query = query.filter(IssuedInvoiceModel.delivery_status != 4)
+
         return query.order_by(asc(IssuedInvoiceModel.delivery_date)).all()
 
-    def get_by_number(self, session: Session, invoice_number: str) -> Optional[IssuedInvoiceModel]:
+    def get_invoice_by_number(
+        self, session: Session, invoice_number: str
+    ) -> Optional[IssuedInvoiceModel]:
+
         return session.query(IssuedInvoiceModel).filter(
             IssuedInvoiceModel.invoice_number == invoice_number
         ).first()
 
-    def update_status(self, session: Session, invoice_number: str, new_status: int, translator: Optional[str] = None,
-                      new_payment_status: Optional[int] = None) -> bool:
-        """
-        Updates the delivery status and optionally the payment status of an invoice.
-        """
-        invoice = self.get_by_number(session, invoice_number)
+    def update_invoice_status(
+        self,
+        session: Session,
+        invoice_number: str,
+        new_status: int,
+        translator: Optional[str] = None,
+        new_payment_status: Optional[int] = None
+    ) -> bool:
+
+        invoice = self.get_invoice_by_number(session, invoice_number)
         if not invoice:
             return False
 
@@ -75,18 +91,23 @@ class HomePageInvoicesRepository:
         Item = aliased(InvoiceItemModel)
 
         total_docs = session.query(func.sum(Item.quantity)).scalar() or 0
+
         in_office_docs = (
-                session.query(func.sum(Item.quantity))
-                .join(Invoice, Item.invoice_number == Invoice.invoice_number)
-                .filter(Invoice.delivery_status != 4)
-                .scalar()
-                or 0
+            session.query(func.sum(Item.quantity))
+            .join(Invoice, Item.invoice_number == Invoice.invoice_number)
+            .filter(Invoice.delivery_status != 4)
+            .scalar()
+            or 0
         )
+
         delivered_docs = total_docs - in_office_docs
 
         return DocumentStatistics(total_docs, in_office_docs, delivered_docs)
 
-    def get_most_repeated_doc(self, session: Session) -> Optional[Tuple[int, int]]:
+    def get_most_repeated_doc(
+        self, session: Session
+    ) -> Optional[Tuple[int, int]]:
+
         return (
             session.query(
                 InvoiceItemModel.service_id,
@@ -97,7 +118,10 @@ class HomePageInvoicesRepository:
             .first()
         )
 
-    def get_most_repeated_doc_month(self, session: Session) -> Optional[Tuple[int, int, int, int]]:
+    def get_most_repeated_doc_month(
+        self, session: Session
+    ) -> Optional[Tuple[int, int, int, int]]:
+
         return (
             session.query(
                 InvoiceItemModel.service_id,
@@ -105,7 +129,10 @@ class HomePageInvoicesRepository:
                 extract("month", IssuedInvoiceModel.delivery_date).label("month"),
                 func.sum(InvoiceItemModel.quantity).label("total_qty"),
             )
-            .join(IssuedInvoiceModel, InvoiceItemModel.invoice_number == IssuedInvoiceModel.invoice_number)
+            .join(
+                IssuedInvoiceModel,
+                InvoiceItemModel.invoice_number == IssuedInvoiceModel.invoice_number,
+            )
             .group_by(
                 InvoiceItemModel.service_id,
                 extract("year", IssuedInvoiceModel.delivery_date),
@@ -115,65 +142,67 @@ class HomePageInvoicesRepository:
             .first()
         )
 
-
-class HomePageCustomersRepository:
-    """Stateless repository for customer data operations."""
-
-    def get_total_count(self, session: Session) -> int:
+    # ================================
+    #     CUSTOMERS SECTION
+    # ================================
+    def get_customer_total_count(self, session: Session) -> int:
         return session.query(CustomerModel).count()
 
-    def get_by_national_id(self, session: Session, national_id: str) -> Optional[CustomerModel]:
-        return session.query(CustomerModel).filter(CustomerModel.national_id == national_id).first()
+    def get_customer_by_national_id(
+        self, session: Session, national_id: str
+    ) -> Optional[CustomerModel]:
 
-    def update_email(self, session: Session, national_id: str, new_email: str) -> bool:
-        customer = self.get_by_national_id(session, national_id)
+        return session.query(CustomerModel).filter(
+            CustomerModel.national_id == national_id
+        ).first()
+
+    def update_customer_email(
+        self, session: Session, national_id: str, new_email: str
+    ) -> bool:
+
+        customer = self.get_customer_by_national_id(session, national_id)
         if customer:
             customer.email = new_email
             return True
         return False
 
+    # ================================
+    #     SERVICES SECTION
+    # ================================
+    def get_service_name_by_id(
+        self, session: Session, service_id: int
+    ) -> Optional[str]:
 
-class HomePageServicesRepository:
-    """Stateless repository for services-related operations."""
+        return (
+            session.query(ServicesModel.name)
+            .filter(ServicesModel.id == service_id)
+            .scalar()
+        )
 
-    def get_name_by_id(self, session: Session, service_id: int) -> Optional[str]:
-        return session.query(ServicesModel.name).filter(ServicesModel.id == service_id).scalar()
+    def get_service_names_by_ids(
+        self, session: Session, service_ids: List[int]
+    ) -> Dict[int, str]:
 
-    def get_names_by_ids(self, session: Session, service_ids: List[int]) -> Dict[int, str]:
         if not service_ids:
             return {}
-        results = session.query(ServicesModel.id, ServicesModel.name).filter(
-            ServicesModel.id.in_(service_ids)
-        ).all()
+
+        results = (
+            session.query(ServicesModel.id, ServicesModel.name)
+            .filter(ServicesModel.id.in_(service_ids))
+            .all()
+        )
+
         return {sid: name for sid, name in results}
 
-
-class HomePageUsersRepository:
-    """Stateless repository for user data operations related to the home page."""
-
+    # ================================
+    #     USERS SECTION
+    # ================================
     def get_all_translators(self, session: Session) -> List[str]:
-        """
-        Retrieves the display names of all users with the 'translator' role.
-        """
         results = (
             session.query(UsersModel.display_name)
-            .filter(UsersModel.role == 'translator')
+            .filter(UsersModel.role == "translator")
             .order_by(UsersModel.display_name)
             .all()
         )
-        # The query returns a list of tuples, e.g., [('John Doe',), ('Jane Smith',)].
-        # We need to flatten it into a simple list of strings.
+
         return [name for (name,) in results]
-
-
-class HomePageRepository:
-    """Facade to aggregate data from multiple repositories for the dashboard."""
-
-    def __init__(self, invoices_repo: HomePageInvoicesRepository,
-                 customers_repo: HomePageCustomersRepository,
-                 services_repo: HomePageServicesRepository,
-                 users_repo: HomePageUsersRepository):
-        self.invoices_repo = invoices_repo
-        self.customers_repo = customers_repo
-        self.services_repo = services_repo
-        self.users_repo = users_repo

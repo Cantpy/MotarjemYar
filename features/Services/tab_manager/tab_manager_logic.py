@@ -65,11 +65,12 @@ class ExcelImportLogic:
 
                 service_data = {
                     'name': name,
-                    'base_price': self._safe_to_int(row.get('Base Price'), default=0),
+                    'base_price': self._safe_to_int(row.get('BaseBusiness Price'), default=0),
                     'default_page_count': self._safe_to_int(row.get('Default Page Count'), default=1),
                     'aliases': [],
                     'dynamic_prices': []
                 }
+                print(f'services data in import document sheet: {service_data}')
 
                 # --- 1. Parse main service aliases ---
                 j = 1

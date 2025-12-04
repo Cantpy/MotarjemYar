@@ -20,23 +20,17 @@ class InvoiceWizardFactory:
     """
 
     @staticmethod
-    def create(customer_engine: Engine,
-               invoices_engine: Engine,
-               services_engine: Engine,
-               users_engine: Engine,
+    def create(business_engine: Engine,
                parent=None) -> InvoiceWizardController:
 
         state_manager = WorkflowStateManager()
         sub_controllers = {
-            'customer': CustomerInfoFactory.create(customer_engine=customer_engine,
+            'customer': CustomerInfoFactory.create(business_engine=business_engine,
                                                    state_manager=state_manager),
-            'documents': DocumentSelectionFactory.create(services_engine=services_engine,
-                                                         state_manager=state_manager),
+            'documents': DocumentSelectionFactory.create(business_engine=business_engine, state_manager=state_manager),
             'assignment': AssignmentWidget(state_manager=state_manager),
-            'details': InvoiceDetailsFactory.create(users_engine=users_engine, invoices_engine=invoices_engine,
-                                                    state_manager=state_manager),
-            'preview': InvoicePreviewFactory.create(invoices_engine=invoices_engine,
-                                                    state_manager=state_manager)
+            'details': InvoiceDetailsFactory.create(business_engine=business_engine, state_manager=state_manager),
+            'preview': InvoicePreviewFactory.create(business_engine=business_engine, state_manager=state_manager)
         }
 
         wizard_view = InvoiceWizardWidget(parent=parent)
@@ -56,9 +50,6 @@ if __name__ == '__main__':
     from shared.testing.launch_feature import launch_feature_for_ui_test
     launch_feature_for_ui_test(
         factory_class=InvoiceWizardFactory,
-        required_engines={'customers': 'customer_engine',
-                          'invoices': 'invoices_engine',
-                          'services': 'services_engine',
-                          'users': 'users_engine'},
+        required_engines={'business': 'business_engine'},
         use_memory_db=True
     )

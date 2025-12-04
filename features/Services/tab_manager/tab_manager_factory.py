@@ -17,14 +17,16 @@ class ServicesManagementFactory:
     """
 
     @staticmethod
-    def create(services_engine: Engine, parent=None) -> ServicesManagementController:
+    def create(business_engine: Engine, parent=None) -> ServicesManagementController:
         """
         Builds the complete, interactive Services Management module.
         """
         container_view = ServicesManagementView(parent)
 
-        documents_controller = ServicesDocumentFactory.create(services_engine, container_view)
-        other_services_controller = OtherServicesFactory.create(services_engine, container_view)
+        documents_controller = ServicesDocumentFactory.create(business_engine=business_engine,
+                                                              parent=container_view)
+        other_services_controller = OtherServicesFactory.create(business_engine=business_engine,
+                                                                parent=container_view)
 
         # 3. Get the VIEW from each sub-controller and add it to the container's tab widget.
         container_view.add_tab(documents_controller.get_view(), "مدارک")
@@ -51,6 +53,6 @@ if __name__ == '__main__':
     from shared.testing.launch_feature import launch_feature_for_ui_test
     launch_feature_for_ui_test(
         factory_class=ServicesManagementFactory,
-        required_engines={'services': 'services_engine'},
+        required_engines={'business': 'business_engine'},
         use_memory_db=True
     )

@@ -11,22 +11,15 @@ class AdminPanelFactory:
     Factory for creating the main Admin Panel container.
     """
     @staticmethod
-    def create(invoices_engine: Engine, customers_engine: Engine,
-               services_engine: Engine, expenses_engine: Engine,
-               payroll_engine: Engine, users_engine: Engine,
-               parent=None) -> AdminPanelController:
+    def create(business_engine: Engine, payroll_engine: Engine, parent=None) -> AdminPanelController:
         """
         Creates a fully configured Admin Panel by assembling all its sub-features.
         This method requires all engines needed by its children.
         """
         # A dictionary of engines to pass to the controller for clean access
         engines = {
-            'invoices': invoices_engine,
-            'customers': customers_engine,
-            'services': services_engine,
-            'expenses': expenses_engine,
-            'payroll': payroll_engine,
-            'users': users_engine,
+            'business': business_engine,
+            'payroll': payroll_engine
         }
 
         view = AdminPanelView(parent=parent)
@@ -41,12 +34,8 @@ if __name__ == '__main__':
     launch_feature_for_ui_test(
         factory_class=AdminPanelFactory,
         required_engines={
-            'invoices': 'invoices_engine',
-            'customers': 'customers_engine',
-            'services': 'services_engine',
-            'expenses': 'expenses_engine',
-            'payroll': 'payroll_engine',
-            'users': 'users_engine'
+            'business': 'business_engine',
+            'payroll': 'payroll_engine'
         },
         use_memory_db=True
     )

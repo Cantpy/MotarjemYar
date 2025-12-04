@@ -1,6 +1,6 @@
 # features/Admin_Panel/users_management/users_management_repo.py
 
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from shared.orm_models.users_models import UsersModel, DeletedUsersModel, EditedUsersLogModel
 
@@ -69,7 +69,7 @@ class UserManagementRepository:
                 display_name=user_to_delete.display_name,
                 role=user_to_delete.role,
                 deleted_by=deleted_by_username,
-                deleted_at=datetime.utcnow(),
+                deleted_at=datetime.now(timezone.utc),
             )
 
             session.add(deleted_record)

@@ -13,13 +13,13 @@ class UsersManagementFactory:
     Factory for creating the User Management feature.
     """
     @staticmethod
-    def create(users_engine: Engine, parent=None) -> UsersManagementController:
+    def create(business_engine: Engine, parent=None) -> UsersManagementController:
         """
         Creates and wires all components for the User Management feature.
         """
-        users_session = ManagedSessionProvider(engine=users_engine)
+        business_session = ManagedSessionProvider(engine=business_engine)
         repo = UserManagementRepository()
-        logic = UserManagementLogic(repository=repo, users_engine=users_session)
+        logic = UserManagementLogic(repository=repo, users_engine=business_session)
         view = UsersManagementView(parent=parent)
         controller = UsersManagementController(view, logic)
         return controller
@@ -30,6 +30,6 @@ if __name__ == "__main__":
 
     launch_feature_for_ui_test(
         factory_class=UsersManagementFactory,
-        required_engines={'users': 'users_engine'},
+        required_engines={'business': 'business_engine'},
         use_memory_db=True
     )

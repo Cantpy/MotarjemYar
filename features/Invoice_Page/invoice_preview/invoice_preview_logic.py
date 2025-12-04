@@ -20,14 +20,14 @@ class InvoicePreviewLogic:
     Handles business _logic related to invoices, such as pagination and data preparation.
     """
     def __init__(self, repo: InvoicePreviewRepository,
-                 invoices_engine: ManagedSessionProvider,
+                 business_engine: ManagedSessionProvider,
                  settings_manager: PreviewSettingsManager):
         self._repo = repo
-        self._invoices_session = invoices_engine
+        self._business_session = business_engine
         self.settings_manager = settings_manager
 
     def get_issued_invoice(self, invoice_number: str) -> IssuedInvoiceModel | None:
-        with self._invoices_session() as session:
+        with self._business_session() as session:
             return self._repo.get_issued_invoice(session, invoice_number)
 
     def get_total_pages(self, invoice: Invoice) -> int:
@@ -170,7 +170,7 @@ class InvoicePreviewLogic:
 
     def get_issued_invoice_with_items(self, invoice_number: str) -> IssuedInvoiceModel | None:
         """Manages the session to get an invoice and its items."""
-        with self._invoices_session() as session:
+        with self._business_session() as session:
             return self._repo.get_issued_invoice_with_items(session, invoice_number)
 
     def get_next_invoice_version_number(self, base_invoice_number: str) -> str:
@@ -178,7 +178,7 @@ class InvoicePreviewLogic:
         Calculates the next version suffix for an invoice (e.g., -v2, -v3).
         This is now session-safe.
         """
-        with self._invoices_session() as session:
+        with self._business_session() as session:
             latest_invoice = self._repo.get_latest_invoice_version(session, base_invoice_number)
 
             if not latest_invoice:
@@ -251,7 +251,7 @@ class InvoicePreviewLogic:
             - bool: True if the data is identical, False otherwise.
             - IssuedInvoiceModel | None: The fetched ORM object for reference, or None.
         """
-        with self._invoices_session() as session:
+        with self._business_session() as session:
             # Fetch the latest version using the active session
             latest_orm = self._repo.get_issued_invoice_with_items(session, base_invoice_number)
 
@@ -344,7 +344,7 @@ class InvoicePreviewLogic:
             - Optional[List[EditedInvoiceModel]]: A list of generated edit logs if
               changes were found, otherwise None.
         """
-        with self._invoices_session() as session:
+        with self._business_session() as session:
             # 1. Fetch the latest version using the active session
             latest_orm = self._repo.get_issued_invoice_with_items(session, base_invoice_number)
 
@@ -496,18 +496,18 @@ class InvoicePreviewLogic:
                 item_orm = self.map_dto_to_orm(item_dto, invoice_dto.invoice_number)
                 items_orm_list.append(item_orm)
 
-        with self._invoices_session() as session:
+        with self._business_session() as session:
             return self._repo.issue_invoice(session, issued_invoice_orm, items_orm_list, edit_logs)
 
     # --- New methods to handle calls that were previously controller -> _repo ---
     def get_invoice_path(self, invoice_number: str) -> str | None:
         """Manages the session to get the invoice path from the _repository."""
-        with self._invoices_session() as session:
+        with self._business_session() as session:
             return self._repo.get_invoice_path(session, invoice_number)
 
     def update_invoice_path(self, invoice_number: str, file_path: str) -> bool:
         """Manages the session to update the invoice path in the _repository."""
-        with self._invoices_session() as session:
+        with self._business_session() as session:
             return self._repo.update_invoice_path(session, invoice_number, file_path)
 
     def create_empty_preview(self):

@@ -27,7 +27,7 @@ class LoginWindowFactory:
         Returns:
             The fully configured LoginController, which is the entry point to the login feature.
         """
-        user_engine = ManagedSessionProvider(engine=engine)
+        business_engine = ManagedSessionProvider(engine=engine)
 
         login_repo = LoginRepository()
         auth_file_repo = AuthFileRepository()
@@ -35,7 +35,7 @@ class LoginWindowFactory:
         logic = LoginService(
             repo=login_repo,
             auth_file_repo=auth_file_repo,
-            user_engine=user_engine
+            business_engine=business_engine
             )
 
         view = LoginWidget()
@@ -48,6 +48,6 @@ if __name__ == '__main__':
     from shared.testing.launch_feature import launch_feature_for_ui_test
     launch_feature_for_ui_test(
         factory_class=LoginWindowFactory,
-        required_engines={'users': 'users_engine'},
+        required_engines={'business': 'business_engine'},
         use_memory_db=True
     )

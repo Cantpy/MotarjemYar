@@ -1,34 +1,35 @@
-# ============================================================================
 # features/Invoice_Table/invoice_table_repo.py
-# ============================================================================
+
+"""
+Repository for invoice-related database operations.
+"""
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from features.Invoice_Table.invoice_table_models import InvoiceSummary
-from shared.orm_models.invoices_models import (
+from shared.orm_models.business_models import (
     IssuedInvoiceModel, InvoiceItemModel, DeletedInvoiceModel,
     InvoiceItemData, InvoiceData, EditedInvoiceModel, EditedInvoiceData,
-    DeletedInvoiceData
+    DeletedInvoiceData, UsersModel, ServicesModel, ServiceDynamicPrice
 )
-from shared.orm_models.users_models import UsersModel
-# --- MODIFICATION START ---
-# Import Employee and Role models from the payroll domain
 from shared.orm_models.payroll_models import EmployeeModel, EmployeeRoleModel
-# --- MODIFICATION END ---
-from shared.orm_models.services_models import ServicesModel, ServiceDynamicPrice
 
 
-class InvoiceRepository:
-    """Repository for invoice-related database operations."""
+class BusinessRepository:
+    """
+    Stateless and pure database access layer for business-related operations.
+    This class should contain no business logic, only raw data operations.
+    """
 
-    # ─────────────────────────────── Retrieval ─────────────────────────────── #
+    # ────────────────────────────────────────────────────────────── #
+    #                           INVOICES                             #
+    # ────────────────────────────────────────────────────────────── #
 
     def get_all_invoices(self, session: Session) -> list[InvoiceData]:
-        """Retrieve all issued invoices."""
         try:
             invoices = session.query(IssuedInvoiceModel).all()
             return [invoice.to_dataclass() for invoice in invoices]
@@ -37,7 +38,6 @@ class InvoiceRepository:
             return []
 
     def get_invoice_by_number(self, session: Session, invoice_number: str) -> Optional[InvoiceData]:
-        """Retrieve a specific invoice by its number."""
         try:
             invoice = (
                 session.query(IssuedInvoiceModel)
@@ -50,9 +50,8 @@ class InvoiceRepository:
             return None
 
     def get_invoice_and_items(
-            self, session: Session, invoice_number: str
+        self, session: Session, invoice_number: str
     ) -> tuple[Optional[InvoiceData], list[InvoiceItemData]]:
-        """Retrieve an invoice and its items together."""
         try:
             invoice_orm = (
                 session.query(IssuedInvoiceModel)
@@ -77,12 +76,9 @@ class InvoiceRepository:
             print(f"[ERROR] Failed to fetch invoice and items for {invoice_number}: {e}")
             return None, []
 
-    # ─────────────────────────────── Services & Prices ─────────────────────────────── #
-
     def get_services_and_dynamic_prices(
-            self, session: Session, service_ids: set[int], dynamic_price_ids: set[int]
+        self, session: Session, service_ids: set[int], dynamic_price_ids: set[int]
     ) -> tuple[dict[int, str], dict[int, str]]:
-        """Batch-fetch service and dynamic price names from the services database."""
         try:
             service_map = {}
             dynamic_price_map = {}
@@ -104,14 +100,10 @@ class InvoiceRepository:
                 dynamic_price_map = {dp.id: dp.name for dp in dynamic_prices}
 
             return service_map, dynamic_price_map
-        except SQLAlchemyError as e:
-            print(f"[ERROR] Failed to fetch services or dynamic prices: {e}")
+        except SQLAlchemyError:
             return {}, {}
 
-    # ─────────────────────────────── Update Operations ─────────────────────────────── #
-
     def update_invoice(self, session: Session, invoice_number: str, updates: dict[str, object]) -> bool:
-        """Update a specific invoice."""
         try:
             invoice = (
                 session.query(IssuedInvoiceModel)
@@ -134,20 +126,12 @@ class InvoiceRepository:
             return False
 
     def update_pdf_path(self, session: Session, invoice_number: str, new_path: str) -> bool:
-        """Update PDF file path."""
         return self.update_invoice(session, invoice_number, {"pdf_file_path": new_path})
 
     def update_translator(self, session: Session, invoice_number: str, translator_name: str) -> bool:
-        """Update translator."""
         return self.update_invoice(session, invoice_number, {"translator": translator_name})
 
-    # ─────────────────────────────── Deletion (Soft) ─────────────────────────────── #
-
     def delete_invoice(self, session: Session, invoice_number: str, deleted_by_user: str) -> bool:
-        """
-        Moves a single invoice to the deleted_invoices table instead of permanently deleting it.
-        This is an atomic operation for one invoice.
-        """
         try:
             invoice_to_delete = session.query(IssuedInvoiceModel).filter(
                 IssuedInvoiceModel.invoice_number == invoice_number
@@ -183,7 +167,7 @@ class InvoiceRepository:
                 username=invoice_to_delete.username,
                 pdf_file_path=invoice_to_delete.pdf_file_path,
                 remarks=invoice_to_delete.remarks,
-                deleted_at=datetime.utcnow(),
+                deleted_at=datetime.now(timezone.utc),
                 deleted_by=deleted_by_user
             )
             session.add(deleted_invoice)
@@ -195,10 +179,7 @@ class InvoiceRepository:
             print(f"Error moving invoice {invoice_number} to deleted table: {e}")
             return False
 
-    # ─────────────────────────────── Aggregations ─────────────────────────────── #
-
     def get_document_count(self, session: Session, invoice_number: str) -> int:
-        """Get total quantity of documents for an invoice."""
         try:
             count = (
                 session.query(func.sum(InvoiceItemModel.quantity))
@@ -206,12 +187,10 @@ class InvoiceRepository:
                 .scalar()
             )
             return count or 0
-        except SQLAlchemyError as e:
-            print(f"[ERROR] Failed to count documents for {invoice_number}: {e}")
+        except SQLAlchemyError:
             return 0
 
     def get_all_document_counts(self, session: Session) -> dict[str, int]:
-        """Get document counts for all invoices."""
         try:
             results = (
                 session.query(
@@ -222,14 +201,10 @@ class InvoiceRepository:
                 .all()
             )
             return {inv_num: count for inv_num, count in results}
-        except SQLAlchemyError as e:
-            print(f"[ERROR] Failed to get all document counts: {e}")
+        except SQLAlchemyError:
             return {}
 
-    # ─────────────────────────────── Summaries & Exports ─────────────────────────────── #
-
     def get_invoice_summary(self, session: Session) -> Optional[InvoiceSummary]:
-        """Generate general statistics for invoices."""
         try:
             total_count = session.query(func.count(IssuedInvoiceModel.id)).scalar() or 0
             total_amount = session.query(func.sum(IssuedInvoiceModel.total_amount)).scalar() or 0
@@ -252,12 +227,10 @@ class InvoiceRepository:
                 total_amount=total_amount,
                 translator_stats=translator_stats,
             )
-        except SQLAlchemyError as e:
-            print(f"[ERROR] Failed to get invoice summary: {e}")
+        except SQLAlchemyError:
             return None
 
     def export_invoices_data(self, session: Session, invoice_numbers: list[str]) -> list[dict[str, object]]:
-        """Export simplified invoice data."""
         try:
             invoices = (
                 session.query(IssuedInvoiceModel)
@@ -277,14 +250,10 @@ class InvoiceRepository:
                 }
                 for inv in invoices
             ]
-        except SQLAlchemyError as e:
-            print(f"[ERROR] Failed to export invoices: {e}")
+        except SQLAlchemyError:
             return []
 
-    # ─────────────────────────────── Edit History ─────────────────────────────── #
-
     def add_invoice_edits(self, session: Session, edits: list[EditedInvoiceData]) -> bool:
-        """Adds a batch of edit history records to the database."""
         try:
             orm_edits = [
                 EditedInvoiceModel(
@@ -301,13 +270,11 @@ class InvoiceRepository:
             session.bulk_save_objects(orm_edits)
             session.commit()
             return True
-        except SQLAlchemyError as e:
+        except SQLAlchemyError:
             session.rollback()
-            print(f"[ERROR] Failed to add invoice edit history: {e}")
             return False
 
     def get_edit_history_by_invoice_number(self, session: Session, invoice_number: str) -> list[EditedInvoiceData]:
-        """Retrieves all edit history for a specific invoice, ordered by date."""
         try:
             history_orm = (
                 session.query(EditedInvoiceModel)
@@ -316,12 +283,10 @@ class InvoiceRepository:
                 .all()
             )
             return [item.to_dataclass() for item in history_orm]
-        except SQLAlchemyError as e:
-            print(f"[ERROR] Failed to retrieve edit history for {invoice_number}: {e}")
+        except SQLAlchemyError:
             return []
 
     def get_all_deleted_invoices(self, session: Session) -> list[DeletedInvoiceData]:
-        """Retrieve all deleted invoices, ordered by deletion date."""
         try:
             invoices = (
                 session.query(DeletedInvoiceModel)
@@ -329,15 +294,74 @@ class InvoiceRepository:
                 .all()
             )
             return [invoice.to_dataclass() for invoice in invoices]
-        except SQLAlchemyError as e:
-            print(f"[ERROR] Failed to retrieve deleted invoices: {e}")
+        except SQLAlchemyError:
             return []
+
+    # ────────────────────────────────────────────────────────────── #
+    #                             USERS                              #
+    # ────────────────────────────────────────────────────────────── #
+
+    def get_user_with_employee_details(
+        self,
+        users_session: Session,
+        payroll_session: Session,
+        username: str
+    ) -> dict[str, object] | None:
+        try:
+            user = users_session.query(UsersModel).filter(
+                UsersModel.username == username
+            ).first()
+
+            if not user:
+                return None
+
+            employee = None
+            if user.employee_id:
+                employee = payroll_session.query(EmployeeModel).filter(
+                    EmployeeModel.employee_id == user.employee_id
+                ).first()
+
+            return {
+                'username': user.username,
+                'role': user.role,
+                'active': user.active,
+                'display_name': user.display_name,
+                'avatar_path': user.avatar_path,
+                'employee_id': user.employee_id,
+                'employee_name': employee.full_name if employee else None,
+                'email': employee.email if employee else None,
+                'phone': employee.phone_number if employee else None,
+                'national_id': employee.national_id if employee else None,
+            }
+        except SQLAlchemyError as e:
+            print(f"Error getting user {username}: {e}")
+            return None
+
+    def update_display_name(
+        self,
+        users_session: Session,
+        username: str,
+        new_display_name: str
+    ) -> bool:
+        try:
+            user = users_session.query(UsersModel).filter(
+                UsersModel.username == username
+            ).first()
+
+            if user:
+                user.display_name = new_display_name
+                users_session.commit()
+                return True
+            return False
+        except SQLAlchemyError:
+            users_session.rollback()
+            return False
 
 
 class PayrollRepository:
     """
     Repository for payroll-related database operations.
-    Now includes method to fetch translator names.
+    This class should contain no business logic, only raw data operations.
     """
     def get_translator_names(self, payroll_session: Session) -> list[str]:
         """
@@ -372,91 +396,16 @@ class PayrollRepository:
         return ["نامشخص"] + unique_names
 
 
-class UserRepository:
-    """
-    Repository for user-related database operations.
-    Now fetches employee data from payroll DB for translator names.
-    """
-    def get_user_with_employee_details(
-            self,
-            users_session: Session,
-            payroll_session: Session,
-            username: str
-    ) -> dict[str, object] | None:
-        """
-        Get user data with employee details from payroll DB.
-        """
-        try:
-            user = users_session.query(UsersModel).filter(
-                UsersModel.username == username
-            ).first()
-
-            if not user:
-                return None
-
-            # Fetch employee details from payroll DB
-            employee = None
-            if user.employee_id:
-                employee = payroll_session.query(EmployeeModel).filter(
-                    EmployeeModel.employee_id == user.employee_id
-                ).first()
-
-            return {
-                'username': user.username,
-                'role': user.role,
-                'active': user.active,
-                'display_name': user.display_name,
-                'avatar_path': user.avatar_path,
-                'employee_id': user.employee_id,
-                # Employee details from payroll DB
-                'employee_name': employee.full_name if employee else None,
-                'email': employee.email if employee else None,
-                'phone': employee.phone_number if employee else None,
-                'national_id': employee.national_id if employee else None,
-            }
-        except SQLAlchemyError as e:
-            print(f"Error getting user {username}: {e}")
-            return None
-
-    def update_display_name(
-            self,
-            users_session: Session,
-            username: str,
-            new_display_name: str
-    ) -> bool:
-        """Update user's display name."""
-        try:
-            user = users_session.query(UsersModel).filter(
-                UsersModel.username == username
-            ).first()
-
-            if user:
-                user.display_name = new_display_name
-                users_session.commit()
-                return True
-            return False
-        except SQLAlchemyError as e:
-            users_session.rollback()
-            print(f"Error updating display name: {e}")
-            return False
-
-
 class RepositoryManager:
     """Manager class to coordinate different repositories"""
 
     def __init__(self):
-        self.invoice_repo = InvoiceRepository()
-        self.user_repo = UserRepository()
+        self.business_repo = BusinessRepository()
         self.payroll_repo = PayrollRepository()
 
-    def get_invoice_repository(self) -> InvoiceRepository:
-        """Get invoice repository instance"""
-        return self.invoice_repo
-
-    def get_user_repository(self) -> UserRepository:
-        """Get user repository instance"""
-        return self.user_repo
+    def get_business_repository(self) -> BusinessRepository:
+        return self.business_repo
 
     def get_payroll_repository(self) -> PayrollRepository:
-        """Get payroll repository instance"""
         return self.payroll_repo
+

@@ -10,7 +10,7 @@ Creates users and login logs from mock data sources.
 from __future__ import annotations
 
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List
 
 from sqlalchemy.orm import Session
@@ -65,8 +65,8 @@ class UsersSeeder:
                 active=1,
                 display_name=person["full_name"],
                 avatar_path=None,
-                created_at=str(datetime.utcnow()),
-                updated_at=str(datetime.utcnow()),
+                created_at=str(datetime.now(timezone.utc)),
+                updated_at=str(datetime.now(timezone.utc)),
             )
             users.append(user)
             self.session.add(user)
@@ -77,7 +77,7 @@ class UsersSeeder:
         """Create mock login/logout logs for each user."""
         for user in users:
             for _ in range(random.randint(1, 3)):
-                login_time = datetime.utcnow() - timedelta(days=random.randint(1, 30))
+                login_time = datetime.now(timezone.utc) - timedelta(days=random.randint(1, 30))
                 logout_time = login_time + timedelta(hours=random.randint(1, 8))
                 log = LoginLogsModel(
                     user_id=user.id,

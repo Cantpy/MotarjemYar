@@ -3,7 +3,7 @@
 from sqlalchemy import Integer, Text, DateTime, ForeignKey, CheckConstraint, Index, event
 from sqlalchemy.orm import Mapped, mapped_column, declarative_base, relationship
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass
 
 BaseInvoices = declarative_base()
@@ -234,9 +234,9 @@ class IssuedInvoiceModel(BaseInvoices):
 @event.listens_for(IssuedInvoiceModel, 'before_update', propagate=True)
 def before_update_listener(mapper, connection, target):
     if target.delivery_status == 4 and target.collection_date is None:
-        target.collection_date = datetime.utcnow()
+        target.collection_date = datetime.now(timezone.utc)
     if target.payment_status == 1 and target.payment_date is None:
-        target.payment_date = datetime.utcnow()
+        target.payment_date = datetime.now(timezone.utc)
 
 
 class DeletedInvoiceModel(BaseInvoices):
@@ -325,7 +325,7 @@ class EditedInvoiceModel(BaseInvoices):
     new_value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     edited_by: Mapped[str] = mapped_column(Text, nullable=False)
-    edited_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    edited_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), nullable=False)
 
     remarks: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
@@ -430,7 +430,7 @@ class WorkspaceBatchModel(BaseInvoices):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     batch_number: Mapped[str] = mapped_column(Text, nullable=False, unique=True, index=True)
     office_type: Mapped[str] = mapped_column(Text, nullable=False)  # 'judiciary' | 'foreign_affairs'
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), nullable=False)
     sent_by: Mapped[str] = mapped_column(Text, nullable=False)
     received_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     status: Mapped[str] = mapped_column(Text, default="pending")  # 'pending', 'sent', 'approved', 'returned', 'rejected'
@@ -471,7 +471,7 @@ class WorkspaceBatchItemModel(BaseInvoices):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     batch_id: Mapped[int] = mapped_column(ForeignKey("workspace_batches.id", ondelete="CASCADE"), nullable=False)
     invoice_item_id: Mapped[int] = mapped_column(ForeignKey("invoice_items.id", ondelete="CASCADE"), nullable=False)
-    sent_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    sent_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), nullable=False)
     approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     approval_status: Mapped[str] = mapped_column(Text, default="pending")  # 'pending', 'approved', 'rejected'
     remarks: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -507,7 +507,8 @@ class WorkspaceQuotaModel(BaseInvoices):
     office_type: Mapped[str] = mapped_column(Text, nullable=False, unique=True)  # judiciary | foreign_affairs
     max_daily: Mapped[int] = mapped_column(Integer, default=0)
     max_weekly: Mapped[int] = mapped_column(Integer, default=0)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc),
+                                                 onupdate=datetime.now(timezone.utc))
 
     __table_args__ = (
         Index('idx_workspace_quotas_office_type', 'office_type'),

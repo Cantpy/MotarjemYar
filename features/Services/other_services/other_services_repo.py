@@ -2,7 +2,7 @@
 
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
-from shared.orm_models.services_models import OtherServicesModel
+from shared.orm_models.business_models import OtherServicesModel
 
 
 class OtherServicesRepository:

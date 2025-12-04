@@ -12,12 +12,12 @@ from shared.session_provider import ManagedSessionProvider
 
 class OtherServicesFactory:
     @staticmethod
-    def create(services_engine: Engine, parent=None) -> OtherServicesController:
+    def create(business_engine: Engine, parent=None) -> OtherServicesController:
         """Creates and wires the complete Other Services module."""
 
-        services_session = ManagedSessionProvider(services_engine)
+        business_session = ManagedSessionProvider(business_engine)
         repo = OtherServicesRepository()
-        logic = OtherServicesLogic(repo, services_session)
+        logic = OtherServicesLogic(repo, business_session)
         view = OtherServicesView(parent)
         controller = OtherServicesController(view, logic)
 
@@ -30,6 +30,6 @@ if __name__ == '__main__':
     from shared.testing.launch_feature import launch_feature_for_ui_test
     launch_feature_for_ui_test(
         factory_class=OtherServicesFactory,
-        required_engines={'services': 'services_engine'},
+        required_engines={'business': 'business_engine'},
         use_memory_db=True
     )

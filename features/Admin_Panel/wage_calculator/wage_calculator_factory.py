@@ -18,22 +18,19 @@ class WageCalculatorFactory:
     It follows the clean pattern of receiving its dependencies.
     """
     @staticmethod
-    def create(payroll_engine: Engine, invoices_engine: Engine,
-               users_engine: Engine, parent=None) -> WageCalculatorController:
+    def create(payroll_engine: Engine, business_engine: Engine, parent=None) -> WageCalculatorController:
         """
         Creates a fully configured CustomerInfo module by assembling its components.
 
         Args:
             payroll_engine: The SQLAlchemy engine for the payroll database.
-            invoices_engine: The SQLAlchemy engine for the invoices' database.
-            users_engine: The SQLAlchemy engine for the users' database.
+            business_engine: The SQLAlchemy engine for the business database.
             parent: The parent QWidget for the view.
         Returns:
             AdminDashboardController: The fully wired controller instance.
         """
         payroll_session = ManagedSessionProvider(payroll_engine)
-        invoices_session = ManagedSessionProvider(invoices_engine)
-        users_session = ManagedSessionProvider(users_engine)
+        business_engine_session = ManagedSessionProvider(business_engine)
 
         # 1. Instantiate the layers, injecting dependencies
         repo = WageCalculatorRepository(users_repository=UsersRepository(),
@@ -41,8 +38,7 @@ class WageCalculatorFactory:
                                         payroll_repository=PayrollRepository())
         logic = WageCalculatorLogic(repository=repo,
                                     payroll_engine=payroll_session,
-                                    invoices_engine=invoices_session,
-                                    users_engine=users_session)
+                                    business_engine=business_engine_session)
         view = WageCalculatorView(parent=parent)
 
         # 2. Instantiate the Controller, which connects everything

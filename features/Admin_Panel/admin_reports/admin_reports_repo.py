@@ -4,11 +4,8 @@ from sqlalchemy import func, extract, case
 from sqlalchemy.orm import Session
 from datetime import date, timedelta
 import jdatetime
-from shared.orm_models.invoices_models import IssuedInvoiceModel, InvoiceItemModel
-from shared.orm_models.services_models import FixedPricesModel
-from shared.orm_models.expenses_models import ExpenseModel
-from shared.orm_models.customer_models import CompanionModel
-from shared.orm_models.services_models import ServicesModel
+from shared.orm_models.business_models import (IssuedInvoiceModel, InvoiceItemModel, FixedPricesModel, ExpenseModel,
+                                               CompanionModel, ServicesModel)
 
 
 class AdminReportsRepository:
@@ -82,20 +79,19 @@ class AdminReportsRepository:
         ).filter(ExpenseModel.expense_date.between(start_date, end_date)).group_by('month').all()
         return {row.month: row.total for row in results}
 
-    def get_invoice_based_expenses_by_month(self, invoices_session: Session, services_session: Session,
-                                            year: int) -> dict:
+    def get_invoice_based_expenses_by_month(self, session: Session, year: int) -> dict:
         """Calculates expenses related to seals."""
         start_date, end_date = self._get_gregorian_date_range_for_jalali_year(year)
 
         # 1. Get seal prices from services.db
-        jud_seal_price = services_session.query(FixedPricesModel.price).filter_by(
+        jud_seal_price = session.query(FixedPricesModel.price).filter_by(
             name='judiciary_seal').scalar() or 0
-        fa_seal_price = services_session.query(FixedPricesModel.price).filter_by(
+        fa_seal_price = session.query(FixedPricesModel.price).filter_by(
             name='foreign_affairs_seal').scalar() or 0
 
         # 2. Get monthly counts of seals from invoices.db
         results = (
-            invoices_session.query(
+            session.query(
                 extract('month', IssuedInvoiceModel.issue_date).label('month'),
                 func.sum(InvoiceItemModel.has_judiciary_seal).label('jud_count'),
                 func.sum(InvoiceItemModel.has_foreign_affairs_seal).label('fa_count')

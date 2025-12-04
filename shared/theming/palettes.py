@@ -58,7 +58,7 @@ def set_summer_palette(app):
 def set_autumn_palette(app):
     palette = QPalette()
 
-    # Base background and text
+    # BaseBusiness background and text
     palette.setColor(QPalette.Window, QColor("#FFA955"))  # warm orange background
     palette.setColor(QPalette.Base, QColor("#FFD63A"))  # input fields
     palette.setColor(QPalette.AlternateBase, QColor("#6DE1D2"))  # alt rows

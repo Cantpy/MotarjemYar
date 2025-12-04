@@ -3,8 +3,7 @@
 from sqlalchemy.orm import Session
 
 from features.Invoice_Page.invoice_preview.invoice_preview_models import PreviewOfficeInfo
-
-from shared.orm_models.users_models import TranslationOfficeDataModel
+from shared.orm_models.business_models import TranslationOfficeDataModel
 
 
 class InvoiceDetailsRepository:

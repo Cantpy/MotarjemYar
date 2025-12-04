@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import enum
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional, List
 
@@ -38,7 +38,7 @@ class EmploymentType(enum.Enum):
 
 
 def _now() -> datetime:
-    return datetime.utcnow()
+    return datetime.now(timezone.utc)
 
 
 class EmployeeModel(BasePayroll):

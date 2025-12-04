@@ -15,17 +15,15 @@ class InvoiceDetailsLogic:
     """The pure Python 'brain' for the invoice details step."""
 
     def __init__(self, repo: InvoiceDetailsRepository,
-                 users_engine: ManagedSessionProvider,
-                 invoices_engine: ManagedSessionProvider,
+                 business_engine: ManagedSessionProvider,
                  settings_manager: SettingsManager
                  ):
         super().__init__()
         self._repo = repo
-        self._users_session = users_engine
-        self._invoices_session = invoices_engine
+        self._business_session = business_engine
         self._settings_manager = settings_manager
-        self._invoice_number_service = InvoiceNumberService(invoices_engine)
-        with self._users_session() as session:
+        self._invoice_number_service = InvoiceNumberService(business_engine)
+        with self._business_session() as session:
             self._office_info = self._repo.get_office_info(session)
 
     def create_initial_details(self, items: list[InvoiceItem]) -> InvoiceDetails:

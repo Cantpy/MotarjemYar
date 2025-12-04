@@ -3,7 +3,7 @@
 import uuid
 import jdatetime
 from decimal import Decimal, getcontext
-from datetime import datetime
+from datetime import datetime, timezone
 
 from features.Admin_Panel.wage_calculator.wage_calculator_models import (PayrollRunEmployee, PayslipData,
                                                                          PayrollComponent, EmployeeInfo,
@@ -27,12 +27,10 @@ STATUS_TRANSLATIONS = {
 class WageCalculatorLogic:
     def __init__(self, repository: WageCalculatorRepository,
                  payroll_engine: ManagedSessionProvider,
-                 invoices_engine: ManagedSessionProvider,
-                 users_engine: ManagedSessionProvider):
+                 business_engine: ManagedSessionProvider):
         self._repo = repository
         self._payroll_session = payroll_engine
-        self._invoices_session = invoices_engine
-        self._users_session = users_engine
+        self._business_session = business_engine
 
     def get_employee_list(self) -> list[EmployeeInfo]:
         """Gets a simple list of employees for the UI to display in a dropdown."""
@@ -101,8 +99,7 @@ class WageCalculatorLogic:
         year = jdatetime.date.fromgregorian(date=start_date).year
 
         with (self._payroll_session() as p_session,
-              self._invoices_session() as i_session,
-              self._users_session() as u_session):
+              self._business_session() as b_session):
             employee = self._repo.payroll_repo.get_employee_by_id(p_session, employee_id)
             if not employee or not employee.payroll_profile:
                 raise ValueError(f"پروفایل حقوقی برای کارمند با شناسه {employee_id} یافت نشد.")
@@ -110,11 +107,11 @@ class WageCalculatorLogic:
             constants = self._repo.payroll_repo.get_system_constants(p_session, year)
             tax_brackets = self._repo.payroll_repo.get_tax_brackets(p_session, year)
             salary_components_map = self._repo.payroll_repo.get_salary_components_map(p_session)
-            translation_office_info = self._repo.users_repo.get_translation_office_info(u_session)
+            translation_office_info = self._repo.users_repo.get_translation_office_info(b_session)
 
             calculated_data = self._calculate_single_payslip(
                 employee, start_date, end_date, work_metric, constants,
-                tax_brackets, salary_components_map, i_session
+                tax_brackets, salary_components_map, b_session
             )
 
             components = [
@@ -175,13 +172,15 @@ class WageCalculatorLogic:
 
     def audit_payroll(self, payslip_data: PayslipData):
         """Logs an audit entry for payroll processing."""
+        user_info = SessionManager().get_session()
+        user_name = user_info.full_name or user_info.user_id
         with self._payroll_session() as session:
             audit_log = PayrollAuditLogModel(
                 entity_type='payslip',
                 entity_id=payslip_data.payroll_id,
                 action='create',
-                performed_by='current_user_name',  # Replace with actual current user
-                performed_at=datetime.utcnow(),
+                performed_by=user_name,
+                performed_at=datetime.now(timezone.utc),
                 details=f"Payslip created for {payslip_data.employee_name}"
             )
             session.add(audit_log)
@@ -247,8 +246,8 @@ class WageCalculatorLogic:
         if not record:
             return None
 
-        with self._users_session as u_session:
-            translation_office_info = self._repo.users_repo.get_translation_office_info(u_session)
+        with self._business_session as session:
+            translation_office_info = self._repo.users_repo.get_translation_office_info(session)
 
         if isinstance(translation_office_info, list):
             office_model = translation_office_info[0] if translation_office_info else None
@@ -279,7 +278,6 @@ class WageCalculatorLogic:
 
         user_info = SessionManager().get_session()
 
-        # --- MODIFIED: Populate employment type for viewer ---
         # Note: This is a simplified conversion. A full implementation would need to
         # rebuild commission/part-time data from other sources if it's not stored
         # directly in the payroll record. For now, we set the type.
@@ -343,7 +341,7 @@ class WageCalculatorLogic:
             hourly_rate = D(profile.hourly_rate_rials or constants.get("MIN_HOURLY_WAGE_RIAL", 0))
             total_hours = D(work_metric)
             base_salary = total_hours * hourly_rate
-            calculated_components["Base Hourly Salary"] = base_salary
+            calculated_components["BaseBusiness Hourly Salary"] = base_salary
             extra_data['hours_worked'] = total_hours
 
         # --- MODIFIED: Implemented Commission logic ---

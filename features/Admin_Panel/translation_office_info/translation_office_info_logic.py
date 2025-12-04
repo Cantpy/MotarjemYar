@@ -11,9 +11,9 @@ class TranslationOfficeInfoLogic:
     It uses the repository to fetch data and maps it to a DTO for the view.
     """
 
-    def __init__(self, users_session: ManagedSessionProvider,
+    def __init__(self, business_engine: ManagedSessionProvider,
                  repository: TranslationOfficeInfoRepository):
-        self._users_session = users_session
+        self._business_session = business_engine
         self._repository = repository
 
     def get_office_display_data(self) -> TranslationOfficeData:
@@ -24,7 +24,7 @@ class TranslationOfficeInfoLogic:
             A DTO containing the office name and registration number.
         """
         try:
-            with self._users_session as session:
+            with self._business_session as session:
                 office_orm = self._repository.get_office_info(session)
                 if office_orm:
                     return TranslationOfficeData(

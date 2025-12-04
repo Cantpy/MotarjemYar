@@ -1,4 +1,4 @@
-# tests/test_logic.py
+# testing/test_logic.py
 
 import pytest
 from InvoicePage import InvoiceService, create_mock_invoice
@@ -49,7 +49,7 @@ def test_get_items_for_page(invoice_service):
     assert invoice_service.get_items_for_page(3) == []
 
 
-#### `tests/test_repo.py`
+#### `testing/test_repo.py`
 
 # This
 # test
@@ -59,7 +59,7 @@ def test_get_items_for_page(invoice_service):
 # database and `pandas` and `openpyxl`.
 #
 # ```python
-# tests/test_repo.py
+# testing/test_repo.py
 # Note: This is an integration test and requires a database.
 
 import pytest

@@ -1,3 +1,5 @@
+# shared/orm_models/info_page_models.py
+
 from sqlalchemy import Column, Integer, String, Text, ForeignKey
 from sqlalchemy.orm import relationship, declarative_base
 

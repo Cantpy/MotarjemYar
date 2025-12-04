@@ -33,30 +33,30 @@ class ServicesLogic:
     Business logic for services management.
     """
 
-    def __init__(self, repo: ServiceRepository, services_engine: ManagedSessionProvider):
+    def __init__(self, repo: ServiceRepository, business_engine: ManagedSessionProvider):
         self._repo = repo
-        self._services_session = services_engine
+        self._business_engine = business_engine
         self.test_database_connection()
 
     def get_all_services(self) -> list[ServicesDTO]:
-        with self._services_session() as session:
+        with self._business_engine() as session:
             service_models = self._repo.get_all(session)
             return [_to_dto(model) for model in service_models]
 
     def get_service_with_aliases(self, service_id: int) -> ServicesDTO | None:
         """Fetches a single service with all its related aliases."""
-        with self._services_session() as session:
+        with self._business_engine() as session:
             service_model = self._repo.get_by_id_with_aliases(session, service_id)
             return _to_dto(service_model) if service_model else None
 
     def update_aliases(self, service_id: int, aliases_data: dict) -> bool:
         """Updates the aliases for a service and its dynamic prices."""
-        with self._services_session() as session:
+        with self._business_engine() as session:
             return self._repo.update_aliases(session, service_id, aliases_data)
 
     def update_service_properties(self, service_id: int, properties_data: dict) -> ServicesDTO | None:
         """Updates the properties for a service (aliases, page count, etc.)."""
-        with self._services_session() as session:
+        with self._business_engine() as session:
             updated_model = self._repo.update_service_properties(session, service_id, properties_data)
             return _to_dto(updated_model) if updated_model else None
 
@@ -65,7 +65,7 @@ class ServicesLogic:
         normalized_data = self._normalize_service_data(service_data)
         self._validate_service_data(normalized_data)
 
-        with self._services_session() as session:
+        with self._business_engine() as session:
             if self._repo.exists_by_name(session, normalized_data['name']):
                 raise ValueError(f"مدرکی با نام '{normalized_data['name']}' از قبل وجود دارد.")
 
@@ -76,7 +76,7 @@ class ServicesLogic:
         normalized_data = self._normalize_service_data(service_data)
         self._validate_service_data(normalized_data)
 
-        with self._services_session() as session:
+        with self._business_engine() as session:
             if self._repo.exists_by_name(session, normalized_data['name'], exclude_id=service_id):
                 raise ValueError(f"مدرکی با نام '{normalized_data['name']}' از قبل وجود دارد.")
 
@@ -84,11 +84,11 @@ class ServicesLogic:
             return _to_dto(updated_model) if updated_model else None
 
     def delete_service(self, service_id: int) -> bool:
-        with self._services_session() as session:
+        with self._business_engine() as session:
             return self._repo.delete(session, service_id)
 
     def delete_multiple_services(self, service_ids: list[int]) -> int:
-        with self._services_session() as session:
+        with self._business_engine() as session:
             return self._repo.delete_multiple(session, service_ids)
 
     # --- Helpers ---
@@ -142,7 +142,7 @@ class ServicesLogic:
         return normalized
 
     def test_database_connection(self):
-        with self._services_session() as session:
+        with self._business_engine() as session:
             self._repo.get_all(session)
             print("Database connection test successful.")
 
@@ -155,13 +155,14 @@ class ServicesLogic:
             return 0
 
         # Normalize and validate each service
+        print(f'services data: {services_data}')
         normalized_services = []
         for raw_data in services_data:
             normalized = self._normalize_service_data(raw_data)
             self._validate_service_data(normalized)
             normalized_services.append(normalized)
 
-        with self._services_session() as session:
+        with self._business_engine() as session:
             # Check for duplicates within the database
             for service in normalized_services:
                 if self._repo.exists_by_name(session, service['name']):

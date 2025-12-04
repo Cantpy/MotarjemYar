@@ -1,6 +1,6 @@
 # orm_models.py
 
-# ... (All your existing Base and model classes from the prompt) ...
+# ... (All your existing BaseBusiness and model classes from the prompt) ...
 
 # --- Add these dataclasses for data transfer ---
 from dataclasses import dataclass

@@ -15,14 +15,14 @@ class TranslationOfficeInfoFactory:
     Factory for creating the Translation Office Info feature.
     """
     @staticmethod
-    def create(users_engine: Engine, parent=None) -> TranslationOfficeInfoController:
+    def create(business_engine: Engine, parent=None) -> TranslationOfficeInfoController:
         """
         Creates and returns a fully assembled Translation Office Info controller
         by wiring up the view, logic, and repository.
         """
-        users_session = ManagedSessionProvider(users_engine)
+        users_session = ManagedSessionProvider(business_engine)
         view = TranslationOfficeInfoView(parent=parent)
         repository = TranslationOfficeInfoRepository()
-        logic = TranslationOfficeInfoLogic(users_session=users_session, repository=repository)
+        logic = TranslationOfficeInfoLogic(business_engine=users_session, repository=repository)
         controller = TranslationOfficeInfoController(view=view, logic=logic)
         return controller

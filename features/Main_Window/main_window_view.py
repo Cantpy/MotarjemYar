@@ -211,7 +211,7 @@ class MainWindowView(QMainWindow, FramelessWindowMixin):
         QApplication.setApplicationName(SETTINGS_APP)
         self._settings = QSettings()
 
-        # Base sizes
+        # BaseBusiness sizes
         self.base_size = QSize(DEFAULT_BASE_WIDTH, DEFAULT_BASE_HEIGHT)
         self.base_font_size = DEFAULT_FONT_PT
 

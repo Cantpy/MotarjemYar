@@ -1,11 +1,15 @@
 # features/Login/login_window_repo.py
 
-from datetime import datetime, timedelta
+"""
+
+"""
+
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import joinedload, Session
 from sqlalchemy.exc import SQLAlchemyError
 
 from config.config import MAX_LOGIN_ATTEMPTS, LOCKOUT_DURATION_MINUTES
-from shared.orm_models.users_models import UsersModel, LoginLogsModel
+from shared.orm_models.business_models import UsersModel, LoginLogsModel
 
 
 class LoginRepository:
@@ -95,7 +99,7 @@ class LoginRepository:
         """
         user.failed_login_attempts += 1
         if user.failed_login_attempts >= MAX_LOGIN_ATTEMPTS:
-            lockout_time = datetime.utcnow() + timedelta(minutes=LOCKOUT_DURATION_MINUTES)
+            lockout_time = datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_DURATION_MINUTES)
             user.lockout_until_utc = lockout_time
             print(f"User '{user.username}' account locked until {lockout_time.isoformat()} UTC.")
 

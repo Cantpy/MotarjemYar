@@ -25,11 +25,11 @@ class MainWindowFactory:
         Returns:
             The fully configured InvoiceWizardController.
         """
-        users_engine = engines.get('users')
-        if not users_engine:
+        business_engine = engines.get('business')
+        if not business_engine:
             raise RuntimeError("MainWindowFactory requires the 'users' engine.")
 
-        users_session = ManagedSessionProvider(engine=users_engine)
+        users_session = ManagedSessionProvider(engine=business_engine)
         repo = LoginRepository()
         logic = MainWindowLogic(repo=repo, users_engine=users_session)
         view = MainWindowView()
@@ -45,20 +45,6 @@ class MainWindowFactory:
 if __name__ == "__main__":
     import sys
     from PySide6.QtWidgets import QApplication
-
-    # Use the generic test helper we designed
-    from shared.testing.launch_feature import launch_feature_for_ui_test
-
-    # --- THIS IS THE OLD, INCORRECT WAY ---
-    # launch_feature_for_ui_test(
-    #     factory_class=MainWindowFactory,
-    #     required_engine_names={'customers', 'invoices'}, # This is now incomplete and wrong
-    #     use_memory_db=True
-    # )
-
-    # --- THIS IS THE NEW, CORRECT WAY ---
-    # The main window test is special and can't use the simple helper.
-    # It needs to be a mini-version of your ApplicationManager's startup.
 
     app = QApplication(sys.argv)
 

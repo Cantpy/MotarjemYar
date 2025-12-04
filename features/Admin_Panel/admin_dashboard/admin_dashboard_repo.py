@@ -2,10 +2,8 @@
 
 from sqlalchemy import func, cast, Date
 from sqlalchemy.orm import Session, joinedload
-from datetime import date, timedelta, datetime, time
-from shared.orm_models.invoices_models import IssuedInvoiceModel
-from shared.orm_models.users_models import LoginLogsModel
-from shared.orm_models.customer_models import CompanionModel
+from datetime import date, timedelta, datetime, time, timezone
+from shared.orm_models.business_models import IssuedInvoiceModel, LoginLogsModel, CompanionModel
 import jdatetime
 
 
@@ -21,7 +19,7 @@ class AdminDashboardRepository:
         2. The advance_payment of new invoices issued today that are not yet fully paid.
         """
 
-        today_utc = datetime.utcnow().date()
+        today_utc = datetime.now(timezone.utc).date()
         start_of_today_utc = datetime.combine(today_utc, time.min)
         end_of_today_utc = datetime.combine(today_utc, time.max)
 
@@ -45,7 +43,7 @@ class AdminDashboardRepository:
         1. The final_amount of invoices fully paid this month.
         2. The advance_payment of new invoices issued this month that are not yet fully paid.
         """
-        today_utc = datetime.utcnow().date()
+        today_utc = datetime.now(timezone.utc).date()
         start_of_month_utc = datetime.combine(today_utc.replace(day=1), time.min)
 
         # 1. Revenue from fully paid invoices this month
