@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc
 from shared.orm_models.business_models import (ServicesModel, SmartSearchHistoryModel, ServiceDynamicPrice,
                                                FixedPricesModel, OtherServicesModel)
-from features.Invoice_Page.document_selection.document_selection_models import Service, FixedPrice
+from features.Invoice_Page.document_selection.document_selection_models import Service, FixedPrice, DynamicPrice
 
 
 class DocumentSelectionRepository:
@@ -29,8 +29,19 @@ class DocumentSelectionRepository:
             )
         )
         for db_s in query.all():
-            # Use the corrected to_dto method here
-            dyn_prices = [df.to_dto() for df in db_s.dynamic_prices]
+
+            dyn_prices = []
+            for fee in db_s.dynamic_prices:
+                # Extract aliases safe-guarding against empty lists
+                fee_aliases = [a.alias for a in fee.aliases]
+
+                dyn_prices.append(DynamicPrice(
+                    id=fee.id,
+                    service_id=db_s.id,
+                    name=fee.name,
+                    unit_price=fee.unit_price,
+                    aliases=fee_aliases
+                ))
 
             aliases = [alias.alias for alias in db_s.aliases]
 
