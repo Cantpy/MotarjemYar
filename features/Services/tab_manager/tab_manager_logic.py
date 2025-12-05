@@ -44,7 +44,10 @@ class ExcelImportLogic:
         if pd.isna(value):
             return default
         try:
-            return int(float(value)) # Convert to float first to handle "10.0"
+            # Handle strings with commas (e.g., "150,000")
+            if isinstance(value, str):
+                value = value.replace(',', '').strip()
+            return int(float(value))  # Convert to float first to handle "10.0"
         except (ValueError, TypeError):
             return default
 
@@ -63,14 +66,27 @@ class ExcelImportLogic:
                     # Skip rows that don't have a primary service name
                     continue
 
+                # --- FIX: Robust Price Extraction ---
+                # Check for 'Base Price' first, then fallbacks
+                raw_base_price = row.get('Base Price')
+                if pd.isna(raw_base_price):
+                    raw_base_price = row.get('BaseBusiness Price')
+                if pd.isna(raw_base_price):
+                    raw_base_price = row.get('Price')
+                if pd.isna(raw_base_price):
+                    raw_base_price = row.get('Cost')
+
                 service_data = {
                     'name': name,
-                    'base_price': self._safe_to_int(row.get('BaseBusiness Price'), default=0),
+                    # Now we use the raw_base_price found above
+                    'base_price': self._safe_to_int(raw_base_price, default=0),
                     'default_page_count': self._safe_to_int(row.get('Default Page Count'), default=1),
                     'aliases': [],
                     'dynamic_prices': []
                 }
-                print(f'services data in import document sheet: {service_data}')
+
+                # Debug print to confirm data is captured correctly now
+                # print(f"Importing row {row_num}: {name} - Price: {service_data['base_price']}")
 
                 # --- 1. Parse main service aliases ---
                 j = 1
@@ -144,7 +160,7 @@ class ExcelImportLogic:
             return result
 
         for index, row in df.iterrows():
-            row_num = index + 2 # For user-friendly error messages
+            row_num = index + 2  # For user-friendly error messages
             try:
                 name = str(row.get('name', '')).strip()
                 price_val = row.get('price')
@@ -154,7 +170,7 @@ class ExcelImportLogic:
                 if pd.isna(price_val) or str(price_val).strip() == '':
                     raise ValueError("'price' field cannot be empty.")
 
-                price = int(float(price_val))
+                price = self._safe_to_int(price_val, default=0)
 
                 services_to_create.append({'name': name, 'price': price})
                 result.added_services_names.append(name)

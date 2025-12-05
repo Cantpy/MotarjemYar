@@ -1,6 +1,6 @@
 # features/Services/documents/documents_models.py
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 
 
 @dataclass
@@ -22,3 +22,25 @@ class ServicesDTO:
     default_page_count: int
     aliases: list[str] = field(default_factory=list)
     dynamic_prices: list[ServiceDynamicFeeDTO] = field(default_factory=list)
+
+
+@dataclass
+class NormalizedDynamicPriceDTO:
+    """DTO for a cleaned, validated dynamic price ready for DB insertion."""
+    name: str
+    unit_price: int
+    aliases: list[dict] = field(default_factory=list)  # Format: [{'alias': 'name'}]
+
+
+@dataclass
+class NormalizedServiceDTO:
+    """DTO for a cleaned, validated Service ready for DB insertion."""
+    name: str
+    base_price: int
+    default_page_count: int
+    aliases: list[dict] = field(default_factory=list) # Format: [{'alias': 'name'}]
+    dynamic_prices: list[NormalizedDynamicPriceDTO] = field(default_factory=list)
+
+    def to_dict(self):
+        """Helper to convert back to dictionary for the Repository layer."""
+        return asdict(self)

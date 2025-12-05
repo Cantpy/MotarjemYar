@@ -20,6 +20,7 @@ class ServicesController(QObject):
         self._view = view
         self._logic = logic
         self._data_cache: list[ServicesDTO] = []
+        print(f'data cache initialized: {self._data_cache}')
         self._connect_signals()
 
     def get_view(self) -> ServicesDocumentsView:
@@ -57,7 +58,6 @@ class ServicesController(QObject):
         Handles the user typing in the search bar. It simply calls the main
         filtering method. This is the entry point for UI-driven searches.
         """
-        # FIX: No longer calls back to a refresh method. It just filters.
         self._filter_and_update_view(text)
 
     # ... (handle_add, handle_edit, handle_delete, handle_bulk_delete, handle_manage_aliases remain unchanged) ...
@@ -190,9 +190,7 @@ class ServicesController(QObject):
         except Exception as e:
             show_error_message_box(self._view, "خطا", f"خطا در باز کردن پنجره جزئیات:\n{e}")
 
-
     # --- Private Worker Methods & Slots ---
-
     def _on_data_changed(self):
         """
         Slot connected to the data_changed signal. This is the entry point for
@@ -210,12 +208,14 @@ class ServicesController(QObject):
         text = text.lower().strip()
         if not text:
             # If search is empty, display the entire cache
+            print(f"Displaying full data cache with {self._data_cache}")
             self._view.update_display(self._data_cache)
             return
 
         # Otherwise, filter the data and display the result
         filtered_data = [s for s in self._data_cache if text in s.name.lower()]
         self._view.update_display(filtered_data)
+        print(f"Filtered data with search '{text}': {filtered_data}")
 
     def _perform_create_service(self, service_data: dict):
         try:
@@ -269,6 +269,7 @@ class ServicesController(QObject):
                     self._data_cache[index] = updated_service
                     # Emit the signal to trigger a filtered refresh
                     self.data_changed.emit()
-                show_information_message_box(self._view, "موفق", f"جزئیات مدرک '{updated_service.name}' بروزرسانی شد.")
+                show_information_message_box(self._view, "موفق",
+                                             f"جزئیات مدرک '{updated_service.name}' بروزرسانی شد.")
         except Exception as e:
             show_error_message_box(self._view, "خطا", f"خطا در بروزرسانی جزئیات:\n{e}")

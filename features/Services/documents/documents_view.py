@@ -1,4 +1,4 @@
-"""documents_view.py - Documents management _view using PySide6"""
+# features/Services/documents/documents_view.py
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QCheckBox, QLabel, QPushButton, QLineEdit, QTableWidget, QTableWidgetItem,
@@ -106,6 +106,7 @@ class ServicesDocumentsView(QWidget):
     @Slot(list)
     def update_display(self, services: list[ServicesDTO]):
         """Populates the table with service data provided by the controller."""
+        print(f'Updating display with services: {services}')
         self.table.setSortingEnabled(False)
         self.table.setRowCount(0)
         self.row_to_id_mapping.clear()
@@ -127,26 +128,28 @@ class ServicesDocumentsView(QWidget):
 
     def get_current_service_data_for_edit(self) -> dict | None:
         """
-        Provides the controller with the current values of the selected row,
-        so the controller can pre-populate the edit dialog.
+        Provides the controller with the current values of the selected row.
         """
         row = self.table.currentRow()
         if row == -1:
             return None
 
         return {
-            "document_name": self.table.item(row, 1).text(),
-            "base_cost": self.table.item(row, 2).text().replace(',', ''),
-            "variable_name_1": self.table.item(row, 3).text(),
-            "variable_cost_1": self.table.item(row, 4).text().replace(',', ''),
-            "variable_name_2": self.table.item(row, 5).text(),
-            "variable_cost_2": self.table.item(row, 6).text().replace(',', ''),
+            "name": self.table.item(row, 1).text(),
+            "base_price": self.table.item(row, 2).text().replace(',', ''),
+
+            # These are used to populate the dialog fields:
+            "fee_1_name": self.table.item(row, 3).text(),
+            "fee_1_price": self.table.item(row, 4).text().replace(',', ''),
+            "fee_2_name": self.table.item(row, 5).text(),
+            "fee_2_price": self.table.item(row, 6).text().replace(',', ''),
         }
 
     # --- Internal Helper Methods (Purely for UI Management) ---
 
     def _populate_row(self, row_number: int, service: ServicesDTO):
         """Fills a single table row with data."""
+        print(f'Populating row {row_number} with service: {service}')
         # Checkbox
         checkbox_widget, _ = self._create_checkbox_widget()
         self.table.setCellWidget(row_number, 0, checkbox_widget)
@@ -256,9 +259,7 @@ class ServicesDocumentsView(QWidget):
             if widget:
                 checkbox = widget.findChild(QCheckBox)
                 if checkbox:
-                    # *** FIX: Temporarily block signals for the row checkbox ***
-                    # This prevents the _update_selection_ui method from being
-                    # called for every single row, which was causing the issue.
+                    # Temporarily block signals for the row checkbox
                     checkbox.blockSignals(True)
                     checkbox.setChecked(is_checked)
                     checkbox.blockSignals(False)
