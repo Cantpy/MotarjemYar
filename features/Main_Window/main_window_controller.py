@@ -113,9 +113,7 @@ class MainWindowController(QObject):
 
     def _create_invoice_table_controller(self):
         controller = InvoiceTableFactory.create(
-            invoices_engine=self._engines.get('invoices'),
-            users_engine=self._engines.get('users'),
-            services_engine=self._engines.get('services'),
+            business_engine=self._engines.get('business'),
             payroll_engine=self._engines.get('payroll'),
             parent=self._view
         )

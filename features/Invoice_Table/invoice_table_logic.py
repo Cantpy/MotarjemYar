@@ -88,17 +88,12 @@ class InvoiceService:
     # --- MODIFICATION START ---
     def __init__(self,
                  repo_manager: RepositoryManager,
-                 invoices_engine: ManagedSessionProvider,
-                 users_engine: ManagedSessionProvider,
-                 services_engine: ManagedSessionProvider,
-                 payroll_engine: ManagedSessionProvider):  # Add payroll_engine
+                 business_engine: ManagedSessionProvider,
+                 payroll_engine: ManagedSessionProvider):
         self._repo_manager = repo_manager
-        self._invoice_session = invoices_engine
-        self._users_session = users_engine
-        self._services_session = services_engine
-        self._payroll_session = payroll_engine  # Store payroll_engine
+        self._business_session = business_engine
+        self._payroll_session = payroll_engine
         self._document_counts_cache: Dict[str, int] = {}
-    # --- MODIFICATION END ---
 
     # ==============================================================
     # BASIC FETCH OPERATIONS
@@ -106,15 +101,15 @@ class InvoiceService:
 
     def get_all_invoices(self) -> List[InvoiceData]:
         """Loads all invoices and updates the document count cache."""
-        with self._invoice_session() as session:
-            invoices = self._repo_manager.get_invoice_repository().get_all_invoices(session)
+        with self._business_session() as session:
+            invoices = self._repo_manager.get_business_repository().get_all_invoices(session)
             self._update_document_counts_cache()
             return invoices
 
     def get_invoice_by_number(self, invoice_number: str) -> Optional[InvoiceData]:
         """Retrieves a single invoice by its number."""
-        with self._invoice_session() as session:
-            return self._repo_manager.get_invoice_repository().get_invoice_by_number(session, invoice_number)
+        with self._business_session() as session:
+            return self._repo_manager.get_business_repository().get_invoice_by_number(session, invoice_number)
 
     # ==============================================================
     # DETAILED FETCH (Invoice + Items + Services)
@@ -125,11 +120,11 @@ class InvoiceService:
         Fetches an invoice and all its associated items,
         then enriches them with dynamic price names.
         """
-        repo = self._repo_manager.get_invoice_repository()
+        repo = self._repo_manager.get_business_repository()
 
         # Step 1: Fetch invoice and item dataclasses from the invoices DB.
         # This is safe because the repository converts ORM objects to dataclasses inside the session.
-        with self._invoice_session() as invoice_session:
+        with self._business_session() as invoice_session:
             invoice_data, items_data = repo.get_invoice_and_items(invoice_session, invoice_number)
 
             if not invoice_data:
@@ -148,7 +143,7 @@ class InvoiceService:
                 dynamic_price_ids.add(item.dynamic_price_2)
 
         # Step 3: Fetch ONLY dynamic price names from the services DB.
-        with self._services_session() as services_session:
+        with self._business_session() as services_session:
             # We pass an empty set for service_ids as it's no longer needed.
             _, dynamic_price_map = repo.get_services_and_dynamic_prices(
                 services_session, set(), dynamic_price_ids
@@ -174,11 +169,11 @@ class InvoiceService:
         if not invoice_numbers:
             return []
 
-        repo = self._repo_manager.get_invoice_repository()
+        repo = self._repo_manager.get_business_repository()
         failed_deletions: List[str] = []
 
         for number in invoice_numbers:
-            with self._invoice_session() as session:
+            with self._business_session() as session:
                 # MODIFICATION: Pass the username to the repository method
                 if not repo.delete_invoice(session, number, deleted_by_user):
                     failed_deletions.append(number)
@@ -191,20 +186,20 @@ class InvoiceService:
 
     def update_invoice_data(self, invoice_number: str, updates: Dict[str, Any]) -> bool:
         """Updates specific fields of an invoice."""
-        with self._invoice_session() as session:
-            return self._repo_manager.get_invoice_repository().update_invoice(session, invoice_number, updates)
+        with self._business_session() as session:
+            return self._repo_manager.get_business_repository().update_invoice(session, invoice_number, updates)
 
     def update_translator(self, invoice_number: str, translator_name: str) -> bool:
         """Updates translator for an invoice."""
-        with self._invoice_session() as session:
-            return self._repo_manager.get_invoice_repository().update_translator(
+        with self._business_session() as session:
+            return self._repo_manager.get_business_repository().update_translator(
                 session, invoice_number, translator_name
             )
 
     def update_pdf_path(self, invoice_number: str, new_path: str) -> bool:
         """Updates the PDF file path for an invoice."""
-        with self._invoice_session() as session:
-            return self._repo_manager.get_invoice_repository().update_pdf_path(session, invoice_number, new_path)
+        with self._business_session() as session:
+            return self._repo_manager.get_business_repository().update_pdf_path(session, invoice_number, new_path)
 
     # ==============================================================
     # UTILITY OPERATIONS
@@ -221,18 +216,18 @@ class InvoiceService:
 
     def _update_document_counts_cache(self):
         """Refreshes the internal cache of document counts from the database."""
-        with self._invoice_session() as session:
-            self._document_counts_cache = self._repo_manager.get_invoice_repository().get_all_document_counts(session)
+        with self._business_session() as session:
+            self._document_counts_cache = self._repo_manager.get_business_repository().get_all_document_counts(session)
 
     def get_invoice_summary(self) -> Optional[InvoiceSummary]:
         """Retrieves summary statistics for all invoices."""
-        with self._invoice_session() as session:
-            return self._repo_manager.get_invoice_repository().get_invoice_summary(session)
+        with self._business_session() as session:
+            return self._repo_manager.get_business_repository().get_invoice_summary(session)
 
     def get_invoices_for_export(self, invoice_numbers: List[str]) -> List[Dict[str, Any]]:
         """Fetches simplified invoice data suitable for exporting."""
-        with self._invoice_session() as session:
-            return self._repo_manager.get_invoice_repository().export_invoices_data(session, invoice_numbers)
+        with self._business_session() as session:
+            return self._repo_manager.get_business_repository().export_invoices_data(session, invoice_numbers)
 
     # ==============================================================
     # EDIT HISTORY OPERATIONS
@@ -242,19 +237,19 @@ class InvoiceService:
         """Logs a list of changes made to an invoice."""
         if not edits:
             return True  # Nothing to log
-        with self._invoice_session() as session:
-            return self._repo_manager.get_invoice_repository().add_invoice_edits(session, edits)
+        with self._business_session() as session:
+            return self._repo_manager.get_business_repository().add_invoice_edits(session, edits)
 
     def get_invoice_edit_history(self, invoice_number: str) -> List[EditedInvoiceData]:
         """Retrieves the full edit history for a given invoice."""
-        with self._invoice_session() as session:
-            return self._repo_manager.get_invoice_repository().get_edit_history_by_invoice_number(session,
-                                                                                                  invoice_number)
+        with self._business_session() as session:
+            return self._repo_manager.get_business_repository().get_edit_history_by_invoice_number(session,
+                                                                                                   invoice_number)
 
     def get_all_deleted_invoices(self) -> List[DeletedInvoiceData]:
         """Retrieves all invoices from the deleted_invoices table."""
-        with self._invoice_session() as session:
-            return self._repo_manager.get_invoice_repository().get_all_deleted_invoices(session)
+        with self._business_session() as session:
+            return self._repo_manager.get_business_repository().get_all_deleted_invoices(session)
 
 
 # =============================================================================

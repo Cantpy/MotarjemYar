@@ -6,10 +6,11 @@ Repository for invoice-related database operations.
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
+# We remove the broad try/except blocks so errors propagate to the UI controller
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List, Tuple, Dict
 
+# Import the Data Classes and Models correctly
 from features.Invoice_Table.invoice_table_models import InvoiceSummary
 from shared.orm_models.business_models import (
     IssuedInvoiceModel, InvoiceItemModel, DeletedInvoiceModel,
@@ -22,108 +23,95 @@ from shared.orm_models.payroll_models import EmployeeModel, EmployeeRoleModel
 class BusinessRepository:
     """
     Stateless and pure database access layer for business-related operations.
-    This class should contain no business logic, only raw data operations.
+    Allows exceptions to bubble up to be handled by the Controller/UI.
     """
 
     # ────────────────────────────────────────────────────────────── #
     #                           INVOICES                             #
     # ────────────────────────────────────────────────────────────── #
 
-    def get_all_invoices(self, session: Session) -> list[InvoiceData]:
-        try:
-            invoices = session.query(IssuedInvoiceModel).all()
-            return [invoice.to_dataclass() for invoice in invoices]
-        except SQLAlchemyError as e:
-            print(f"[ERROR] Failed to retrieve all invoices: {e}")
-            return []
+    def get_all_invoices(self, session: Session) -> List[InvoiceData]:
+        """
+        Fetches all invoices.
+        Note: Removed try/except so connection/schema errors appear in the UI.
+        """
+        invoices = session.query(IssuedInvoiceModel).all()
+        # Convert ORM objects to Dataclasses
+        return [invoice.to_dataclass() for invoice in invoices]
 
     def get_invoice_by_number(self, session: Session, invoice_number: str) -> Optional[InvoiceData]:
-        try:
-            invoice = (
-                session.query(IssuedInvoiceModel)
-                .filter(IssuedInvoiceModel.invoice_number == invoice_number)
-                .one_or_none()
-            )
-            return invoice.to_dataclass() if invoice else None
-        except SQLAlchemyError as e:
-            print(f"[ERROR] Failed to get invoice {invoice_number}: {e}")
-            return None
+        invoice = (
+            session.query(IssuedInvoiceModel)
+            .filter(IssuedInvoiceModel.invoice_number == invoice_number)
+            .one_or_none()
+        )
+        return invoice.to_dataclass() if invoice else None
 
     def get_invoice_and_items(
-        self, session: Session, invoice_number: str
-    ) -> tuple[Optional[InvoiceData], list[InvoiceItemData]]:
-        try:
-            invoice_orm = (
-                session.query(IssuedInvoiceModel)
-                .filter_by(invoice_number=invoice_number)
-                .one_or_none()
-            )
+            self, session: Session, invoice_number: str
+    ) -> Tuple[Optional[InvoiceData], List[InvoiceItemData]]:
 
-            if not invoice_orm:
-                return None, []
+        invoice_orm = (
+            session.query(IssuedInvoiceModel)
+            .filter_by(invoice_number=invoice_number)
+            .one_or_none()
+        )
 
-            items_orm = (
-                session.query(InvoiceItemModel)
-                .filter_by(invoice_number=invoice_number)
-                .all()
-            )
-
-            return (
-                invoice_orm.to_dataclass(),
-                [item.to_dataclass() for item in items_orm],
-            )
-        except SQLAlchemyError as e:
-            print(f"[ERROR] Failed to fetch invoice and items for {invoice_number}: {e}")
+        if not invoice_orm:
             return None, []
 
+        items_orm = (
+            session.query(InvoiceItemModel)
+            .filter_by(invoice_number=invoice_number)
+            .all()
+        )
+
+        return (
+            invoice_orm.to_dataclass(),
+            [item.to_dataclass() for item in items_orm],
+        )
+
     def get_services_and_dynamic_prices(
-        self, session: Session, service_ids: set[int], dynamic_price_ids: set[int]
-    ) -> tuple[dict[int, str], dict[int, str]]:
-        try:
-            service_map = {}
-            dynamic_price_map = {}
+            self, session: Session, service_ids: set[int], dynamic_price_ids: set[int]
+    ) -> Tuple[Dict[int, str], Dict[int, str]]:
 
-            if service_ids:
-                services = (
-                    session.query(ServicesModel)
-                    .filter(ServicesModel.id.in_(service_ids))
-                    .all()
-                )
-                service_map = {s.id: s.name for s in services}
+        service_map = {}
+        dynamic_price_map = {}
 
-            if dynamic_price_ids:
-                dynamic_prices = (
-                    session.query(ServiceDynamicPrice)
-                    .filter(ServiceDynamicPrice.id.in_(dynamic_price_ids))
-                    .all()
-                )
-                dynamic_price_map = {dp.id: dp.name for dp in dynamic_prices}
-
-            return service_map, dynamic_price_map
-        except SQLAlchemyError:
-            return {}, {}
-
-    def update_invoice(self, session: Session, invoice_number: str, updates: dict[str, object]) -> bool:
-        try:
-            invoice = (
-                session.query(IssuedInvoiceModel)
-                .filter(IssuedInvoiceModel.invoice_number == invoice_number)
-                .one_or_none()
+        if service_ids:
+            services = (
+                session.query(ServicesModel)
+                .filter(ServicesModel.id.in_(service_ids))
+                .all()
             )
+            service_map = {s.id: s.name for s in services}
 
-            if not invoice:
-                return False
+        if dynamic_price_ids:
+            dynamic_prices = (
+                session.query(ServiceDynamicPrice)
+                .filter(ServiceDynamicPrice.id.in_(dynamic_price_ids))
+                .all()
+            )
+            dynamic_price_map = {dp.id: dp.name for dp in dynamic_prices}
 
-            for key, value in updates.items():
-                if hasattr(invoice, key):
-                    setattr(invoice, key, value)
+        return service_map, dynamic_price_map
 
-            session.commit()
-            return True
-        except SQLAlchemyError as e:
-            session.rollback()
-            print(f"[ERROR] Failed to update invoice {invoice_number}: {e}")
+    def update_invoice(self, session: Session, invoice_number: str, updates: Dict[str, object]) -> bool:
+        invoice = (
+            session.query(IssuedInvoiceModel)
+            .filter(IssuedInvoiceModel.invoice_number == invoice_number)
+            .one_or_none()
+        )
+
+        if not invoice:
             return False
+
+        for key, value in updates.items():
+            if hasattr(invoice, key):
+                setattr(invoice, key, value)
+
+        session.commit()
+        return True
 
     def update_pdf_path(self, session: Session, invoice_number: str, new_path: str) -> bool:
         return self.update_invoice(session, invoice_number, {"pdf_file_path": new_path})
@@ -132,15 +120,18 @@ class BusinessRepository:
         return self.update_invoice(session, invoice_number, {"translator": translator_name})
 
     def delete_invoice(self, session: Session, invoice_number: str, deleted_by_user: str) -> bool:
+        # Keep try/except here because this is a Transactional write operation
+        # and we want to return False on failure rather than crashing,
+        # allowing the controller to count failures.
         try:
             invoice_to_delete = session.query(IssuedInvoiceModel).filter(
                 IssuedInvoiceModel.invoice_number == invoice_number
             ).first()
 
             if not invoice_to_delete:
-                print(f"Invoice {invoice_number} not found for deletion.")
                 return False
 
+            # Create archive record
             deleted_invoice = DeletedInvoiceModel(
                 invoice_number=invoice_to_delete.invoice_number,
                 name=invoice_to_delete.name,
@@ -174,86 +165,74 @@ class BusinessRepository:
             session.delete(invoice_to_delete)
             session.commit()
             return True
-        except SQLAlchemyError as e:
+        except Exception as e:
             session.rollback()
-            print(f"Error moving invoice {invoice_number} to deleted table: {e}")
+            print(f"Error deleting invoice {invoice_number}: {e}")
             return False
 
     def get_document_count(self, session: Session, invoice_number: str) -> int:
-        try:
-            count = (
-                session.query(func.sum(InvoiceItemModel.quantity))
-                .filter(InvoiceItemModel.invoice_number == invoice_number)
-                .scalar()
-            )
-            return count or 0
-        except SQLAlchemyError:
-            return 0
+        count = (
+            session.query(func.sum(InvoiceItemModel.quantity))
+            .filter(InvoiceItemModel.invoice_number == invoice_number)
+            .scalar()
+        )
+        return count or 0
 
-    def get_all_document_counts(self, session: Session) -> dict[str, int]:
-        try:
-            results = (
-                session.query(
-                    InvoiceItemModel.invoice_number,
-                    func.sum(InvoiceItemModel.quantity),
-                )
-                .group_by(InvoiceItemModel.invoice_number)
-                .all()
+    def get_all_document_counts(self, session: Session) -> Dict[str, int]:
+        results = (
+            session.query(
+                InvoiceItemModel.invoice_number,
+                func.sum(InvoiceItemModel.quantity),
             )
-            return {inv_num: count for inv_num, count in results}
-        except SQLAlchemyError:
-            return {}
+            .group_by(InvoiceItemModel.invoice_number)
+            .all()
+        )
+        return {inv_num: count for inv_num, count in results}
 
     def get_invoice_summary(self, session: Session) -> Optional[InvoiceSummary]:
-        try:
-            total_count = session.query(func.count(IssuedInvoiceModel.id)).scalar() or 0
-            total_amount = session.query(func.sum(IssuedInvoiceModel.total_amount)).scalar() or 0
+        total_count = session.query(func.count(IssuedInvoiceModel.id)).scalar() or 0
+        total_amount = session.query(func.sum(IssuedInvoiceModel.total_amount)).scalar() or 0
 
-            translator_stats = [
-                (translator, count)
-                for translator, count in session.query(
-                    IssuedInvoiceModel.translator, func.count(IssuedInvoiceModel.id)
-                )
-                .filter(
-                    IssuedInvoiceModel.translator.isnot(None),
-                    IssuedInvoiceModel.translator != "نامشخص",
-                )
-                .group_by(IssuedInvoiceModel.translator)
-                .all()
-            ]
-
-            return InvoiceSummary(
-                total_count=total_count,
-                total_amount=total_amount,
-                translator_stats=translator_stats,
+        translator_stats = [
+            (translator, count)
+            for translator, count in session.query(
+                IssuedInvoiceModel.translator, func.count(IssuedInvoiceModel.id)
             )
-        except SQLAlchemyError:
-            return None
-
-    def export_invoices_data(self, session: Session, invoice_numbers: list[str]) -> list[dict[str, object]]:
-        try:
-            invoices = (
-                session.query(IssuedInvoiceModel)
-                .filter(IssuedInvoiceModel.invoice_number.in_(invoice_numbers))
-                .all()
+            .filter(
+                IssuedInvoiceModel.translator.isnot(None),
+                IssuedInvoiceModel.translator != "نامشخص",
             )
-            return [
-                {
-                    "invoice_number": inv.invoice_number,
-                    "name": inv.name,
-                    "national_id": inv.national_id,
-                    "phone": inv.phone,
-                    "issue_date": inv.issue_date,
-                    "delivery_date": inv.delivery_date,
-                    "translator": inv.translator,
-                    "total_amount": inv.total_amount,
-                }
-                for inv in invoices
-            ]
-        except SQLAlchemyError:
-            return []
+            .group_by(IssuedInvoiceModel.translator)
+            .all()
+        ]
 
-    def add_invoice_edits(self, session: Session, edits: list[EditedInvoiceData]) -> bool:
+        return InvoiceSummary(
+            total_count=total_count,
+            total_amount=total_amount,
+            translator_stats=translator_stats,
+        )
+
+    def export_invoices_data(self, session: Session, invoice_numbers: List[str]) -> List[dict]:
+        invoices = (
+            session.query(IssuedInvoiceModel)
+            .filter(IssuedInvoiceModel.invoice_number.in_(invoice_numbers))
+            .all()
+        )
+        return [
+            {
+                "invoice_number": inv.invoice_number,
+                "name": inv.name,
+                "national_id": inv.national_id,
+                "phone": inv.phone,
+                "issue_date": inv.issue_date,
+                "delivery_date": inv.delivery_date,
+                "translator": inv.translator,
+                "total_amount": inv.total_amount,
+            }
+            for inv in invoices
+        ]
+
+    def add_invoice_edits(self, session: Session, edits: List[EditedInvoiceData]) -> bool:
         try:
             orm_edits = [
                 EditedInvoiceModel(
@@ -270,78 +249,69 @@ class BusinessRepository:
             session.bulk_save_objects(orm_edits)
             session.commit()
             return True
-        except SQLAlchemyError:
+        except Exception:
             session.rollback()
             return False
 
-    def get_edit_history_by_invoice_number(self, session: Session, invoice_number: str) -> list[EditedInvoiceData]:
-        try:
-            history_orm = (
-                session.query(EditedInvoiceModel)
-                .filter(EditedInvoiceModel.invoice_number == invoice_number)
-                .order_by(EditedInvoiceModel.edited_at.desc())
-                .all()
-            )
-            return [item.to_dataclass() for item in history_orm]
-        except SQLAlchemyError:
-            return []
+    def get_edit_history_by_invoice_number(self, session: Session, invoice_number: str) -> List[EditedInvoiceData]:
+        history_orm = (
+            session.query(EditedInvoiceModel)
+            .filter(EditedInvoiceModel.invoice_number == invoice_number)
+            .order_by(EditedInvoiceModel.edited_at.desc())
+            .all()
+        )
+        return [item.to_dataclass() for item in history_orm]
 
-    def get_all_deleted_invoices(self, session: Session) -> list[DeletedInvoiceData]:
-        try:
-            invoices = (
-                session.query(DeletedInvoiceModel)
-                .order_by(DeletedInvoiceModel.deleted_at.desc())
-                .all()
-            )
-            return [invoice.to_dataclass() for invoice in invoices]
-        except SQLAlchemyError:
-            return []
+    def get_all_deleted_invoices(self, session: Session) -> List[DeletedInvoiceData]:
+        invoices = (
+            session.query(DeletedInvoiceModel)
+            .order_by(DeletedInvoiceModel.deleted_at.desc())
+            .all()
+        )
+        return [invoice.to_dataclass() for invoice in invoices]
 
     # ────────────────────────────────────────────────────────────── #
     #                             USERS                              #
     # ────────────────────────────────────────────────────────────── #
 
     def get_user_with_employee_details(
-        self,
-        users_session: Session,
-        payroll_session: Session,
-        username: str
-    ) -> dict[str, object] | None:
-        try:
-            user = users_session.query(UsersModel).filter(
-                UsersModel.username == username
-            ).first()
+            self,
+            users_session: Session,
+            payroll_session: Session,
+            username: str
+    ) -> Optional[dict]:
 
-            if not user:
-                return None
+        user = users_session.query(UsersModel).filter(
+            UsersModel.username == username
+        ).first()
 
-            employee = None
-            if user.employee_id:
-                employee = payroll_session.query(EmployeeModel).filter(
-                    EmployeeModel.employee_id == user.employee_id
-                ).first()
-
-            return {
-                'username': user.username,
-                'role': user.role,
-                'active': user.active,
-                'display_name': user.display_name,
-                'avatar_path': user.avatar_path,
-                'employee_id': user.employee_id,
-                'employee_name': employee.full_name if employee else None,
-                'email': employee.email if employee else None,
-                'phone': employee.phone_number if employee else None,
-                'national_id': employee.national_id if employee else None,
-            }
-        except SQLAlchemyError as e:
-            print(f"Error getting user {username}: {e}")
+        if not user:
             return None
 
+        employee = None
+        if user.employee_id:
+            employee = payroll_session.query(EmployeeModel).filter(
+                EmployeeModel.employee_id == user.employee_id
+            ).first()
+
+        return {
+            'username': user.username,
+            'role': user.role,
+            'active': user.active,
+            'display_name': user.display_name,
+            'avatar_path': user.avatar_path,
+            'employee_id': user.employee_id,
+            'employee_name': employee.full_name if employee else None,
+            'email': employee.email if employee else None,
+            'phone': employee.phone_number if employee else None,
+            'national_id': employee.national_id if employee else None,
+        }
+
     def update_display_name(
-        self,
-        users_session: Session,
-        username: str,
-        new_display_name: str
+            self,
+            users_session: Session,
+            username: str,
+            new_display_name: str
     ) -> bool:
         try:
             user = users_session.query(UsersModel).filter(
@@ -353,7 +323,7 @@ class BusinessRepository:
                 users_session.commit()
                 return True
             return False
-        except SQLAlchemyError:
+        except Exception:
             users_session.rollback()
             return False
 
@@ -361,22 +331,19 @@ class BusinessRepository:
 class PayrollRepository:
     """
     Repository for payroll-related database operations.
-    This class should contain no business logic, only raw data operations.
     """
-    def get_translator_names(self, payroll_session: Session) -> list[str]:
+
+    def get_translator_names(self, payroll_session: Session) -> List[str]:
         """
         Get a list of translator names from the payroll database.
-        Fetches full names of active employees with the 'translator' role.
         """
         translator_names = ["نامشخص"]
         try:
-            # Query active employees who have the 'translator' role
             translators = (
                 payroll_session.query(EmployeeModel)
                 .join(EmployeeRoleModel, EmployeeModel.role_id == EmployeeRoleModel.role_id)
                 .filter(
                     EmployeeRoleModel.role_name_en == 'translator',
-                    # Assuming we only want current employees
                     EmployeeModel.termination_date.is_(None)
                 )
                 .all()
@@ -386,12 +353,9 @@ class PayrollRepository:
                 if translator.full_name:
                     translator_names.append(translator.full_name)
 
-        except SQLAlchemyError as e:
-            print(f"Error loading translator names from payroll DB: {e}")
-            # Fallback data in case of error
-            translator_names.extend(["مریم", "علی", "رضا"])
+        except Exception as e:
+            print(f"Error loading translator names: {e}")
 
-        # Remove duplicates and sort, keeping "نامشخص" at the top
         unique_names = sorted(list(set(translator_names) - {"نامشخص"}))
         return ["نامشخص"] + unique_names
 
@@ -408,4 +372,3 @@ class RepositoryManager:
 
     def get_payroll_repository(self) -> PayrollRepository:
         return self.payroll_repo
-

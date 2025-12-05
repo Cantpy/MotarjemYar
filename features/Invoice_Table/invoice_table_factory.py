@@ -17,23 +17,18 @@ class InvoiceTableFactory:
     Factory class for creating and wiring up the Invoice Table feature components.
     """
     @staticmethod
-    def create(invoices_engine: Engine, users_engine: Engine,
-               services_engine: Engine, payroll_engine: Engine, parent=None) -> InvoiceTableController:
+    def create(business_engine: Engine, payroll_engine: Engine, parent=None) -> InvoiceTableController:
         """
         Creates and wires up all components for the Invoice Table feature.
         Args:
-            invoices_engine: SQLAlchemy engine for the invoices database.
-            users_engine: SQLAlchemy engine for the users database.
-            services_engine: SQLAlchemy engine for the services database.
+            business_engine: SQLAlchemy engine for the business domain.
             payroll_engine: SQLAlchemy engine for the payroll database.
             parent: Optional parent widget.
         Returns:
             An initialized InvoiceTableController.
         """
-        invoices_session = ManagedSessionProvider(engine=invoices_engine)
-        users_session = ManagedSessionProvider(engine=users_engine)
-        services_session = ManagedSessionProvider(engine=services_engine)
-        payroll_session = ManagedSessionProvider(engine=payroll_engine)  # Create payroll session
+        business_session = ManagedSessionProvider(engine=business_engine)
+        payroll_session = ManagedSessionProvider(engine=payroll_engine)
 
         invoice_table_view = InvoiceTableView(parent=parent)
 
@@ -44,10 +39,8 @@ class InvoiceTableFactory:
         validation_service = ValidationService()
         search_service = SearchService()
         invoice_service = InvoiceService(repo_manager=repo_manager,
-                                        invoices_engine=invoices_session,
-                                        users_engine=users_session,
-                                        services_engine=services_session,
-                                        payroll_engine=payroll_session)
+                                         business_engine=business_session,
+                                         payroll_engine=payroll_session)
         export_service = InvoiceExportService(invoice_service=invoice_service)
         format_service = NumberFormatService()
 
@@ -74,9 +67,7 @@ if __name__ == "__main__":
     launch_feature_for_ui_test(
         factory_class=InvoiceTableFactory,
         required_engines={
-            'invoices': 'invoices_engine',
-            'users': 'users_engine',
-            'services': 'services_engine',
+            'business': 'business_engine',
             'payroll': 'payroll_engine'
         },
         use_memory_db=True
