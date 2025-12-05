@@ -7,6 +7,8 @@ from PySide6.QtGui import QColor
 from features.Home_Page.home_page_settings.home_page_settings_models import Settings, StatCardConfig
 from features.Home_Page.home_page_styles import HOME_SETTINGS_STYLES
 
+from shared.utils.persian_tools import to_persian_numbers
+
 
 class StatCardWidget(QFrame):
     """
@@ -236,10 +238,11 @@ class HomepageSettingsDialog(QDialog):
         is_valid = enabled_count % 3 == 0
 
         if is_valid:
-            self.card_count_label.setText(f"تعداد کارت‌های انتخاب شده: {enabled_count} ✓")
+            self.card_count_label.setText(f"تعداد کارت‌های انتخاب شده: {to_persian_numbers(enabled_count)} ✓")
             self.card_count_label.setStyleSheet("color: #27ae60; font-weight: bold;")
         else:
-            self.card_count_label.setText(f"تعداد کارت‌های انتخاب شده: {enabled_count} ⚠ (باید مضرب ۳ باشد)")
+            self.card_count_label.setText(
+                f"تعداد کارت‌های انتخاب شده: {to_persian_numbers(enabled_count)} ⚠ (باید مضرب ۳ باشد)")
             self.card_count_label.setStyleSheet("color: #e74c3c; font-weight: bold;")
 
     def _create_spinbox(self, min_val: int, max_val: int, current_val: int) -> QSpinBox:

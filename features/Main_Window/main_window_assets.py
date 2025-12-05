@@ -14,6 +14,7 @@ settings_icon = get_resource_path("resources", 'icons', "settings.svg")
 user_icon = get_resource_path("resources", 'icons', "user.svg")
 logout_icon = get_resource_path("resources", 'icons', "logout.svg")
 
+app_icon = get_resource_path("resources", "designs", "png-icon.png")
 
 # import qtawesome as qta
 # minimize_icon = qta.icon('fa.window-minimize')
